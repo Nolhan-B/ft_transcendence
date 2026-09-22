@@ -1,1 +1,5 @@
-   "workspaces": ["services/*", "frontend", "shared"]
+{
+  "name": "ft_transcendence",
+  "private": true,
+  "workspaces": ["services/*", "frontend", "shared"]
+}
