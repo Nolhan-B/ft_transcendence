@@ -1,9 +1,45 @@
+
 services:
   auth:
     build:
       context: ./services/auth
-      dockerfile: Dockerfiles
-    port:
+      dockerfile: Dockerfile
+    ports:
       - "3001:3001"
     volumes:
-      -
+      - ./services/auth/src:/app/src
+    environment:
+      - NODE_ENV=development
+
+  game:
+    build:
+      context: ./services/game
+      dockerfile: Dockerfile
+    ports:
+      - "3002:3002"
+    volumes:
+      - ./services/game/src:/app/src
+    environment:
+      - NODE_ENV=development
+
+  chat:
+    build:
+      context: ./services/chat
+      dockerfile: Dockerfile
+    ports: 
+      - "3003:3003"
+    volumes:
+      - ./services/chat/src:/app/src
+    environment:
+      - NODE_ENV=development
+
+  user:
+    build:
+      context: ./services/user
+      dockerfile: Dockerfile
+    ports:
+      - "3004:3004"
+    volumes:
+      - ./services/user/src:/app/src
+    environment:
+      - NODE_ENV=development
