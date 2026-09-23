@@ -1,20 +1,17 @@
+import 'dotenv/config';
 import Fastify from 'fastify';
+import jwt from '@fastify/jwt';
+import prismaPlugin from './plugins/prisma.js';
+import authRoutes from './routes/auth.js';
 
-const fastify = Fastify({
-  logger: true
+const app = Fastify({ logger: true });
+
+app.register(jwt, { secret: process.env.JWT_SECRET ?? 'dev-secret' });
+app.register(prismaPlugin);
+app.register(authRoutes);
+
+const port = Number(process.env.AUTH_PORT ?? 3001);
+app.listen({ port, host: '0.0.0.0' }).catch((err) => {
+  app.log.error(err);
+  process.exit(1);
 });
-
-fastify.get('/', async (request, reply) => {
-  return { service: 'auth', status: 'ok', message: "live reload on" };
-});
-
-const start = async () => {
-  try {
-    await fastify.listen({ port: 3001, host: '0.0.0.0' });
-  } catch (err) {
-    fastify.log.error(err);
-    process.exit(1);
-  }
-};
-
-start();
