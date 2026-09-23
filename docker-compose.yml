@@ -4,19 +4,17 @@ services:
     build:
       context: ./services/auth
       dockerfile: Dockerfile
-    ports:
-      - "3001:3001"
     volumes:
       - ./services/auth/src:/app/src
     environment:
-      - NODE_ENV=development
+      - DATABASE_URL=postgres://transcendence_user:transcendence_password@postgres:5432/transcendence_db
+    depends_on:
+      - postgres
 
   game:
     build:
       context: ./services/game
       dockerfile: Dockerfile
-    ports:
-      - "3002:3002"
     volumes:
       - ./services/game/src:/app/src
     environment:
@@ -26,8 +24,6 @@ services:
     build:
       context: ./services/chat
       dockerfile: Dockerfile
-    ports: 
-      - "3003:3003"
     volumes:
       - ./services/chat/src:/app/src
     environment:
@@ -37,9 +33,49 @@ services:
     build:
       context: ./services/user
       dockerfile: Dockerfile
-    ports:
-      - "3004:3004"
     volumes:
       - ./services/user/src:/app/src
     environment:
       - NODE_ENV=development
+
+  frontend:
+      build:
+        context: ./frontend
+        dockerfile: Dockerfile
+      volumes:
+        - ./frontend:/app
+        - /app/node_modules
+      environment:
+        - NODE_ENV=development
+
+  gateway:
+    build:
+      context: ./gateway
+      dockerfile: Dockerfile
+    ports:
+      - "8080:80"
+    depends_on:
+      - frontend
+      - auth
+      - game
+      - chat
+      - user
+
+  postgres:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: transcendence_user
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+      POSTGRES_DB: transcendence_db
+    secrets:
+      - db_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
+
+secrets:
+  db_password:
+    file: ./secrets/db_password.txt
