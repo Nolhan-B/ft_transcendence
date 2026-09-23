@@ -50,10 +50,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
           type: 'object',
           required: ['email', 'password'],
           properties: {
-            email: { type: 'string', format: 'email' },
-            password: { type: 'string', minLength: 1 },
-          },
-        },
+            email: { type: 'string', format: 'email' },password: { type: 'string', minLength: 1 },},},
       },
     },
     async (request, reply) => {
@@ -71,4 +68,13 @@ export default async function authRoutes(fastify: FastifyInstance) {
   );
 
   fastify.get('/health', async () => ({ service: 'auth', status: 'ok' }));
+
+  fastify.get('/me', async (request, reply) => {
+    await request.jwtVerify();
+    const { id } = request.user as { id: string; email: string };
+
+    const user = await authService.getMe(fastify.prisma, id);
+    if (!user) return reply.code(404).send({ error: 'User not found' });
+    return { user };
+  });
 }
