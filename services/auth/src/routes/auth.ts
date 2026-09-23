@@ -1,38 +1,74 @@
 import { FastifyInstance } from 'fastify';
 import bcrypt from 'bcrypt';
-import * as authService from '../services/auth.service.js'
+import * as authService from '../services/auth.service.js';
 
 export default async function authRoutes(fastify: FastifyInstance) {
-  fastify.post('/signup', async (request, reply) => {
-    const { email, username, password } = request.body as {
-      email: string;
-      username: string;
-      password: string;
-    };
+  fastify.post(
+    '/signup',
+    {
+      schema: {
+        body: {
+          type: 'object',
+          required: ['email', 'username', 'password'],
+          properties: {
+            email: { type: 'string', format: 'email' },
+            username: { type: 'string', minLength: 3, maxLength: 20 },
+            password: { type: 'string', minLength: 8 },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const { email, username, password } = request.body as {
+        email: string;
+        username: string;
+        password: string;
+      };
 
-    const user = await authService.signup(fastify.prisma, email, username, password);
-    const token = fastify.jwt.sign({ id: user.id, email: user.email });
-    return reply.code(201).send({ token, user });
+      try {
+        const user = await authService.signup(
+          fastify.prisma,
+          email,
+          username,
+          password,
+        );
+        const token = fastify.jwt.sign({ id: user.id, email: user.email });
+        return reply.code(201).send({ token, user });
+      } catch {
+        return reply
+          .code(409)
+          .send({ error: 'Email or username already taken' });
+      }
+    },
+  );
 
+  fastify.post(
+    '/login',
+    {
+      schema: {
+        body: {
+          type: 'object',
+          required: ['email', 'password'],
+          properties: {
+            email: { type: 'string', format: 'email' },
+            password: { type: 'string', minLength: 1 },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const { email, password } = request.body as {
+        email: string;
+        password: string;
+      };
 
-  });
+      const user = await authService.login(fastify.prisma, email, password);
+      if (!user) return reply.code(401).send({ error: 'Invalid credentials' });
 
-  fastify.post('/login', async (request, reply) => {
-    const { email, password } = request.body as {
-      email: string;
-      password: string;
-    };
-
-    const user = await fastify.prisma.user.findUnique({ where: { email } });
-    if (!user) return reply.code(401).send({ error: 'Invalid credentials' });
-
-    const valid = await bcrypt.compare(password, user.password);
-    if (!valid) return reply.code(401).send({ error: 'Invalid credentials' });
-
-    const token = fastify.jwt.sign({ id: user.id, email: user.email });
-
-    return { token, user: { id: user.id, email: user.email, username: user.username, avatarUrl: user.avatarUrl, createdAt: user.createdAt } };
-  });
+      const token = fastify.jwt.sign({ id: user.id, email: user.email });
+      return { token, user };
+    },
+  );
 
   fastify.get('/health', async () => ({ service: 'auth', status: 'ok' }));
 }

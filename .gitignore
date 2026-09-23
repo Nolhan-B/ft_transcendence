@@ -25,3 +25,12 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
+
+#from Prisma
+skills-lock.json
+.agents/
+.claude/
+.windsurf/
+
+#Prettier
+.prettierrc
