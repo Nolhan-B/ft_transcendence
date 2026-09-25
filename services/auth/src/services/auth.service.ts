@@ -1,6 +1,6 @@
 import bcrypt from 'bcrypt';
 import { PrismaClient } from '../generated/prisma/client.js';
-import type { User } from '@shared/types/user.js';
+import type { User } from 'shared';
 
 export async function signup(
   prisma: PrismaClient,

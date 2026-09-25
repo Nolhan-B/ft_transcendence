@@ -4,7 +4,7 @@ import type {
   SignupPayload,
   LoginPayload,
   TwoFactorRequiredResponse,
-} from '@shared/types/user.js';
+} from 'shared';
 
 export default async function authRoutes(fastify: FastifyInstance) {
   fastify.post(
