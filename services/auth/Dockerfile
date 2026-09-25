@@ -1,15 +1,21 @@
-FROM node:20-alpine
+FROM node:22-alpine
 
 WORKDIR /app
 
-COPY package*.json ./
+RUN apk add --no-cache netcat-openbsd
 
+COPY package*.json ./
 RUN npm install
+
+COPY prisma ./prisma
+RUN npx prisma generate
 
 COPY . .
 
-EXPOSE 3001
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
+
 
 CMD ["npm", "run", "dev"]
-
-

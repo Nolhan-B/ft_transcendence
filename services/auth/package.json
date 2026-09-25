@@ -2,7 +2,7 @@
   "name": "auth-service",
   "version": "1.0.0",
   "scripts": {
-    "dev": "tsx watch src/server.ts"
+    "dev": "npx prisma generate && tsx watch src/server.ts"
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",

@@ -34,7 +34,8 @@ export default async function authRoutes(fastify: FastifyInstance) {
         );
         const token = fastify.jwt.sign({ id: user.id, email: user.email });
         return reply.code(201).send({ token, user });
-      } catch {
+      } catch(err) {
+        request.log.error(err);
         return reply
           .code(409)
           .send({ error: 'Email or username already taken' });
