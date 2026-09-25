@@ -7,7 +7,10 @@
     "rootDir": "src",
     "strict": true,
     "esModuleInterop": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "paths": {
+      "@shared/*": ["../../shared/src/*"]
+    },
   },
   "include": ["src"]
 }

@@ -1,13 +1,13 @@
 import bcrypt from 'bcrypt';
 import { PrismaClient } from '../generated/prisma/client.js';
-import type { User } from '../../../shared/src/types/user.js';
+import type { User } from '@shared/types/user.js';
 
 export async function signup(
   prisma: PrismaClient,
   email: string,
   username: string,
   password: string,
-) {
+): Promise<Omit<User, 'twoFactorSecret' | 'twoFactorSecretEnabled'>> {
   const hashedPassword = await bcrypt.hash(password, 10);
 
   const user = await prisma.user.create({
@@ -27,7 +27,7 @@ export async function login(
   prisma: PrismaClient,
   email: string,
   password: string,
-) {
+): Promise<Omit<User, 'twoFactorSecret'> | null> {
   const user = await prisma.user.findUnique({ where: { email } });
   if (!user) return null;
 
@@ -39,6 +39,7 @@ export async function login(
     email: user.email,
     username: user.username,
     avatarUrl: user.avatarUrl,
+    twoFactorSecretEnabled: user.twoFactorSecretEnabled,
     createdAt: user.createdAt.toISOString(),
   };
 }
@@ -46,7 +47,7 @@ export async function login(
 export async function getMe(
   prisma: PrismaClient,
   id: string,
-): Promise<User | null> {
+): Promise<Omit<User, 'twoFactorSecret'> | null> {
   const user = await prisma.user.findUnique({ where: { id } });
   if (!user) return null;
 
@@ -55,6 +56,7 @@ export async function getMe(
     email: user.email,
     username: user.username,
     avatarUrl: user.avatarUrl,
-    createdAt: user.createdAt.toISOString()
+    twoFactorSecretEnabled: user.twoFactorSecretEnabled,
+    createdAt: user.createdAt.toISOString(),
   };
 }

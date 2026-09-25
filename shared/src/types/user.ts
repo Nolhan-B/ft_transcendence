@@ -6,6 +6,8 @@ export interface User {
   email: string;
   username: string;
   avatarUrl: string | null;
+  twoFactorSecret: string | null;
+  twoFactorSecretEnabled: boolean;
   createdAt: ISODateString;
 }
 
@@ -32,7 +34,16 @@ export interface LoginPayload {
   password: string;
 }
 
-export interface AuthResponse {
-  token: string;
-  user: User;
+export interface TwoFactorRequiredResponse {
+  requiresTwoFactor: true;
+  tempToken: string;
 }
+
+export interface TwoFactorValidatePayload {
+  tempToken: string;
+  code: string;
+}
+
+export type AuthResponse =
+  | { token: string; user: User }
+  | TwoFactorRequiredResponse;
