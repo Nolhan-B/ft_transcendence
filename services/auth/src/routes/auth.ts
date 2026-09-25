@@ -1,5 +1,4 @@
 import { FastifyInstance } from 'fastify';
-import bcrypt from 'bcrypt';
 import * as authService from '../services/auth.service.js';
 
 export default async function authRoutes(fastify: FastifyInstance) {
