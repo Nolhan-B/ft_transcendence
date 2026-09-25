@@ -6,10 +6,10 @@ services:
       dockerfile: Dockerfile
     volumes:
       - ./services/auth/src:/app/src
-    environment:
-      - DATABASE_URL=postgres://transcendence_user:transcendence_password@postgres:5432/transcendence_db
     depends_on:
       - postgres
+    secrets:
+      - db_password
 
   game:
     build:
@@ -60,6 +60,7 @@ services:
       - game
       - chat
       - user
+      - adminer
 
   postgres:
     image: postgres:16-alpine
@@ -72,6 +73,18 @@ services:
       - db_password
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U transcendence_user -d transcendence_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  adminer:
+    image: adminer:latest
+    restart: always
+    depends_on:
+      - postgres
+
 
 volumes:
   postgres_data:
