@@ -2,6 +2,7 @@ import { PrismaClient } from '../generated/prisma/client.js';
 import { authenticator } from '@otplib/preset-default';
 import QRCode from 'qrcode';
 import { User } from 'shared';
+import bcrypt from 'bcrypt';
 
 export async function enableTwoFactor(
   prisma: PrismaClient,
@@ -52,6 +53,37 @@ export async function verifyTwoFactor(
       createdAt: updatedUser.createdAt.toISOString(),
     };
   }
+  return null;
+}
 
+export async function disableTwoFactor(
+  prisma: PrismaClient,
+  userId: string,
+  password: string,
+  code: string,
+): Promise<Omit<User, 'twoFactorSecret'> | null> {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) return null;
+
+  const valid = await bcrypt.compare(password, user.password);
+  if (!valid) return null;
+
+  if (!user.twoFactorSecret) return null;
+
+  if (authenticator.verify({ token: code, secret: user.twoFactorSecret })) {
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: { twoFactorSecret: null, twoFactorSecretEnabled: false },
+    });
+    if (!updatedUser) return null;
+    return {
+      id: updatedUser.id,
+      email: updatedUser.email,
+      username: updatedUser.username,
+      avatarUrl: updatedUser.avatarUrl,
+      twoFactorSecretEnabled: updatedUser.twoFactorSecretEnabled,
+      createdAt: updatedUser.createdAt.toISOString(),
+    };
+  }
   return null;
 }
