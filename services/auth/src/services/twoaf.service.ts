@@ -56,6 +56,30 @@ export async function verifyTwoFactor(
   return null;
 }
 
+export async function validateTwoFactor(
+  prisma: PrismaClient,
+  userId: string,
+  code: string,
+): Promise<Omit<User, 'twoFactorSecret'> | null> {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) return null;
+
+  if (!user.twoFactorSecret) return null;
+
+  if (authenticator.verify({ token: code, secret: user.twoFactorSecret })) {
+    if (!user) return null;
+    return {
+      id: user.id,
+      email: user.email,
+      username: user.username,
+      avatarUrl: user.avatarUrl,
+      twoFactorSecretEnabled: user.twoFactorSecretEnabled,
+      createdAt: user.createdAt.toISOString(),
+    };
+  }
+  return null
+}
+
 export async function disableTwoFactor(
   prisma: PrismaClient,
   userId: string,
