@@ -89,4 +89,23 @@ export default async function authRoutes(fastify: FastifyInstance) {
     if (!user) return reply.code(404).send({ error: 'User not found' });
     return { user };
   });
+
+  fastify.delete('/account', async (request, reply) => {
+    await request.jwtVerify();
+    const { id } = request.user as { id: string };
+    const { password, code } = request.body as {
+      password: string;
+      code?: string;
+    };
+
+    const deleted = await authService.deleteAccount(
+      fastify.prisma,
+      id,
+      password,
+      code,
+    );
+    if (!deleted) return reply.code(401).send({ error: 'Invalid credentials' });
+
+    return reply.send({ message: 'Account deleted' });
+  });
 }
