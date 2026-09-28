@@ -34,6 +34,11 @@ export interface LoginPayload {
   password: string;
 }
 
+export interface TempTokenPayload {
+  id: string;
+  requires2FA: true;
+}
+
 export interface TwoFactorRequiredResponse {
   requiresTwoFactor: true;
   tempToken: string;
@@ -46,3 +51,12 @@ export interface TwoFactorValidatePayload {
 
 export type AuthResponse =
   { token: string; user: User } | TwoFactorRequiredResponse;
+
+export interface TwoFactorVerifyPayload {
+  code: string;
+}
+
+export interface TwoFactorDisablePayload {
+  password: string;
+  code: string;
+}

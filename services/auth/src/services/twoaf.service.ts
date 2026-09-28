@@ -77,7 +77,7 @@ export async function validateTwoFactor(
       createdAt: user.createdAt.toISOString(),
     };
   }
-  return null
+  return null;
 }
 
 export async function disableTwoFactor(

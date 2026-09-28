@@ -1,6 +1,11 @@
 import { FastifyInstance } from 'fastify';
 import * as twofaService from '../services/twoaf.service.js';
-import { verify } from 'otplib';
+import type {
+  TwoFactorVerifyPayload,
+  TwoFactorValidatePayload,
+  TwoFactorDisablePayload,
+  TempTokenPayload,
+} from 'shared';
 
 export default async function twofaRoutes(fastify: FastifyInstance) {
   fastify.post('/2fa/enable', async (request, reply) => {
@@ -14,7 +19,7 @@ export default async function twofaRoutes(fastify: FastifyInstance) {
   fastify.post('/2fa/verify', async (request, reply) => {
     await request.jwtVerify();
     const { id } = request.user as { id: string };
-    const { code } = request.body as { code: string };
+    const { code } = request.body as TwoFactorVerifyPayload;
 
     const user = await twofaService.verifyTwoFactor(fastify.prisma, id, code);
     if (!user) return reply.code(401).send({ error: 'Invalid code' });
@@ -23,14 +28,8 @@ export default async function twofaRoutes(fastify: FastifyInstance) {
   });
 
   fastify.post('/2fa/validate', async (request, reply) => {
-    const { tempToken, code } = request.body as {
-      tempToken: string;
-      code: string;
-    };
-    const payload = fastify.jwt.verify(tempToken) as {
-      id: string;
-      requires2FA: boolean;
-    };
+    const { tempToken, code } = request.body as TwoFactorValidatePayload;
+    const payload = fastify.jwt.verify(tempToken) as TempTokenPayload;
     if (!payload.requires2FA)
       return reply.code(401).send({ error: 'Invalid token' });
 
@@ -48,10 +47,7 @@ export default async function twofaRoutes(fastify: FastifyInstance) {
   fastify.post('/2fa/disable', async (request, reply) => {
     await request.jwtVerify();
     const { id } = request.user as { id: string };
-    const { password, code } = request.body as {
-      password: string;
-      code: string;
-    };
+    const { password, code } = request.body as TwoFactorDisablePayload;
 
     const user = await twofaService.disableTwoFactor(
       fastify.prisma,
