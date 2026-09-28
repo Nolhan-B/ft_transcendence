@@ -1,6 +1,7 @@
 import bcrypt from 'bcrypt';
 import { PrismaClient } from '../generated/prisma/client.js';
 import type { User } from 'shared';
+import { authenticator } from '@otplib/preset-default';
 
 export async function signup(
   prisma: PrismaClient,
@@ -42,6 +43,28 @@ export async function login(
     twoFactorSecretEnabled: user.twoFactorSecretEnabled,
     createdAt: user.createdAt.toISOString(),
   };
+}
+
+export async function deleteAccount(
+  prisma: PrismaClient,
+  userId: string,
+  password: string,
+  code?: string,
+): Promise<boolean> {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) return false;
+
+  const validPassword = await bcrypt.compare(password, user.password);
+  if (!validPassword) return false;
+
+  if (user.twoFactorSecretEnabled) {
+    if (!code || !user.twoFactorSecret) return false;
+    if (!authenticator.verify({ token: code, secret: user.twoFactorSecret }))
+      return false;
+  }
+
+  await prisma.user.delete({ where: { id: userId } });
+  return true;
 }
 
 export async function getMe(
