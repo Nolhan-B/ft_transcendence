@@ -11,6 +11,11 @@ export interface User {
   createdAt: ISODateString;
 }
 
+export type Profile = Omit<
+  User,
+  'email' | 'twoFactorSecret' | 'twoFactorSecretEnabled'
+>;
+
 export type PublicUser = Omit<User, 'email'>;
 
 export type OnlineStatus = 'online' | 'offline' | 'in_game';
