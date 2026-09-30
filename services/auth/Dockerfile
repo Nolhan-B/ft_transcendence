@@ -4,18 +4,17 @@ WORKDIR /app
 
 RUN apk add --no-cache netcat-openbsd
 
-COPY package*.json ./
+COPY services/auth/package*.json ./
 RUN npm install
 
-COPY prisma ./prisma
+COPY shared/prisma ./prisma
+COPY services/auth/prisma7.config.ts ./
 RUN npx prisma generate
 
-COPY . .
+COPY services/auth/ ./
 
-COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+COPY services/auth/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
-
-
 CMD ["npm", "run", "dev"]

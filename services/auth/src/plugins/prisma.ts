@@ -23,7 +23,9 @@ function getDatabaseUrl(): string {
     return process.env.DATABASE_URL;
   }
 
-  throw new Error("Impossible de se connecter : aucun secret ni variable DATABASE_URL trouvée.");
+  throw new Error(
+    'Impossible de se connecter : aucun secret ni variable DATABASE_URL trouvée.',
+  );
 }
 
 const pool = new pg.Pool({ connectionString: getDatabaseUrl() });
