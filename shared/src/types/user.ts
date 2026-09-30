@@ -44,6 +44,15 @@ export interface TempTokenPayload {
   requires2FA: true;
 }
 
+export interface JwtPayload {
+  id: string;
+  email: string;
+}
+
+export interface UpdateProfilePayload {
+  username?: string;
+}
+
 export interface TwoFactorRequiredResponse {
   requiresTwoFactor: true;
   tempToken: string;
