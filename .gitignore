@@ -40,4 +40,4 @@ skills-lock.json
 
 
 shared/src/generated/
-services/user/src/generated/services/*/src/generated/
+services/*/src/generated/
