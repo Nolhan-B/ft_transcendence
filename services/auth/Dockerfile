@@ -11,9 +11,12 @@ COPY services/auth/package*.json ./services/auth/
 # Installation ciblée pour le workspace auth + shared
 RUN npm install --workspace=auth-service --workspace=shared
 
-# Génération Prisma
-COPY services/auth/prisma ./services/auth/prisma
-RUN npx --workspace=auth-service prisma generate
+# On copie le dossier Prisma centralisé depuis shared ainsi que la config locale d'auth
+COPY shared/prisma ./shared/prisma
+COPY services/auth/prisma* ./services/auth/
+
+# Génération Prisma ciblée sur le schéma centralisé de shared
+RUN npx --workspace=auth-service prisma generate --schema=/app/shared/prisma/schema.prisma
 
 # 2. Stage Développement
 FROM base AS dev
@@ -35,11 +38,11 @@ FROM base AS builder
 COPY shared ./shared
 COPY services/auth ./services/auth
 
-# 1. On compile d'abord la lib partagée pour générer shared/dist/index.d.ts
+# Compilation de la lib partagée en premier (pour générer les types .d.ts)
 WORKDIR /app/shared
 RUN npm run build
 
-# 2. On compile ensuite auth qui peut maintenant trouver les types
+# Compilation du service auth
 WORKDIR /app/services/auth
 RUN npm run build
 RUN npm prune --omit=dev
@@ -50,13 +53,13 @@ WORKDIR /app/services/auth
 ENV NODE_ENV=production
 RUN apk add --no-cache wget
 
-# On récupère les modules de la racine (contenant les symlinks monorepo) et le dist
+# On récupère les modules compilés, les fichiers partagés et les binaires Prisma
 COPY --chown=node:node --from=builder /app/node_modules /app/node_modules
 COPY --chown=node:node --from=builder /app/shared /app/shared
 COPY --chown=node:node --from=builder /app/services/auth/dist ./dist
-COPY --chown=node:node --from=builder /app/services/auth/prisma ./prisma
+COPY --chown=node:node --from=builder /app/services/auth/prisma* ./
 COPY --chown=node:node --from=builder /app/services/auth/package*.json ./
 
 USER node
-EXPOSE 3000
+EXPOSE 3001
 CMD ["node", "dist/server.js"]
