@@ -5,6 +5,8 @@ import profileRoutes from './routes/profiles.js';
 import fs from 'node:fs';
 import process from 'node:process';
 import multipart from '@fastify/multipart';
+import staticPlugin from '@fastify/static';
+import path from 'path';
 
 if (fs.existsSync('/run/secrets/db_url')) {
   process.env.DATABASE_URL = fs
@@ -12,6 +14,11 @@ if (fs.existsSync('/run/secrets/db_url')) {
     .trim();
 }
 const fastify = Fastify({ logger: true });
+
+fastify.register(staticPlugin, {
+  root: path.join(process.cwd(), 'uploads'),
+  prefix: '/uploads/',
+});
 
 fastify.register(prismaPlugin);
 fastify.register(multipart, { limits: { fileSize: 5 * 1024 * 1024 } }); // 5MB max
