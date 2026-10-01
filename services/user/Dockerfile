@@ -8,7 +8,7 @@ RUN npm install
 
 COPY services/user/ ./
 
-COPY shared/prisma/schema.prisma ./prisma/schema.prisma
+COPY shared/prisma ./shared/prisma
 
 RUN npx prisma generate
 

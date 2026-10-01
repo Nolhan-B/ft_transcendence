@@ -20,7 +20,10 @@ function getDatabaseUrl(): string {
     );
     return `postgresql://transcendence_user:${password}@postgres:5432/transcendence_db?schema=public`;
   }
-  throw new Error("No database configuration found");
+    if (process.env["DATABASE_URL"]) {
+    return process.env["DATABASE_URL"];
+  }
+  return "postgresql://build:build@postgres:5432/build?schema=public";
 }
 
 export default defineConfig({

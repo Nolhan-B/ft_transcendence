@@ -1,22 +1,22 @@
 import "dotenv/config";
 import fs from "node:fs";
-
 import { defineConfig } from "prisma/config";
 
-// Fonction pour récupérer la DB_URL depuis le secret Docker ou l'environnement
 function getDatabaseUrl(): string | undefined {
-  const secretPath = "/run/secrets/db_url";
-  if (fs.existsSync(secretPath)) {
-    return fs.readFileSync(secretPath, "utf-8").trim();
+  if (fs.existsSync("/run/secrets/db_password")) {
+    const password = encodeURIComponent(
+      fs.readFileSync("/run/secrets/db_password", "utf-8").trim()
+    );
+    return `postgresql://transcendence_user:${password}@postgres:5432/transcendence_db?schema=public`;
+  }
+  if (fs.existsSync("/run/secrets/db_url")) {
+    return fs.readFileSync("/run/secrets/db_url", "utf-8").trim();
   }
   return process.env["DATABASE_URL"];
 }
 
 export default defineConfig({
-  schema: "prisma/schema.prisma",
-  migrations: {
-    path: "prisma/migrations",
-  },
+  schema: "shared/prisma/schema.prisma",
   datasource: {
     url: getDatabaseUrl(),
   },
