@@ -79,7 +79,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
     },
   );
 
-  fastify.get('/health', async () => ({ service: 'auth', status: 'ok' }));
+  fastify.get('/health', { logLevel: 'silent' }, async () => ({ service: 'auth', status: 'ok' }));
 
   fastify.get('/me', async (request, reply) => {
     await request.jwtVerify();

@@ -43,3 +43,24 @@ export async function updateProfile(
     createdAt: updatedUser.createdAt.toISOString(),
   };
 }
+
+export async function updateAvatar(
+  prisma: PrismaClient,
+  id: string,
+  avatarUrl: string,
+): Promise<Profile | null> {
+  const user = await prisma.user.findUnique({ where: { id } });
+  if (!user) return null;
+
+  const updatedUser = await prisma.user.update({
+    where: { id },
+    data: { avatarUrl },
+  });
+
+  return {
+    id: updatedUser.id,
+    username: updatedUser.username,
+    avatarUrl: updatedUser.avatarUrl,
+    createdAt: updatedUser.createdAt.toISOString(),
+  };
+}

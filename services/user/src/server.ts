@@ -1,19 +1,42 @@
-import 'dotenv/config';
 import Fastify from 'fastify';
 import prismaPlugin from './plugins/prisma.js';
 import jwt from '@fastify/jwt';
 import profileRoutes from './routes/profiles.js';
+import fs from 'node:fs';
+import process from 'node:process';
+import multipart from '@fastify/multipart';
 
-const app = Fastify({ logger: true });
+if (fs.existsSync('/run/secrets/db_url')) {
+  process.env.DATABASE_URL = fs
+    .readFileSync('/run/secrets/db_url', 'utf-8')
+    .trim();
+}
+const fastify = Fastify({ logger: true });
 
-app.register(prismaPlugin);
-app.register(jwt, { secret: process.env.JWT_SECRET ?? 'dev-secret' });
-app.register(profileRoutes);
+fastify.register(prismaPlugin);
+fastify.register(multipart, { limits: { fileSize: 5 * 1024 * 1024 } }); // 5MB max
+fastify.register(jwt, { secret: process.env.JWT_SECRET ?? 'dev-secret' });
+fastify.register(profileRoutes);
 
-app.get('/health', async () => ({ service: 'user', status: 'ok' }));
+fastify.get('/health', async () => ({ service: 'user', status: 'ok' }));
 
 const port = Number(process.env.USER_PORT ?? 3004);
-app.listen({ port, host: '0.0.0.0' }).catch((err) => {
-  app.log.error(err);
+fastify.listen({ port, host: '0.0.0.0' }).catch((err) => {
+  fastify.log.error(err);
   process.exit(1);
 });
+
+fastify.get('/', async () => {
+  return { service: 'user', status: 'ok' };
+});
+
+const start = async () => {
+  try {
+    await fastify.listen({ port: 3004, host: '0.0.0.0' });
+  } catch (err) {
+    fastify.log.error(err);
+    process.exit(1);
+  }
+};
+
+start();
