@@ -4,6 +4,10 @@ const fastify = Fastify({
   logger: true
 });
 
+fastify.get('/health', {
+  logLevel: 'silent'
+}, async () => ({ service: 'game', status: 'ok' }));
+
 fastify.get('/', async () => {
   return { service: 'game', status: 'ok' };
 });

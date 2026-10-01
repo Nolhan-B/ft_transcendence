@@ -1,8 +1,19 @@
 import Fastify from 'fastify';
+import fs from 'node:fs';
+import process from 'node:process'
+
+if (fs.existsSync('/run/secrets/db_url')) {
+  process.env.DATABASE_URL = fs.readFileSync('/run/secrets/db_url', 'utf-8').trim();
+}
 
 const fastify = Fastify({
   logger: true
 });
+
+fastify.get('/health', {
+  logLevel: 'silent'
+}, async () => ({ service: 'user', status: 'ok'}));
+
 
 fastify.get('/', async () => {
   return { service: 'user', status: 'ok' };

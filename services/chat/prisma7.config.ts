@@ -1,5 +1,6 @@
 import "dotenv/config";
 import fs from "node:fs";
+
 import { defineConfig } from "prisma/config";
 
 // Fonction pour récupérer la DB_URL depuis le secret Docker ou l'environnement

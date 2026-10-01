@@ -32,3 +32,4 @@ model Friendship {
 
   @@unique([userId, friendId])
 }
+
