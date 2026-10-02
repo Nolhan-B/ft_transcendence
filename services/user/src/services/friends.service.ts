@@ -6,39 +6,69 @@ export async function getFriends(
   prisma: PrismaClient,
   userId: string,
 ): Promise<Profile[]> {
-  if (!userId) return [];
+  const sent = await getSent(prisma, userId, FriendshipStatus.ACCEPTED);
+  const received = await getReceived(prisma, userId, FriendshipStatus.ACCEPTED);
+  return [...sent, ...received];
+}
 
-  const sent = await prisma.friendship.findMany({
-    where: { userId: userId, status: FriendshipStatus.ACCEPTED },
+export async function getReceivedPendingRequests(
+  prisma: PrismaClient,
+  userId: string,
+): Promise<Profile[]> {
+  return getReceived(prisma, userId, FriendshipStatus.PENDING);
+}
+
+export async function getSentPendingRequests(
+  prisma: PrismaClient,
+  userId: string,
+): Promise<Profile[]> {
+  return getSent(prisma, userId, FriendshipStatus.PENDING);
+}
+
+////// fonction helpeuse
+
+async function getSent(
+  prisma: PrismaClient,
+  userId: string,
+  status: FriendshipStatus,
+): Promise<Profile[]> {
+  const results = await prisma.friendship.findMany({
+    where: { userId, status },
     include: {
       friend: {
         select: { id: true, username: true, avatarUrl: true, createdAt: true },
       },
     },
   });
+  return results.map((f) => mapToProfile(f.friend));
+}
 
-  const sentProfiles = sent.map((f) => ({
-    id: f.friend.id,
-    username: f.friend.username,
-    avatarUrl: f.friend.avatarUrl,
-    createdAt: f.friend.createdAt.toISOString(),
-  }));
-
-  const received = await prisma.friendship.findMany({
-    where: { friendId: userId, status: FriendshipStatus.ACCEPTED },
+async function getReceived(
+  prisma: PrismaClient,
+  userId: string,
+  status: FriendshipStatus,
+): Promise<Profile[]> {
+  const results = await prisma.friendship.findMany({
+    where: { friendId: userId, status },
     include: {
       user: {
         select: { id: true, username: true, avatarUrl: true, createdAt: true },
       },
     },
   });
+  return results.map((f) => mapToProfile(f.user));
+}
 
-  const receivedProfiles = received.map((f) => ({
-    id: f.user.id,
-    username: f.user.username,
-    avatarUrl: f.user.avatarUrl,
-    createdAt: f.user.createdAt.toISOString(),
-  }));
-
-  return [...sentProfiles, ...receivedProfiles];
+function mapToProfile(user: {
+  id: string;
+  username: string;
+  avatarUrl: string | null;
+  createdAt: Date;
+}): Profile {
+  return {
+    id: user.id,
+    username: user.username,
+    avatarUrl: user.avatarUrl,
+    createdAt: user.createdAt.toISOString(),
+  };
 }
