@@ -48,6 +48,37 @@ export async function sendFriendRequest(
   };
 }
 
+export async function acceptFriendRequest(
+  prisma: PrismaClient,
+  userId: string,
+  friendId: string,
+): Promise<Friendship | null> {
+  if (!userId || !friendId) return null;
+
+  const friendship = await prisma.friendship.findUnique({
+    where: { userId_friendId: { friendId, userId } },
+  });
+
+  if (!friendship) return null;
+
+  if (friendship.status == FriendshipStatus.ACCEPTED) return null;
+
+  const updatedFriendship = await prisma.friendship.update({
+    where: { id: friendship.id },
+    data: { status: FriendshipStatus.ACCEPTED },
+  });
+
+  if (!updatedFriendship) return null;
+
+  return {
+    id: updatedFriendship.id,
+    userId: updatedFriendship.userId,
+    friendId: updatedFriendship.friendId,
+    status: updatedFriendship.status as FriendshipStatus,
+    createdAt: updatedFriendship.createdAt.toISOString(),
+  };
+}
+
 ////// fonction helpeuse
 
 async function getSent(

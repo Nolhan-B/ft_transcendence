@@ -35,6 +35,6 @@ model Friendship {
   user      User @relation("sentRequests", fields: [userId], references: [id], onDelete: Cascade)
   friend    User @relation("receivedRequests", fields: [friendId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, friendId])
+  @@unique([userId, friendId], name: "userId_friendId")
 }
 
