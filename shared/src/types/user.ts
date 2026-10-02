@@ -74,3 +74,8 @@ export interface TwoFactorDisablePayload {
   password: string;
   code: string;
 }
+
+export enum FriendshipStatus {
+  PENDING = 'pending',
+  ACCEPTED = 'accepted',
+}
