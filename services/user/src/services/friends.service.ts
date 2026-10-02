@@ -1,4 +1,3 @@
-import { DbNullClass } from '@prisma/client/runtime/client';
 import { PrismaClient } from '../generated/prisma/client.js';
 import type { Profile, Friendship } from 'shared';
 import { FriendshipStatus } from 'shared';
@@ -77,6 +76,28 @@ export async function acceptFriendRequest(
     status: updatedFriendship.status as FriendshipStatus,
     createdAt: updatedFriendship.createdAt.toISOString(),
   };
+}
+
+export async function deleteFriendRequest(
+  prisma: PrismaClient,
+  userId: string,
+  friendId: string,
+): Promise<boolean> {
+  if (!userId || !friendId) return false;
+
+  const friendship = await prisma.friendship.findFirst({
+    where: {
+      OR: [
+        { userId: userId, friendId: friendId },
+        { userId: friendId, friendId: userId },
+      ],
+    },
+  });
+  if (!friendship) return false;
+
+  await prisma.friendship.delete({ where: { id: friendship.id } });
+
+  return true;
 }
 
 ////// fonction helpeuse

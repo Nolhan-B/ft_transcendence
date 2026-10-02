@@ -63,4 +63,21 @@ export default async function friendsRoutes(fastify: FastifyInstance) {
 
     return reply.send({ friendship });
   });
+
+  fastify.delete('/friends/:id', async (request, reply) => {
+    await request.jwtVerify();
+    const { id: userId } = request.user as JwtPayload;
+    const { id: friendId } = request.params as { id: string };
+
+    const deleted = await friendsService.deleteFriendRequest(
+      fastify.prisma,
+      userId,
+      friendId,
+    );
+
+    if (!deleted)
+      return reply.code(404).send({ error: 'Friendship not found' });
+
+    return reply.send({ message: 'Friendship deleted' });
+  });
 }
