@@ -1,5 +1,5 @@
 import bcrypt from 'bcrypt';
-import { PrismaClient } from '../generated/prisma/client.js';
+import { PrismaClient } from '../../../../shared/src/generated/prisma/client.js';
 import type { User } from 'shared';
 import { authenticator } from '@otplib/preset-default';
 

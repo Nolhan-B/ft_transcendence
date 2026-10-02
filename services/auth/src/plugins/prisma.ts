@@ -2,7 +2,7 @@ import fp from 'fastify-plugin';
 import fs from 'node:fs';
 import pg from 'pg';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient } from "../../shared/src/generated/prisma/client.js";
+import { PrismaClient } from "../../../../shared/src/generated/prisma/client.js";
 
 // Fonction pour récupérer l'URL de connexion sécurisée
 function getDatabaseUrl(): string {

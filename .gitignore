@@ -39,3 +39,6 @@ skills-lock.json
 .prettierrc
 shared/src/generated/
 services/*/src/generated/
+
+generated/
+shared/src/generated/
