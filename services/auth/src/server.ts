@@ -7,7 +7,6 @@ import twofaRoutes from './routes/twoaf.js';
 import fs from 'node:fs';
 import process from 'node:process';
 
-
 if (fs.existsSync('/run/secrets/db_url')) {
   process.env.DATABASE_URL = fs.readFileSync('/run/secrets/db_url', 'utf-8').trim();
 }
