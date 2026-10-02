@@ -11,6 +11,11 @@ export interface User {
   createdAt: ISODateString;
 }
 
+export type Profile = Omit<
+  User,
+  'email' | 'twoFactorSecret' | 'twoFactorSecretEnabled'
+>;
+
 export type PublicUser = Omit<User, 'email'>;
 
 export type OnlineStatus = 'online' | 'offline' | 'in_game';
@@ -39,6 +44,15 @@ export interface TempTokenPayload {
   requires2FA: true;
 }
 
+export interface JwtPayload {
+  id: string;
+  email: string;
+}
+
+export interface UpdateProfilePayload {
+  username?: string;
+}
+
 export interface TwoFactorRequiredResponse {
   requiresTwoFactor: true;
   tempToken: string;
@@ -59,4 +73,9 @@ export interface TwoFactorVerifyPayload {
 export interface TwoFactorDisablePayload {
   password: string;
   code: string;
+}
+
+export enum FriendshipStatus {
+  PENDING = 'pending',
+  ACCEPTED = 'accepted',
 }
