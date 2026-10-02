@@ -23,4 +23,16 @@ export default async function friendsRoutes(fastify: FastifyInstance) {
 
     return reply.send({ receivedRequests });
   });
+
+  fastify.get('/friends/requests/sent', async (request, reply) => {
+    await request.jwtVerify();
+    const { id } = request.user as JwtPayload;
+
+    const receivedRequests = await friendsService.getSentPendingRequests(
+      fastify.prisma,
+      id,
+    );
+
+    return reply.send({ receivedRequests });
+  });
 }
