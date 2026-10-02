@@ -1,5 +1,6 @@
+import { DbNullClass } from '@prisma/client/runtime/client';
 import { PrismaClient } from '../generated/prisma/client.js';
-import type { Profile } from 'shared';
+import type { Profile, Friendship } from 'shared';
 import { FriendshipStatus } from 'shared';
 
 export async function getFriends(
@@ -23,6 +24,28 @@ export async function getSentPendingRequests(
   userId: string,
 ): Promise<Profile[]> {
   return getSent(prisma, userId, FriendshipStatus.PENDING);
+}
+
+export async function sendFriendRequest(
+  prisma: PrismaClient,
+  userId: string,
+  friendId: string,
+): Promise<Friendship | null> {
+  if (!userId || !friendId) return null;
+
+  const friendship = await prisma.friendship.create({
+    data: { userId, friendId },
+  });
+
+  if (!friendship) return null;
+
+  return {
+    id: friendship.id,
+    userId: friendship.userId,
+    friendId: friendship.friendId,
+    status: friendship.status as FriendshipStatus,
+    createdAt: friendship.createdAt.toISOString(),
+  };
 }
 
 ////// fonction helpeuse
