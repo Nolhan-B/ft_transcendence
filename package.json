@@ -1,5 +1,17 @@
 {
   "name": "ft_transcendence",
   "private": true,
-  "workspaces": ["services/*", "frontend", "shared"]
+  "scripts": {
+    "lint": "eslint . --max-warnings=0"
+  },
+  "workspaces": [
+    "services/*",
+    "frontend",
+    "shared"
+  ],
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.11.0",
+    "typescript-eslint": "^8.71.0"
+  }
 }
