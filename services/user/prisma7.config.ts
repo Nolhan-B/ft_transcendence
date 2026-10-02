@@ -16,7 +16,7 @@ function getDatabaseUrl(): string | undefined {
 }
 
 export default defineConfig({
-  schema: '/app/shared/prisma/schema.prisma',
+  schema: 'shared/prisma/schema.prisma',
   datasource: {
     url: getDatabaseUrl(),
   },
