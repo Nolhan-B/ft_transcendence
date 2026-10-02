@@ -58,6 +58,12 @@ export default async function profileRoutes(fastify: FastifyInstance) {
     const filename = `${id}-${Date.now()}${ext}`;
     const filepath = path.join(process.cwd(), 'uploads', 'avatars', filename);
 
+    const currentUser = await fastify.prisma.user.findUnique({ where: { id } });
+    if (currentUser?.avatarUrl) {
+      const oldPath = path.join(process.cwd(), currentUser.avatarUrl);
+      fs.unlink(oldPath, () => {});
+    }
+
     await pipeline(file.file, fs.createWriteStream(filepath));
 
     const profile = await profileService.updateAvatar(
