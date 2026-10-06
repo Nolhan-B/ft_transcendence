@@ -67,7 +67,6 @@ export async function validateTwoFactor(
   if (!user.twoFactorSecret) return null;
 
   if (authenticator.verify({ token: code, secret: user.twoFactorSecret })) {
-    if (!user) return null;
     return {
       id: user.id,
       email: user.email,
