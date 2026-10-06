@@ -35,8 +35,9 @@ export default async function authRoutes(fastify: FastifyInstance) {
         );
         const token = fastify.jwt.sign({ id: user.id, email: user.email });
         return reply.code(201).send({ token, user });
-      } catch (err: any) {
-        if (err?.code === 'P2002') {
+      } catch (err: unknown) {
+        const prismaError = err as { code?: string };
+        if (prismaError.code === 'P2002') {
           return reply
             .code(409)
             .send({ error: 'Email or username already taken' });
