@@ -4,6 +4,7 @@ import type {
   SignupPayload,
   LoginPayload,
   TwoFactorRequiredResponse,
+  JwtPayload,
 } from 'shared';
 
 export default async function authRoutes(fastify: FastifyInstance) {
@@ -34,11 +35,15 @@ export default async function authRoutes(fastify: FastifyInstance) {
         );
         const token = fastify.jwt.sign({ id: user.id, email: user.email });
         return reply.code(201).send({ token, user });
-      } catch (err) {
+      } catch (err: unknown) {
+        const prismaError = err as { code?: string };
+        if (prismaError.code === 'P2002') {
+          return reply
+            .code(409)
+            .send({ error: 'Email or username already taken' });
+        }
         request.log.error(err);
-        return reply
-          .code(409)
-          .send({ error: 'Email or username already taken' });
+        return reply.code(500).send({ error: 'Internal server error' });
       }
     },
   );
@@ -79,11 +84,14 @@ export default async function authRoutes(fastify: FastifyInstance) {
     },
   );
 
-  fastify.get('/health', { logLevel: 'silent' }, async () => ({ service: 'auth', status: 'ok' }));
+  fastify.get('/health', { logLevel: 'silent' }, async () => ({
+    service: 'auth',
+    status: 'ok',
+  }));
 
   fastify.get('/me', async (request, reply) => {
     await request.jwtVerify();
-    const { id } = request.user as { id: string; email: string };
+    const { id } = request.user as JwtPayload;
 
     const user = await authService.getMe(fastify.prisma, id);
     if (!user) return reply.code(404).send({ error: 'User not found' });
@@ -92,7 +100,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
 
   fastify.delete('/account', async (request, reply) => {
     await request.jwtVerify();
-    const { id } = request.user as { id: string };
+    const { id } = request.user as JwtPayload;
     const { password, code } = request.body as {
       password: string;
       code?: string;
@@ -104,7 +112,8 @@ export default async function authRoutes(fastify: FastifyInstance) {
       password,
       code,
     );
-    if (!deleted) return reply.code(401).send({ error: 'Invalid credentials' });
+    if (!deleted)
+      return reply.code(401).send({ error: 'Invalid password or 2FA code' });
 
     return reply.send({ message: 'Account deleted' });
   });

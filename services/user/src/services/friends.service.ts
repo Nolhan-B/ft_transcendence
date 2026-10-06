@@ -1,5 +1,10 @@
 import { PrismaClient } from '../generated/prisma/client.js';
-import type { Profile, Friendship } from 'shared';
+import type {
+  Profile,
+  Friendship,
+  FriendshipWithFriend,
+  FriendshipWithUser,
+} from 'shared';
 import { FriendshipStatus } from 'shared';
 
 export async function getFriends(
@@ -60,7 +65,7 @@ export async function acceptFriendRequest(
 
   if (!friendship) return null;
 
-  if (friendship.status == FriendshipStatus.ACCEPTED) return null;
+  if (friendship.status === FriendshipStatus.ACCEPTED) return null;
 
   const updatedFriendship = await prisma.friendship.update({
     where: { id: friendship.id },
@@ -73,7 +78,7 @@ export async function acceptFriendRequest(
     id: updatedFriendship.id,
     userId: updatedFriendship.userId,
     friendId: updatedFriendship.friendId,
-    status: updatedFriendship.status as FriendshipStatus,
+    status: updatedFriendship.status,
     createdAt: updatedFriendship.createdAt.toISOString(),
   };
 }
@@ -115,7 +120,7 @@ async function getSent(
       },
     },
   });
-  return results.map((f) => mapToProfile(f.friend));
+  return results.map((f: FriendshipWithFriend) => mapToProfile(f.friend));
 }
 
 async function getReceived(
@@ -131,7 +136,7 @@ async function getReceived(
       },
     },
   });
-  return results.map((f) => mapToProfile(f.user));
+  return results.map((f: FriendshipWithUser) => mapToProfile(f.user));
 }
 
 function mapToProfile(user: {
