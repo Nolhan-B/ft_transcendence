@@ -18,13 +18,21 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
 
       - name: Install dependencies
         run: npm ci
 
       - name: Run ESLint
         run: npm run lint
+
+  security:
+    name: Check Secrets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
 
   docker-build:
     name: Build & Validate Docker Stack
@@ -59,6 +67,20 @@ jobs:
             done
           '
           echo "All services are up and healthy!"
+
+      - name: Test User Signup via Gateway E2E
+        run: |
+          STATUS_CODE=$(curl -s -o response.json -w "%{http_code}" -X POST http://127.0.0.1:8080/api/auth/signup \
+            -H "Content-Type: application/json" \
+            -d '{"email":"ci_bot@test.com","username":"cibot","password":"securepassword123"}')
+
+          echo "HTTP Status Code: $STATUS_CODE"
+          cat response.json
+
+          if [ "$STATUS_CODE" -ne 201 ]; then
+            echo "INSCRIPTION FAILED WITH HTTP CODE $STATUS_CODE"
+            exit 1
+          fi
 
       - name: Dump Docker logs on failure
         if: failure()
