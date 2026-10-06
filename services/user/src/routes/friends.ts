@@ -28,12 +28,12 @@ export default async function friendsRoutes(fastify: FastifyInstance) {
     await request.jwtVerify();
     const { id } = request.user as JwtPayload;
 
-    const receivedRequests = await friendsService.getSentPendingRequests(
+    const sentRequests = await friendsService.getSentPendingRequests(
       fastify.prisma,
       id,
     );
 
-    return reply.send({ receivedRequests });
+    return reply.send({ sentRequests });
   });
 
   fastify.post("/friends/request/:id", async (request, reply) => {
@@ -41,13 +41,16 @@ export default async function friendsRoutes(fastify: FastifyInstance) {
     const { id: userId } = request.user as JwtPayload;
     const { id: friendId } = request.params as { id: string };
 
-    const receivedRequests = await friendsService.sendFriendRequest(
+    const friendship = await friendsService.sendFriendRequest(
       fastify.prisma,
       userId,
       friendId,
     );
 
-    return reply.send({ receivedRequests });
+    if (!friendship)
+      return reply.code(400).send({ error: "Could not send friend request" });
+
+    return reply.send({ friendship });
   });
 
   fastify.post("/friends/accept/:id", async (request, reply) => {
@@ -60,6 +63,9 @@ export default async function friendsRoutes(fastify: FastifyInstance) {
       userId,
       friendId,
     );
+
+    if (!friendship)
+      return reply.code(404).send({ error: "Friend request not found" });
 
     return reply.send({ friendship });
   });

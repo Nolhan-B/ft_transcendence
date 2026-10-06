@@ -24,7 +24,7 @@ export interface Friendship {
   id: UUID;
   userId: UUID;
   friendId: UUID;
-  status: "pending" | "accepted";
+  status: FriendshipStatus;
   createdAt: ISODateString;
 }
 
@@ -79,3 +79,21 @@ export enum FriendshipStatus {
   PENDING = "pending",
   ACCEPTED = "accepted",
 }
+
+export type FriendshipWithFriend = {
+  friend: {
+    id: string;
+    username: string;
+    avatarUrl: string | null;
+    createdAt: Date;
+  };
+};
+
+export type FriendshipWithUser = {
+  user: {
+    id: string;
+    username: string;
+    avatarUrl: string | null;
+    createdAt: Date;
+  };
+};

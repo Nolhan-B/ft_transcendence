@@ -2,7 +2,7 @@
   "name": "ft_transcendence",
   "private": true,
   "scripts": {
-    "lint": "eslint . --max-warnings=0"
+    "lint": "eslint . --max-warnings=0 && npx prettier --check ."
   },
   "workspaces": [
     "services/*",
