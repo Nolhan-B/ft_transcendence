@@ -5,12 +5,13 @@ import type {
   TwoFactorValidatePayload,
   TwoFactorDisablePayload,
   TempTokenPayload,
+  JwtPayload,
 } from 'shared';
 
 export default async function twofaRoutes(fastify: FastifyInstance) {
   fastify.post('/2fa/enable', async (request, reply) => {
     await request.jwtVerify();
-    const { id } = request.user as { id: string };
+    const { id } = request.user as JwtPayload;
 
     const qrCode = await twofaService.enableTwoFactor(fastify.prisma, id);
     return reply.send({ qrCode });
@@ -18,7 +19,7 @@ export default async function twofaRoutes(fastify: FastifyInstance) {
 
   fastify.post('/2fa/verify', async (request, reply) => {
     await request.jwtVerify();
-    const { id } = request.user as { id: string };
+    const { id } = request.user as JwtPayload;
     const { code } = request.body as TwoFactorVerifyPayload;
 
     const user = await twofaService.verifyTwoFactor(fastify.prisma, id, code);
@@ -46,7 +47,7 @@ export default async function twofaRoutes(fastify: FastifyInstance) {
 
   fastify.post('/2fa/disable', async (request, reply) => {
     await request.jwtVerify();
-    const { id } = request.user as { id: string };
+    const { id } = request.user as JwtPayload;
     const { password, code } = request.body as TwoFactorDisablePayload;
 
     const user = await twofaService.disableTwoFactor(
