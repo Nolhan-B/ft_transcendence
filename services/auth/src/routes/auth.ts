@@ -1,23 +1,23 @@
-import { FastifyInstance } from 'fastify';
-import * as authService from '../services/auth.service.js';
+import { FastifyInstance } from "fastify";
+import * as authService from "../services/auth.service.js";
 import type {
   SignupPayload,
   LoginPayload,
   TwoFactorRequiredResponse,
-} from 'shared';
+} from "shared";
 
 export default async function authRoutes(fastify: FastifyInstance) {
   fastify.post(
-    '/signup',
+    "/signup",
     {
       schema: {
         body: {
-          type: 'object',
-          required: ['email', 'username', 'password'],
+          type: "object",
+          required: ["email", "username", "password"],
           properties: {
-            email: { type: 'string', format: 'email' },
-            username: { type: 'string', minLength: 3, maxLength: 20 },
-            password: { type: 'string', minLength: 8 },
+            email: { type: "string", format: "email" },
+            username: { type: "string", minLength: 3, maxLength: 20 },
+            password: { type: "string", minLength: 8 },
           },
         },
       },
@@ -38,21 +38,21 @@ export default async function authRoutes(fastify: FastifyInstance) {
         request.log.error(err);
         return reply
           .code(409)
-          .send({ error: 'Email or username already taken' });
+          .send({ error: "Email or username already taken" });
       }
     },
   );
 
   fastify.post(
-    '/login',
+    "/login",
     {
       schema: {
         body: {
-          type: 'object',
-          required: ['email', 'password'],
+          type: "object",
+          required: ["email", "password"],
           properties: {
-            email: { type: 'string', format: 'email' },
-            password: { type: 'string', minLength: 1 },
+            email: { type: "string", format: "email" },
+            password: { type: "string", minLength: 1 },
           },
         },
       },
@@ -61,12 +61,12 @@ export default async function authRoutes(fastify: FastifyInstance) {
       const { email, password } = request.body as LoginPayload;
 
       const user = await authService.login(fastify.prisma, email, password);
-      if (!user) return reply.code(401).send({ error: 'Invalid credentials' });
+      if (!user) return reply.code(401).send({ error: "Invalid credentials" });
 
       if (user.twoFactorSecretEnabled) {
         const tempToken = fastify.jwt.sign(
           { id: user.id, requires2FA: true },
-          { expiresIn: '5m' },
+          { expiresIn: "5m" },
         );
         return reply.send({
           requiresTwoFactor: true,
@@ -79,18 +79,21 @@ export default async function authRoutes(fastify: FastifyInstance) {
     },
   );
 
-  fastify.get('/health', { logLevel: 'silent' }, async () => ({ service: 'auth', status: 'ok' }));
+  fastify.get("/health", { logLevel: "silent" }, async () => ({
+    service: "auth",
+    status: "ok",
+  }));
 
-  fastify.get('/me', async (request, reply) => {
+  fastify.get("/me", async (request, reply) => {
     await request.jwtVerify();
     const { id } = request.user as { id: string; email: string };
 
     const user = await authService.getMe(fastify.prisma, id);
-    if (!user) return reply.code(404).send({ error: 'User not found' });
+    if (!user) return reply.code(404).send({ error: "User not found" });
     return { user };
   });
 
-  fastify.delete('/account', async (request, reply) => {
+  fastify.delete("/account", async (request, reply) => {
     await request.jwtVerify();
     const { id } = request.user as { id: string };
     const { password, code } = request.body as {
@@ -104,8 +107,8 @@ export default async function authRoutes(fastify: FastifyInstance) {
       password,
       code,
     );
-    if (!deleted) return reply.code(401).send({ error: 'Invalid credentials' });
+    if (!deleted) return reply.code(401).send({ error: "Invalid credentials" });
 
-    return reply.send({ message: 'Account deleted' });
+    return reply.send({ message: "Account deleted" });
   });
 }

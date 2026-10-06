@@ -1,9 +1,9 @@
-import { FastifyInstance } from 'fastify';
-import * as friendsService from '../services/friends.service.js';
-import type { JwtPayload } from 'shared';
+import { FastifyInstance } from "fastify";
+import * as friendsService from "../services/friends.service.js";
+import type { JwtPayload } from "shared";
 
 export default async function friendsRoutes(fastify: FastifyInstance) {
-  fastify.get('/friends', async (request, reply) => {
+  fastify.get("/friends", async (request, reply) => {
     await request.jwtVerify();
     const { id } = request.user as JwtPayload;
 
@@ -12,7 +12,7 @@ export default async function friendsRoutes(fastify: FastifyInstance) {
     return reply.send({ friends });
   });
 
-  fastify.get('/friends/requests/received', async (request, reply) => {
+  fastify.get("/friends/requests/received", async (request, reply) => {
     await request.jwtVerify();
     const { id } = request.user as JwtPayload;
 
@@ -24,7 +24,7 @@ export default async function friendsRoutes(fastify: FastifyInstance) {
     return reply.send({ receivedRequests });
   });
 
-  fastify.get('/friends/requests/sent', async (request, reply) => {
+  fastify.get("/friends/requests/sent", async (request, reply) => {
     await request.jwtVerify();
     const { id } = request.user as JwtPayload;
 
@@ -36,7 +36,7 @@ export default async function friendsRoutes(fastify: FastifyInstance) {
     return reply.send({ receivedRequests });
   });
 
-  fastify.post('/friends/request/:id', async (request, reply) => {
+  fastify.post("/friends/request/:id", async (request, reply) => {
     await request.jwtVerify();
     const { id: userId } = request.user as JwtPayload;
     const { id: friendId } = request.params as { id: string };
@@ -50,7 +50,7 @@ export default async function friendsRoutes(fastify: FastifyInstance) {
     return reply.send({ receivedRequests });
   });
 
-  fastify.post('/friends/accept/:id', async (request, reply) => {
+  fastify.post("/friends/accept/:id", async (request, reply) => {
     await request.jwtVerify();
     const { id: userId } = request.user as JwtPayload;
     const { id: friendId } = request.params as { id: string };
@@ -64,7 +64,7 @@ export default async function friendsRoutes(fastify: FastifyInstance) {
     return reply.send({ friendship });
   });
 
-  fastify.delete('/friends/:id', async (request, reply) => {
+  fastify.delete("/friends/:id", async (request, reply) => {
     await request.jwtVerify();
     const { id: userId } = request.user as JwtPayload;
     const { id: friendId } = request.params as { id: string };
@@ -76,8 +76,8 @@ export default async function friendsRoutes(fastify: FastifyInstance) {
     );
 
     if (!deleted)
-      return reply.code(404).send({ error: 'Friendship not found' });
+      return reply.code(404).send({ error: "Friendship not found" });
 
-    return reply.send({ message: 'Friendship deleted' });
+    return reply.send({ message: "Friendship deleted" });
   });
 }

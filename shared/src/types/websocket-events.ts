@@ -1,4 +1,4 @@
-import type { CardColor, GameState } from './game.js';
+import type { CardColor, GameState } from "./game.js";
 
 // Client -> Server
 export interface JoinGamePayload {
@@ -17,27 +17,27 @@ export interface DrawCardPayload {
 
 // Server -> Client
 export interface GameUpdatedEvent {
-  type: 'game_updated';
+  type: "game_updated";
   state: GameState;
 }
 
 export interface PlayerJoinedEvent {
-  type: 'player_joined';
+  type: "player_joined";
   userId: string;
 }
 
 export interface PlayerLeftEvent {
-  type: 'player_left';
+  type: "player_left";
   userId: string;
 }
 
 export interface GameEndedEvent {
-  type: 'game_ended';
+  type: "game_ended";
   winnerId: string;
 }
 
 export interface ErrorEvent {
-  type: 'error';
+  type: "error";
   message: string;
 }
 
