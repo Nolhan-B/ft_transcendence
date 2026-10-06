@@ -68,20 +68,53 @@ jobs:
           '
           echo "All services are up and healthy!"
 
-      - name: Test User Signup via Gateway E2E
+      - name: Run E2E Smoke Tests
         run: |
-          STATUS_CODE=$(curl -s -o response.json -w "%{http_code}" -X POST http://127.0.0.1:8080/api/auth/signup \
-            -H "Content-Type: application/json" \
-            -d '{"email":"ci_bot@test.com","username":"cibot","password":"securepassword123"}')
-
-          echo "HTTP Status Code: $STATUS_CODE"
-          cat response.json
-
-          if [ "$STATUS_CODE" -ne 201 ]; then
-            echo "INSCRIPTION FAILED WITH HTTP CODE $STATUS_CODE"
+          echo "=== 1. Checking Frontend Gateway ==="
+          FRONTEND_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8080/)
+          echo "Frontend HTTP Status: $FRONTEND_STATUS"
+          if [ "$FRONTEND_STATUS" -ne 200 ]; then
+            echo "::error::Frontend service is unreachable (expected HTTP 200, got $FRONTEND_STATUS)"
             exit 1
           fi
 
+          echo "=== 2. Testing User Signup ==="
+          SIGNUP_STATUS=$(curl -s -o signup.json -w "%{http_code}" -X POST http://127.0.0.1:8080/api/auth/signup \
+            -H "Content-Type: application/json" \
+            -d '{"email":"cibot@test.com","username":"cibot","password":"securepassword123"}')
+          echo "Signup HTTP Status: $SIGNUP_STATUS"
+          cat signup.json
+          if [ "$SIGNUP_STATUS" -ne 201 ]; then
+            echo "::error::User signup failed with HTTP $SIGNUP_STATUS"
+            exit 1
+          fi
+
+          echo "=== 3. Testing User Login ==="
+          LOGIN_STATUS=$(curl -s -o login.json -w "%{http_code}" -X POST http://127.0.0.1:8080/api/auth/login \
+            -H "Content-Type: application/json" \
+            -d '{"email":"cibot@test.com","password":"securepassword123"}')
+          echo "Login HTTP Status: $LOGIN_STATUS"
+          cat login.json
+          if [ "$LOGIN_STATUS" -ne 200 ]; then
+            echo "::error::User login failed with HTTP $LOGIN_STATUS"
+            exit 1
+          fi
+
+          # Extract JWT token from JSON response
+          TOKEN=$(node -e "console.log(JSON.parse(require('fs').readFileSync('login.json')).token)")
+
+          echo "=== 4. Testing Protected Route (/me) ==="
+          ME_STATUS=$(curl -s -o me.json -w "%{http_code}" -X GET http://127.0.0.1:8080/api/auth/me \
+            -H "Authorization: Bearer $TOKEN")
+          echo "Me HTTP Status: $ME_STATUS"
+          cat me.json
+          if [ "$ME_STATUS" -ne 200 ]; then
+            echo "::error::Protected route access failed with HTTP $ME_STATUS"
+            exit 1
+          fi
+
+          echo "=== All E2E smoke tests passed successfully! ==="
+ 
       - name: Dump Docker logs on failure
         if: failure()
         run: |
