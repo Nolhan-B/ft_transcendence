@@ -13,12 +13,12 @@ export interface User {
 
 export type Profile = Omit<
   User,
-  "email" | "twoFactorSecret" | "twoFactorSecretEnabled"
+  'email' | 'twoFactorSecret' | 'twoFactorSecretEnabled'
 >;
 
-export type PublicUser = Omit<User, "email">;
+export type PublicUser = Omit<User, 'email'>;
 
-export type OnlineStatus = "online" | "offline" | "in_game";
+export type OnlineStatus = 'online' | 'offline' | 'in_game';
 
 export interface Friendship {
   id: UUID;
@@ -76,8 +76,8 @@ export interface TwoFactorDisablePayload {
 }
 
 export enum FriendshipStatus {
-  PENDING = "pending",
-  ACCEPTED = "accepted",
+  PENDING = 'pending',
+  ACCEPTED = 'accepted',
 }
 
 export type FriendshipWithFriend = {

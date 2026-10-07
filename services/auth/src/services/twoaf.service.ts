@@ -1,8 +1,8 @@
-import { PrismaClient } from "../../../../shared/src/generated/prisma/client.js";
-import { authenticator } from "@otplib/preset-default";
-import QRCode from "qrcode";
-import { User } from "shared";
-import bcrypt from "bcrypt";
+import { PrismaClient } from '../../../../shared/src/generated/prisma/client.js';
+import { authenticator } from '@otplib/preset-default';
+import QRCode from 'qrcode';
+import { User } from 'shared';
+import bcrypt from 'bcrypt';
 
 export async function enableTwoFactor(
   prisma: PrismaClient,
@@ -20,7 +20,7 @@ export async function enableTwoFactor(
 
   const otpauthUrl = authenticator.keyuri(
     user.email,
-    "ft_transcendence",
+    'ft_transcendence',
     secret,
   );
   const qrCode = await QRCode.toDataURL(otpauthUrl);
@@ -32,7 +32,7 @@ export async function verifyTwoFactor(
   prisma: PrismaClient,
   userId: string,
   code: string,
-): Promise<Omit<User, "twoFactorSecret"> | null> {
+): Promise<Omit<User, 'twoFactorSecret'> | null> {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) return null;
 
@@ -60,7 +60,7 @@ export async function validateTwoFactor(
   prisma: PrismaClient,
   userId: string,
   code: string,
-): Promise<Omit<User, "twoFactorSecret"> | null> {
+): Promise<Omit<User, 'twoFactorSecret'> | null> {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) return null;
 
@@ -84,7 +84,7 @@ export async function disableTwoFactor(
   userId: string,
   password: string,
   code: string,
-): Promise<Omit<User, "twoFactorSecret"> | null> {
+): Promise<Omit<User, 'twoFactorSecret'> | null> {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) return null;
 

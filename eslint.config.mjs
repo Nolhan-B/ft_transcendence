@@ -16,12 +16,12 @@ export default tseslint.config(
   {
     files: ['**/*.ts', '**/*.tsx', '**/*.js', '**/*.mjs'],
     rules: {
-      "@typescript-eslint/no-explicit-any": "warn",
-      "@typescript-eslint/no-unused-vars": [
-        "warn",
-        { argsIgnorePattern: "^_" },
+      '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/no-unused-vars': [
+        'warn',
+        { argsIgnorePattern: '^_' },
       ],
-      "no-console": "off",
+      'no-console': 'off',
     },
   },
 );
