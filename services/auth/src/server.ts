@@ -8,7 +8,9 @@ import fs from 'node:fs';
 import process from 'node:process';
 
 if (fs.existsSync('/run/secrets/db_url')) {
-  process.env.DATABASE_URL = fs.readFileSync('/run/secrets/db_url', 'utf-8').trim();
+  process.env.DATABASE_URL = fs
+    .readFileSync('/run/secrets/db_url', 'utf-8')
+    .trim();
 }
 
 const app = Fastify({ logger: true });

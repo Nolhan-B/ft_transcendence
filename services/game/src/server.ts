@@ -1,12 +1,16 @@
 import Fastify from 'fastify';
 
 const fastify = Fastify({
-  logger: true
+  logger: true,
 });
 
-fastify.get('/health', {
-  logLevel: 'silent'
-}, async () => ({ service: 'game', status: 'ok' }));
+fastify.get(
+  '/health',
+  {
+    logLevel: 'silent',
+  },
+  async () => ({ service: 'game', status: 'ok' }),
+);
 
 fastify.get('/', async () => {
   return { service: 'game', status: 'ok' };
