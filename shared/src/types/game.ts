@@ -1,4 +1,4 @@
-export type CardColor = 'red' | 'yellow' | 'green' | 'blue' | 'wild';
+export type CardColor = "red" | "yellow" | "green" | "blue" | "wild";
 
 export type CardValue =
   | '0'

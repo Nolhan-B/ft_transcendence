@@ -1,14 +1,14 @@
-import bcrypt from 'bcrypt';
-import { PrismaClient } from '../../../../shared/src/generated/prisma/client.js';
-import type { User } from 'shared';
-import { authenticator } from '@otplib/preset-default';
+import bcrypt from "bcrypt";
+import { PrismaClient } from "../../../../shared/src/generated/prisma/client.js";
+import type { User } from "shared";
+import { authenticator } from "@otplib/preset-default";
 
 export async function signup(
   prisma: PrismaClient,
   email: string,
   username: string,
   password: string,
-): Promise<Omit<User, 'twoFactorSecret' | 'twoFactorSecretEnabled'>> {
+): Promise<Omit<User, "twoFactorSecret" | "twoFactorSecretEnabled">> {
   const hashedPassword = await bcrypt.hash(password, 10);
 
   const user = await prisma.user.create({
@@ -28,7 +28,7 @@ export async function login(
   prisma: PrismaClient,
   email: string,
   password: string,
-): Promise<Omit<User, 'twoFactorSecret'> | null> {
+): Promise<Omit<User, "twoFactorSecret"> | null> {
   const user = await prisma.user.findUnique({ where: { email } });
   if (!user) return null;
 
@@ -70,7 +70,7 @@ export async function deleteAccount(
 export async function getMe(
   prisma: PrismaClient,
   id: string,
-): Promise<Omit<User, 'twoFactorSecret'> | null> {
+): Promise<Omit<User, "twoFactorSecret"> | null> {
   const user = await prisma.user.findUnique({ where: { id } });
   if (!user) return null;
 

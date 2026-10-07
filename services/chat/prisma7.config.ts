@@ -5,7 +5,7 @@ import { defineConfig } from 'prisma/config';
 function getDatabaseUrl(): string | undefined {
   if (fs.existsSync('/run/secrets/db_password')) {
     const password = encodeURIComponent(
-      fs.readFileSync('/run/secrets/db_password', 'utf-8').trim(),
+      fs.readFileSync("/run/secrets/db_password", "utf-8").trim(),
     );
     return `postgresql://transcendence_user:${password}@postgres:5432/transcendence_db?schema=public`;
   }

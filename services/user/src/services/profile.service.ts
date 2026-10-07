@@ -1,5 +1,5 @@
-import { PrismaClient } from '../generated/prisma/client.js';
-import type { Profile, UpdateProfilePayload } from 'shared';
+import { PrismaClient } from "../generated/prisma/client.js";
+import type { Profile, UpdateProfilePayload } from "shared";
 
 export async function getProfileById(
   prisma: PrismaClient,
