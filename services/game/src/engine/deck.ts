@@ -1,22 +1,22 @@
-import { v4 as uuid } from 'uuid';
-import type { Card, CardColor, CardValue } from 'shared';
+import { v4 as uuid } from "uuid";
+import type { Card, CardColor, CardValue } from "shared";
 
-const COLORS: CardColor[] = ['red', 'yellow', 'green', 'blue'];
+const COLORS: CardColor[] = ["red", "yellow", "green", "blue"];
 
 const NUMBERED_VALUES: CardValue[] = [
-  '0',
-  '1',
-  '2',
-  '3',
-  '4',
-  '5',
-  '6',
-  '7',
-  '8',
-  '9',
+  "0",
+  "1",
+  "2",
+  "3",
+  "4",
+  "5",
+  "6",
+  "7",
+  "8",
+  "9",
 ];
-const ACTION_VALUES: CardValue[] = ['skip', 'reverse', 'draw2'];
-const WILD_VALUES: CardValue[] = ['wild', 'wild_draw4'];
+const ACTION_VALUES: CardValue[] = ["skip", "reverse", "draw2"];
+const WILD_VALUES: CardValue[] = ["wild", "wild_draw4"];
 
 function createCard(color: CardColor, value: CardValue): Card {
   return { id: uuid(), color, value };
@@ -27,11 +27,11 @@ export function createDeck(): Card[] {
 
   for (const color of COLORS) {
     // Un seul 0 par couleur
-    deck.push(createCard(color, '0'));
+    deck.push(createCard(color, "0"));
 
     // Deux de chaque 1-9
     for (const value of NUMBERED_VALUES) {
-      if (value === '0') continue;
+      if (value === "0") continue;
       deck.push(createCard(color, value));
       deck.push(createCard(color, value));
     }
@@ -46,7 +46,7 @@ export function createDeck(): Card[] {
   // 4 wild, 4 wild_draw4
   for (const value of WILD_VALUES) {
     for (let i = 0; i < 4; i++) {
-      deck.push(createCard('wild', value));
+      deck.push(createCard("wild", value));
     }
   }
 

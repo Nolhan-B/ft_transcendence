@@ -21,11 +21,11 @@ import {
   GameStatus,
   GameSettings,
   CardColor,
-} from 'shared';
-import { createDeck, dealCards, shuffleDeck } from './deck.js';
-import type { Card, Player } from 'shared';
-import { v4 as uuid } from 'uuid';
-import { getCardEffect, isValidPlay } from './rules.js';
+} from "shared";
+import { createDeck, dealCards, shuffleDeck } from "./deck.js";
+import type { Card, Player } from "shared";
+import { v4 as uuid } from "uuid";
+import { getCardEffect, isValidPlay } from "./rules.js";
 
 export interface InternalGameState extends GameState {
   drawPile: Card[];
@@ -43,7 +43,7 @@ export function createGame(
 
   let topCard = remaining.shift()!;
 
-  while (topCard.color === 'wild') {
+  while (topCard.color === "wild") {
     remaining.push(topCard);
     remaining = shuffleDeck(remaining);
     topCard = remaining.shift()!;
@@ -110,14 +110,14 @@ export function playCard(
   const effect = getCardEffect(playedCard);
 
   switch (effect.type) {
-    case 'none':
+    case "none":
       advanceToNextPlayer(state);
       break;
-    case 'skip':
+    case "skip":
       advanceToNextPlayer(state);
       advanceToNextPlayer(state);
       break;
-    case 'reverse':
+    case "reverse":
       if (state.players.filter((p) => !p.disconnected).length === 2) {
         advanceToNextPlayer(state);
         advanceToNextPlayer(state);
@@ -127,17 +127,17 @@ export function playCard(
       }
       break;
       break;
-    case 'draw':
+    case "draw":
       advanceToNextPlayer(state);
       drawCardsForCurrentPlayer(state, effect.count);
       advanceToNextPlayer(state);
       break;
-    case 'wild':
+    case "wild":
       if (!chosenColor) return null;
       state.currentColor = chosenColor as CardColor;
       advanceToNextPlayer(state);
       break;
-    case 'wild_draw':
+    case "wild_draw":
       if (!chosenColor) return null;
       state.currentColor = chosenColor as CardColor;
       advanceToNextPlayer(state);
@@ -146,7 +146,7 @@ export function playCard(
       break;
   }
 
-  if (effect.type !== 'wild' && effect.type !== 'wild_draw') {
+  if (effect.type !== "wild" && effect.type !== "wild_draw") {
     state.currentColor = playedCard.color;
   }
 

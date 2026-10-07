@@ -1,11 +1,11 @@
-import { PrismaClient } from '../generated/prisma/client.js';
+import { PrismaClient } from "../generated/prisma/client.js";
 import type {
   Profile,
   Friendship,
   FriendshipWithFriend,
   FriendshipWithUser,
-} from 'shared';
-import { FriendshipStatus } from 'shared';
+} from "shared";
+import { FriendshipStatus } from "shared";
 
 export async function getFriends(
   prisma: PrismaClient,
