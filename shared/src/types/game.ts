@@ -23,20 +23,39 @@ export interface Card {
   value: CardValue;
 }
 
-export type GameMode = "classic" | "ranked";
-export type GameStatus = "waiting" | "in_progress" | "finished";
+export enum GameMode {
+  CLASSIC = "classic",
+  RANKED = "ranked",
+}
+
+export enum GameStatus {
+  WAITING = "waiting",
+  IN_PROGRESS = "in_progress",
+  FINISHED = "finished",
+}
 
 export interface Player {
   userId: string;
   username: string;
   hand: Card[];
   isCurrentTurn: boolean;
+  disconnected: boolean;
+}
+
+export interface GameSettings {
+  stacking: boolean;
+  multiplePlay: boolean;
+  sevenZeroRule: boolean;
+  jumpIn: boolean;
+  bluffChallenge: boolean;
+  unoCallout: boolean;
 }
 
 export interface GameState {
   id: string;
   mode: GameMode;
   status: GameStatus;
+  settings: GameSettings;
   players: Player[];
   currentColor: CardColor;
   topCard: Card;
