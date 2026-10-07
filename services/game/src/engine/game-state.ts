@@ -1,3 +1,20 @@
+//
+//
+//
+//
+// TODO: Implémenter les settings
+// (stacking,
+//  multiplePlay,
+//  sevenZeroRule,
+//  jumpIn,
+//  bluffChallenge,
+//  unoCallout)
+//
+//
+//
+//
+//
+
 import {
   GameMode,
   GameState,
@@ -20,7 +37,9 @@ export function createGame(
   settings?: GameSettings,
 ): InternalGameState {
   const deck: Card[] = shuffleDeck(createDeck());
-  const { hands, remaining } = dealCards(deck, participants.length);
+  const result = dealCards(deck, participants.length);
+  const hands = result.hands;
+  let remaining = result.remaining;
 
   let topCard = remaining.shift()!;
 
@@ -103,10 +122,12 @@ export function playCard(
       advanceToNextPlayer(state);
       break;
     case 'wild':
+      if (!chosenColor) return null;
       state.currentColor = chosenColor as CardColor;
       advanceToNextPlayer(state);
       break;
     case 'wild_draw':
+      if (!chosenColor) return null;
       state.currentColor = chosenColor as CardColor;
       advanceToNextPlayer(state);
       drawCardsForCurrentPlayer(state, effect.count);
