@@ -89,8 +89,13 @@ export function playCard(
   cardId: string,
   chosenColor?: string,
 ): InternalGameState | null {
+  if (state.status === GameStatus.FINISHED) return null;
+
   const player: Player | undefined = getPlayer(state, playerId);
+
   if (!player || player.disconnected) return null;
+
+  if (!player.isCurrentTurn) return null;
 
   const playedCard: Card | undefined = getCardFromHand(player, cardId);
   if (!playedCard) return null;
@@ -113,8 +118,14 @@ export function playCard(
       advanceToNextPlayer(state);
       break;
     case 'reverse':
-      changeDirection(state);
-      advanceToNextPlayer(state);
+      if (state.players.filter((p) => !p.disconnected).length === 2) {
+        advanceToNextPlayer(state);
+        advanceToNextPlayer(state);
+      } else {
+        changeDirection(state);
+        advanceToNextPlayer(state);
+      }
+      break;
       break;
     case 'draw':
       advanceToNextPlayer(state);
