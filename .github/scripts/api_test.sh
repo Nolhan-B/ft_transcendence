@@ -3,6 +3,12 @@ set -euo pipefail
 
 BASE_URL="http://localhost:8080"
 
+cleanup() {
+  docker compose exec -T postgres psql -U transcendence_user -d transcendence_db \
+    -c "DELETE FROM \"User\" WHERE email LIKE 'alice\_%@test.com' OR email LIKE 'bob\_%@test.com';" >/dev/null 2>&1 || true
+}
+trap cleanup EXIT
+
 echo "=== 1. Health checks ==="
 for svc in auth user game chat; do
   echo -n "Vérification $svc... "
@@ -16,14 +22,14 @@ done
 
 echo ""
 echo "=== 2. Création des comptes (Alice & Bob) ==="
-TIMESTAMP=$(date +%s)
-ALICE_EMAIL="alice_${TIMESTAMP}@test.com"
-BOB_EMAIL="bob_${TIMESTAMP}@test.com"
+SUFFIX="$(date +%s)$((RANDOM % 100))"
+ALICE_EMAIL="alice_${SUFFIX}@test.com"
+BOB_EMAIL="bob_${SUFFIX}@test.com"
 
 # Signup Alice
 ALICE_RES=$(curl -s -X POST "$BASE_URL/api/auth/signup" \
   -H "Content-Type: application/json" \
-  -d "{\"email\":\"$ALICE_EMAIL\",\"username\":\"alice_${TIMESTAMP}\",\"password\":\"test1234\"}")
+  -d "{\"email\":\"$ALICE_EMAIL\",\"username\":\"alice_${SUFFIX}\",\"password\":\"test1234\"}")
 
 ALICE_TOKEN=$(node -e "console.log(JSON.parse(process.argv[1]).token || '')" "$ALICE_RES")
 ALICE_ID=$(node -e "console.log(JSON.parse(process.argv[1]).user?.id || '')" "$ALICE_RES")
@@ -37,7 +43,7 @@ echo "Alice créée (ID: $ALICE_ID)"
 # Signup Bob
 BOB_RES=$(curl -s -X POST "$BASE_URL/api/auth/signup" \
   -H "Content-Type: application/json" \
-  -d "{\"email\":\"$BOB_EMAIL\",\"username\":\"bob_${TIMESTAMP}\",\"password\":\"test1234\"}")
+  -d "{\"email\":\"$BOB_EMAIL\",\"username\":\"bob_${SUFFIX}\",\"password\":\"test1234\"}")
 
 BOB_TOKEN=$(node -e "console.log(JSON.parse(process.argv[1]).token || '')" "$BOB_RES")
 BOB_ID=$(node -e "console.log(JSON.parse(process.argv[1]).user?.id || '')" "$BOB_RES")
@@ -67,20 +73,9 @@ if ! echo "$BOB_RECEIVED" | grep -q "$ALICE_ID"; then
   exit 1
 fi
 
-# Extraction de l'ID de la demande (Friendship ID)
-REQUEST_ID=$(node -e '
-  const res = JSON.parse(process.argv[1]);
-  const reqs = res.receivedRequests || res.requests || res;
-  const match = Array.isArray(reqs) ? reqs.find(r => r.userId === process.argv[2] || r.user?.id === process.argv[2]) : null;
-  console.log(match ? match.id : "");
-' "$BOB_RECEIVED" "$ALICE_ID")
-
-# Si le service attend l'ID de la relation, on passe REQUEST_ID, sinon ALICE_ID
-TARGET_ID="${REQUEST_ID:-$ALICE_ID}"
-
-# Bob accepte la demande
-echo "Bob accepte la demande (ID: $TARGET_ID)..."
-curl -fsSL -X POST "$BASE_URL/api/user/friends/accept/$TARGET_ID" \
+# Bob accepte la demande : la route attend l'ID de l'utilisateur qui l'a envoyée
+echo "Bob accepte la demande d'Alice (ID: $ALICE_ID)..."
+curl -fsSL -X POST "$BASE_URL/api/user/friends/accept/$ALICE_ID" \
   -H "Authorization: Bearer $BOB_TOKEN" > /dev/null
 
 # Vérification mutuelle de la liste d'amis
@@ -103,6 +98,17 @@ fi
 echo "Alice supprime Bob de ses amis..."
 curl -fsSL -X DELETE "$BASE_URL/api/user/friends/$BOB_ID" \
   -H "Authorization: Bearer $ALICE_TOKEN" > /dev/null
+
+# Vérification de la suppression
+echo "Vérification de la suppression..."
+ALICE_FRIENDS_AFTER=$(curl -fsSL "$BASE_URL/api/user/friends" \
+  -H "Authorization: Bearer $ALICE_TOKEN")
+
+if echo "$ALICE_FRIENDS_AFTER" | grep -q "$BOB_ID"; then
+  echo "Bob est toujours dans la liste d'amis d'Alice après suppression"
+  echo "Amis d'Alice: $ALICE_FRIENDS_AFTER"
+  exit 1
+fi
 
 echo ""
 echo "Tous les tests d'API sont validés !"
