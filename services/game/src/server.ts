@@ -1,4 +1,5 @@
 import Fastify from "fastify";
+import gameGateway from "./gateway/game.gateway.js";
 
 const fastify = Fastify({
   logger: true,
@@ -11,6 +12,8 @@ fastify.get(
   },
   async () => ({ service: "game", status: "ok" }),
 );
+
+fastify.register(gameGateway);
 
 fastify.get("/", async () => {
   return { service: "game", status: "ok" };

@@ -47,3 +47,8 @@ export type ServerEvent =
   | PlayerLeftEvent
   | GameEndedEvent
   | ErrorEvent;
+
+export type ClientMessage =
+  | ({ type: "join_game" } & JoinGamePayload)
+  | ({ type: "play_card" } & PlayCardPayload)
+  | ({ type: "draw_card" } & DrawCardPayload);
