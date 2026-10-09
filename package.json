@@ -2,7 +2,10 @@
   "name": "ft_transcendence",
   "private": true,
   "scripts": {
-    "lint": "eslint . --max-warnings=0 && npx prettier --check ."
+    "lint": "eslint . --max-warnings=0 && npx prettier --check .",
+    "test-game": "npx tsx services/game/tests/engine.test.ts",
+    "test-api": "bash ./.github/scripts/api_test.sh",
+    "test-e2e": "bash ./.github/scripts/e2e_test.sh"
   },
   "workspaces": [
     "services/*",

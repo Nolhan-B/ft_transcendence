@@ -60,7 +60,7 @@ export async function acceptFriendRequest(
   if (!userId || !friendId) return null;
 
   const friendship = await prisma.friendship.findUnique({
-    where: { userId_friendId: { friendId, userId } },
+    where: { userId_friendId: { userId: friendId, friendId: userId } },
   });
 
   if (!friendship) return null;

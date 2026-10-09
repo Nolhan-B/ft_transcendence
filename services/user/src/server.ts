@@ -2,6 +2,7 @@ import Fastify from "fastify";
 import prismaPlugin from "./plugins/prisma.js";
 import jwt from "@fastify/jwt";
 import profileRoutes from "./routes/profiles.js";
+import friendsRoutes from "./routes/friends.js";
 import fs from "node:fs";
 import process from "node:process";
 import multipart from "@fastify/multipart";
@@ -23,15 +24,12 @@ fastify.register(staticPlugin, {
 fastify.register(prismaPlugin);
 fastify.register(multipart, { limits: { fileSize: 5 * 1024 * 1024 } }); // 5MB max
 fastify.register(jwt, { secret: process.env.JWT_SECRET ?? "dev-secret" });
+
+// Enregistrement des routes
 fastify.register(profileRoutes);
+fastify.register(friendsRoutes);
 
 fastify.get("/health", async () => ({ service: "user", status: "ok" }));
-
-const port = Number(process.env.USER_PORT ?? 3004);
-fastify.listen({ port, host: "0.0.0.0" }).catch((err) => {
-  fastify.log.error(err);
-  process.exit(1);
-});
 
 fastify.get("/", async () => {
   return { service: "user", status: "ok" };
@@ -39,7 +37,8 @@ fastify.get("/", async () => {
 
 const start = async () => {
   try {
-    await fastify.listen({ port: 3004, host: "0.0.0.0" });
+    const port = Number(process.env.USER_PORT ?? 3004);
+    await fastify.listen({ port, host: "0.0.0.0" });
   } catch (err) {
     fastify.log.error(err);
     process.exit(1);

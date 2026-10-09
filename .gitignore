@@ -45,3 +45,8 @@ services/*/src/generated/
 generated/
 shared/src/generated/
 services/user/uploads/*services/user/uploads/
+
+me.json
+profile.json
+login.json
+signup.json

@@ -5,3 +5,5 @@ coverage
 secrets
 *.log
 package-lock.json
+*.github
+*.md
