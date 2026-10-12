@@ -1,7 +1,9 @@
 import { FastifyInstance } from "fastify";
 import { WebSocket } from "@fastify/websocket";
 import { GameManager } from "../managers/game.manager.js";
-import type { ClientMessage } from "shared";
+import type { ClientMessage, GameState, ServerEvent } from "shared";
+import { RawData } from "ws";
+import { InternalGameState } from "../engine/game-state.js";
 
 const manager = new GameManager();
 const rooms: Map<
@@ -10,18 +12,52 @@ const rooms: Map<
 > = new Map();
 
 export default async function gameGateway(fastify: FastifyInstance) {
-  fastify.get("/ws", { websocket: true }, (socket, request) => {
-    socket.on("message", (data) => {
-      // data = le message brut envoyé par le client
+  fastify.get("/ws", { websocket: true }, async (socket, request) => {
+    try {
+      await request.jwtVerify();
+    } catch {
+      sendError(socket, "Unauthorized");
+      socket.close();
+      return;
+    }
+
+    const { id: userId } = request.user as { id: string };
+
+    socket.on("message", (data: RawData) => {
       const message = JSON.parse(data.toString()) as ClientMessage;
 
       switch (message.type) {
         case "join_game":
-          // message.gameId est typé
+          const game = manager.getGame(message.gameId);
+          if (game === undefined) {
+            sendError(socket, "Game not found");
+            break;
+          }
+          const isPlayer = game.players.some((p) => p.userId === userId);
+          if (!isPlayer) {
+            sendError(socket, "You are not part of this game");
+            break;
+          }
+          if (!rooms.has(message.gameId)) {
+            rooms.set(message.gameId, new Set());
+          }
+          rooms.get(message.gameId)!.add({ socket, userId });
+
+          broadCastToRoom(
+            message.gameId,
+            { type: "player_joined", userId },
+            userId,
+          );
+
+          const playerGameState = filterStateForPlayer(game, userId);
+
+          socket.send(
+            JSON.stringify({ type: "game_updated", state: playerGameState }),
+          );
+
           break;
         case "play_card":
-          // message.gameId, message.cardId, message.chosenColor sont typés
-          break;
+        // message.gameId, message.cardId, message.chosenColor sont typés
         case "draw_card":
           // message.gameId est typé
           break;
@@ -35,4 +71,54 @@ export default async function gameGateway(fastify: FastifyInstance) {
     socket.send(JSON.stringify({ type: "connected" }));
     // envoie un message au client
   });
+}
+
+function broadCastToRoom(
+  gameId: string,
+  event: ServerEvent,
+  excludeUserId?: string,
+): void {
+  const room = rooms.get(gameId);
+  if (!room) return;
+
+  const data = JSON.stringify(event);
+  for (const client of room) {
+    if (client.userId !== excludeUserId) {
+      client.socket.send(data);
+    }
+  }
+}
+
+function sendError(socket: WebSocket, message: string): void {
+  socket.send(JSON.stringify({ type: "error", message }));
+}
+
+function filterStateForPlayer(
+  game: InternalGameState,
+  userId: string,
+): GameState {
+  return {
+    id: game.id,
+    mode: game.mode,
+    status: game.status,
+    settings: game.settings,
+    players: game.players.map((p) => ({
+      ...p,
+      hand:
+        p.userId === userId
+          ? p.hand
+          : p.hand.map(() => ({
+              id: "",
+              color: "wild" as any,
+              value: "wild" as any,
+            })),
+    })),
+    currentColor: game.currentColor,
+    topCard: game.topCard,
+    direction: game.direction,
+    drawPileCount: game.drawPileCount,
+    discardPile: game.discardPile,
+    ranking: game.ranking,
+    winnerId: game.winnerId,
+  };
 }
