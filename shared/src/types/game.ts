@@ -80,3 +80,9 @@ export interface GameParticipant {
   id: string;
   username: string;
 }
+
+export interface CreateGamePayload {
+  participants: GameParticipant[];
+  mode: GameMode;
+  settings?: GameSettings;
+}
