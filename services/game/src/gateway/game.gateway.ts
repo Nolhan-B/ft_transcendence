@@ -27,7 +27,7 @@ export default async function gameGateway(fastify: FastifyInstance) {
       const message = JSON.parse(data.toString()) as ClientMessage;
 
       switch (message.type) {
-        case "join_game":
+        case "join_game": {
           const game = manager.getGame(message.gameId);
           if (game === undefined) {
             sendError(socket, "Game not found");
@@ -56,16 +56,54 @@ export default async function gameGateway(fastify: FastifyInstance) {
           );
 
           break;
-        case "play_card":
-        // message.gameId, message.cardId, message.chosenColor sont typés
-        case "draw_card":
-          // message.gameId est typé
+        }
+        case "play_card": {
+          const game = manager.getGame(message.gameId);
+          if (game === undefined) {
+            sendError(socket, "Game not found");
+            break;
+          }
+          const updatedState = manager.playCard(
+            game.id,
+            userId,
+            message.cardId,
+            message.chosenColor,
+          );
+          if (!updatedState) {
+            sendError(socket, "Invalid move");
+            break;
+          }
+          broadCastStateToRoom(game.id, updatedState);
+
           break;
+        }
+        case "draw_card": {
+          const game = manager.getGame(message.gameId);
+          if (!game) {
+            sendError(socket, "Game not found");
+            break;
+          }
+          const updatedState = manager.drawCard(game.id, userId);
+          if (!updatedState) {
+            sendError(socket, "Cannot draw card");
+            break;
+          }
+          broadCastStateToRoom(game.id, updatedState);
+          break;
+        }
       }
     });
 
     socket.on("close", () => {
-      // le joueur s'est déconnecté
+      for (const [gameId, room] of rooms) {
+        for (const client of room) {
+          if (client.socket === socket) {
+            room.delete(client);
+            broadCastToRoom(gameId, { type: "player_left", userId });
+            break;
+          }
+        }
+      }
     });
 
     socket.send(JSON.stringify({ type: "connected" }));
@@ -86,6 +124,19 @@ function broadCastToRoom(
     if (client.userId !== excludeUserId) {
       client.socket.send(data);
     }
+  }
+}
+
+function broadCastStateToRoom(gameId: string, state: InternalGameState): void {
+  const room = rooms.get(gameId);
+  if (!room) return;
+
+  for (const client of room) {
+    const playerGameState = filterStateForPlayer(state, client.userId);
+
+    client.socket.send(
+      JSON.stringify({ type: "game_updated", state: playerGameState }),
+    );
   }
 }
 
