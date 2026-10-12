@@ -1,17 +1,17 @@
 import { FastifyInstance } from "fastify";
 import { WebSocket } from "@fastify/websocket";
-import { GameManager } from "../managers/game.manager.js";
 import type { ClientMessage, GameState, ServerEvent } from "shared";
 import { RawData } from "ws";
 import { InternalGameState } from "../engine/game-state.js";
 
-const manager = new GameManager();
 const rooms: Map<
   string,
   Set<{ socket: WebSocket; userId: string }>
 > = new Map();
 
 export default async function gameGateway(fastify: FastifyInstance) {
+  const manager = fastify.gameManager;
+
   fastify.get("/ws", { websocket: true }, async (socket, request) => {
     try {
       await request.jwtVerify();
