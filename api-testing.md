@@ -60,7 +60,7 @@ curl -X POST localhost:8080/api/auth/2fa/validate -H "Content-Type: application/
 
 ### Disable
 
-```bash
+```bash 
 curl -X POST localhost:8080/api/auth/2fa/disable -H "Authorization: Bearer <token>" -H "Content-Type: application/json" -d '{"password":"test1234","code":"123456"}'
 ```
 

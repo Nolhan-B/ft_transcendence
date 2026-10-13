@@ -21,12 +21,19 @@ services:
 
   game:
     build:
-      context: ./services/game
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: services/game/Dockerfile
+      target: dev
     volumes:
       - ./services/game/src:/app/src
     environment:
       - NODE_ENV=development
+    depends_on:
+      postgres:
+        condition: service_healthy
+    secrets:
+      - db_password
+      - db_url
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3002/health || exit 1"]
       interval: 5s
