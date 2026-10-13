@@ -5,7 +5,8 @@
     "lint": "eslint . --max-warnings=0 && npx prettier --check .",
     "test-game": "npx tsx services/game/tests/engine.test.ts",
     "test-api": "bash ./.github/scripts/api_test.sh",
-    "test-e2e": "bash ./.github/scripts/e2e_test.sh"
+    "test-e2e": "bash ./.github/scripts/e2e_test.sh",
+    "test-all": "npm run test-api && npm run test-e2e && npm run test-game && npm run lint"
   },
   "workspaces": [
     "services/*",
