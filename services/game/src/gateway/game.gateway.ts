@@ -225,7 +225,6 @@ export default async function gameGateway(fastify: FastifyInstance) {
     });
 
     socket.send(JSON.stringify({ type: "connected" }));
-    // envoie un message au client
   });
 }
 
