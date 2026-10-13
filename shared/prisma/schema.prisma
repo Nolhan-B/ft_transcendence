@@ -18,6 +18,8 @@ model User {
   createdAt               DateTime  @default(now())
   sentRequests     Friendship[] @relation("sentRequests")
   receivedRequests Friendship[] @relation("receivedRequests")
+  sentDMs                 DirectMessage[] @relation("sentDMs")
+  receivedDMs             DirectMessage[] @relation("receivedDMs")
 }
 
 enum FriendshipStatus {
@@ -49,3 +51,17 @@ model Match {
   startedAt DateTime @default(now())
   endedAt   DateTime @default(now())
 }
+
+model DirectMessage {
+  id         String   @id @default(uuid())
+  content    String
+  senderId   String
+  receiverId String
+  createdAt  DateTime @default(now())
+
+  sender     User     @relation("sentDMs", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver   User     @relation("receivedDMs", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@index([senderId, receiverId])
+}
+
