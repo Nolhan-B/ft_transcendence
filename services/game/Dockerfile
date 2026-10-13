@@ -1,4 +1,3 @@
-# 1. Base commune
 FROM node:22-alpine AS base
 WORKDIR /app
 RUN apk add --no-cache wget
@@ -9,17 +8,18 @@ COPY services/game/package*.json ./services/game/
 
 RUN npm install --workspace=game-service --workspace=shared
 
+COPY shared ./shared
+RUN cd shared && npm run build
+
 COPY shared/prisma ./shared/prisma
 COPY services/game/prisma* ./services/game/
 
 RUN npx --workspace=game-service prisma generate --schema=/app/shared/prisma/schema.prisma
 
-# 2. Stage Développement
 FROM base AS dev
 ENV NODE_ENV=development
 RUN apk add --no-cache netcat-openbsd
 
-COPY shared ./shared
 COPY services/game ./services/game
 
 WORKDIR /app/services/game
