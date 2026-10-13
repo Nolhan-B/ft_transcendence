@@ -16,8 +16,18 @@ model User {
   twoFactorSecret         String?
   twoFactorSecretEnabled  Boolean   @default(false)
   createdAt               DateTime  @default(now())
+
+  // Friendship
   sentRequests     Friendship[] @relation("sentRequests")
   receivedRequests Friendship[] @relation("receivedRequests")
+
+  // Direct Chat
+  sentMessages     DirectMessage[] @relation("sentMessages")
+  receivedMessages DirectMessage[] @relation("receivedMessages")
+
+  // Block User
+  blockedUsers     BlockedFriendship[] @relation("blockedUsers")
+  blockedBy        BlockedFriendship[] @relation("blockedBy")
 }
 
 enum FriendshipStatus {
@@ -36,5 +46,32 @@ model Friendship {
   friend    User @relation("receivedRequests", fields: [friendId], references: [id], onDelete: Cascade)
 
   @@unique([userId, friendId], name: "userId_friendId")
+}
+
+model DirectMessage {
+  id         String   @id @default(uuid())
+  senderId   String
+  receiverId String
+  content    String
+  delivered  Boolean @default(false)
+  createdAt  DateTime @default(now())
+
+  sender     User     @relation("sentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver   User     @relation("receivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@index([senderId, receiverId])
+  @@index([receiverId, delivered])
+}
+
+model BlockedFriendship {
+  id        String   @id @default(uuid())
+  blockerId String
+  blockedId String
+  createdAt DateTime @default(now())
+
+  blocker   User     @relation("blockedUsers", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked   User     @relation("blockedBy", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerId, blockedId])
 }
 

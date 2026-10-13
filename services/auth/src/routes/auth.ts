@@ -33,7 +33,10 @@ export default async function authRoutes(fastify: FastifyInstance) {
           username,
           password,
         );
-        const token = fastify.jwt.sign({ id: user.id, email: user.email });
+        const token = fastify.jwt.sign(
+          { id: user.id, email: user.email },
+          { expiresIn: "7d" },
+        );
         return reply.code(201).send({ token, user });
       } catch (err: unknown) {
         const prismaError = err as { code?: string };
@@ -71,7 +74,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
       if (user.twoFactorSecretEnabled) {
         const tempToken = fastify.jwt.sign(
           { id: user.id, requires2FA: true },
-          { expiresIn: "5m" },
+          { expiresIn: "7d" },
         );
         return reply.send({
           requiresTwoFactor: true,
@@ -79,7 +82,10 @@ export default async function authRoutes(fastify: FastifyInstance) {
         } as TwoFactorRequiredResponse);
       }
 
-      const token = fastify.jwt.sign({ id: user.id, email: user.email });
+      const token = fastify.jwt.sign(
+        { id: user.id, email: user.email },
+        { expiresIn: "7d" },
+      );
       return { token, user };
     },
   );
