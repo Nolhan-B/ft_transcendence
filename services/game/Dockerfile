@@ -1,15 +1,30 @@
-FROM node:22-alpine
-
+# 1. Base commune
+FROM node:22-alpine AS base
 WORKDIR /app
-
-COPY package*.json ./
-
 RUN apk add --no-cache wget
 
-RUN npm install
+COPY package*.json ./
+COPY shared/package*.json ./shared/
+COPY services/game/package*.json ./services/game/
 
-COPY . .
+RUN npm install --workspace=game-service --workspace=shared
 
-EXPOSE 3002
+COPY shared/prisma ./shared/prisma
+COPY services/game/prisma* ./services/game/
 
+RUN npx --workspace=game-service prisma generate --schema=/app/shared/prisma/schema.prisma
+
+# 2. Stage Développement
+FROM base AS dev
+ENV NODE_ENV=development
+RUN apk add --no-cache netcat-openbsd
+
+COPY shared ./shared
+COPY services/game ./services/game
+
+WORKDIR /app/services/game
+COPY services/game/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 CMD ["npm", "run", "dev"]

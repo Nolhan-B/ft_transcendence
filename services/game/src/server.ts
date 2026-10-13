@@ -4,6 +4,7 @@ import websocket from "@fastify/websocket";
 import gameRoutes from "./routes/game.js";
 import gameManager from "./plugins/game.manager.js";
 import jwt from "@fastify/jwt";
+import prismaPlugin from "./plugins/prisma.js";
 
 const fastify = Fastify({
   logger: true,
@@ -19,6 +20,7 @@ fastify.get(
 
 fastify.register(jwt, { secret: process.env.JWT_SECRET ?? "dev-secret" });
 
+fastify.register(prismaPlugin);
 fastify.register(websocket);
 fastify.register(gameManager);
 
