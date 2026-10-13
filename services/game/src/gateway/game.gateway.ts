@@ -1,6 +1,8 @@
 import { FastifyInstance } from "fastify";
 import { WebSocket } from "@fastify/websocket";
 import {
+  CardColor,
+  CardValue,
   GameStatus,
   type ClientMessage,
   type GameState,
@@ -277,8 +279,8 @@ function filterStateForPlayer(
           ? p.hand
           : p.hand.map(() => ({
               id: "",
-              color: "wild" as any,
-              value: "wild" as any,
+              color: "wild" as CardColor,
+              value: "wild" as CardValue,
             })),
     })),
     currentColor: game.currentColor,
