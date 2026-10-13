@@ -15,6 +15,11 @@ export interface DrawCardPayload {
   gameId: string;
 }
 
+export interface ChatMessagePayload {
+  gameId: string;
+  content: string;
+}
+
 // Server -> Client
 export interface GameUpdatedEvent {
   type: "game_updated";
@@ -41,9 +46,23 @@ export interface ErrorEvent {
   message: string;
 }
 
+export interface ChatMessageEvent {
+  type: "chat_message";
+  userId: string;
+  username: string;
+  content: string;
+}
+
 export type ServerEvent =
   | GameUpdatedEvent
   | PlayerJoinedEvent
   | PlayerLeftEvent
   | GameEndedEvent
+  | ChatMessageEvent
   | ErrorEvent;
+
+export type ClientMessage =
+  | ({ type: "join_game" } & JoinGamePayload)
+  | ({ type: "play_card" } & PlayCardPayload)
+  | ({ type: "draw_card" } & DrawCardPayload)
+  | ({ type: "chat_message" } & ChatMessagePayload);
