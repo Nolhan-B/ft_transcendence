@@ -1,6 +1,11 @@
 import { FastifyInstance } from "fastify";
 import { WebSocket } from "@fastify/websocket";
-import type { ClientMessage, GameState, ServerEvent } from "shared";
+import {
+  GameStatus,
+  type ClientMessage,
+  type GameState,
+  type ServerEvent,
+} from "shared";
 import { RawData } from "ws";
 import { InternalGameState } from "../engine/game-state.js";
 
@@ -75,6 +80,15 @@ export default async function gameGateway(fastify: FastifyInstance) {
           }
           broadCastStateToRoom(game.id, updatedState);
 
+          if (updatedState.status === GameStatus.FINISHED) {
+            broadCastToRoom(game.id, {
+              type: "game_ended",
+              winnerId: updatedState.winnerId!,
+            });
+            // TODO : Faire persister la game en bdd et agir sur les rank pour ranked
+            rooms.delete(updatedState.id);
+            manager.removeGame(updatedState.id);
+          }
           break;
         }
         case "draw_card": {
@@ -89,6 +103,32 @@ export default async function gameGateway(fastify: FastifyInstance) {
             break;
           }
           broadCastStateToRoom(game.id, updatedState);
+
+          if (updatedState.status === GameStatus.FINISHED) {
+            broadCastToRoom(game.id, {
+              type: "game_ended",
+              winnerId: updatedState.winnerId!,
+            });
+            // TODO : Faire persister la game en bdd et agir sur les rank pour ranked
+            rooms.delete(updatedState.id);
+            manager.removeGame(updatedState.id);
+          }
+
+          break;
+        }
+        case "chat_message": {
+          const game = manager.getGame(message.gameId);
+          if (!game) {
+            sendError(socket, "Game not found");
+            break;
+          }
+          const player = game.players.find((p) => p.userId === userId);
+          broadCastToRoom(message.gameId, {
+            type: "chat_message",
+            userId,
+            username: player?.username ?? "",
+            content: message.content,
+          });
           break;
         }
       }
