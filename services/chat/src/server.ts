@@ -171,7 +171,8 @@ fastify.get("/ws", { websocket: true }, (socket, req) => {
     // Check if recipient is connected and ready to receive
     const recipientSocket = connectedClients.get(payload.receiverId);
     const isRecipientOnline =
-      recipientSocket !== undefined && recipientSocket.readyState === socket.OPEN;
+      recipientSocket !== undefined &&
+      recipientSocket.readyState === socket.OPEN;
 
     // 4. Persist to database
     let savedMessage;
