@@ -13,6 +13,22 @@ const rooms: Map<
   string,
   Set<{ socket: WebSocket; userId: string }>
 > = new Map();
+const chatLogs: Map<
+  string,
+  { userId: string; username: string; content: string; time: string }[]
+> = new Map();
+const moveLogs: Map<
+  string,
+  {
+    userId: string;
+    action: string;
+    cardId?: string;
+    cardColor?: string;
+    cardValue?: string;
+    chosenColor?: string;
+    time: string;
+  }[]
+> = new Map();
 
 export default async function gameGateway(fastify: FastifyInstance) {
   const manager = fastify.gameManager;
@@ -28,7 +44,7 @@ export default async function gameGateway(fastify: FastifyInstance) {
 
     const { id: userId } = request.user as { id: string };
 
-    socket.on("message", (data: RawData) => {
+    socket.on("message", async (data: RawData) => {
       const message = JSON.parse(data.toString()) as ClientMessage;
 
       switch (message.type) {
@@ -78,14 +94,39 @@ export default async function gameGateway(fastify: FastifyInstance) {
             sendError(socket, "Invalid move");
             break;
           }
-          broadCastStateToRoom(game.id, updatedState);
+
+          if (!moveLogs.has(updatedState.id)) moveLogs.set(updatedState.id, []);
+
+          moveLogs.get(updatedState.id)!.push({
+            userId,
+            action: "play_card",
+            cardId: message.cardId,
+            cardColor: updatedState.topCard.color,
+            cardValue: updatedState.topCard.value,
+            chosenColor: message.chosenColor,
+            time: new Date().toISOString(),
+          });
+
+          broadCastStateToRoom(updatedState.id, updatedState);
 
           if (updatedState.status === GameStatus.FINISHED) {
-            broadCastToRoom(game.id, {
+            broadCastToRoom(updatedState.id, {
               type: "game_ended",
               winnerId: updatedState.winnerId!,
             });
-            // TODO : Faire persister la game en bdd et agir sur les rank pour ranked
+            await fastify.prisma.match.create({
+              data: {
+                mode: updatedState.mode,
+                players: updatedState.players.map((p) => p.userId),
+                ranking: updatedState.ranking,
+                winnerId: updatedState.winnerId!,
+                chatLog: chatLogs.get(updatedState.id) ?? [],
+                moveLog: moveLogs.get(updatedState.id) ?? [],
+              },
+            });
+            chatLogs.delete(updatedState.id);
+            moveLogs.delete(updatedState.id);
+
             rooms.delete(updatedState.id);
             manager.removeGame(updatedState.id);
           }
@@ -102,14 +143,42 @@ export default async function gameGateway(fastify: FastifyInstance) {
             sendError(socket, "Cannot draw card");
             break;
           }
-          broadCastStateToRoom(game.id, updatedState);
+
+          if (!moveLogs.has(updatedState.id)) moveLogs.set(updatedState.id, []);
+
+          const currentPlayer = updatedState.players.find(
+            (p) => p.userId === userId,
+          );
+          const drawnCard = currentPlayer?.hand[currentPlayer.hand.length - 1];
+
+          moveLogs.get(updatedState.id)!.push({
+            userId,
+            action: "draw_card",
+            cardId: drawnCard?.id,
+            cardColor: drawnCard?.color,
+            cardValue: drawnCard?.value,
+            time: new Date().toISOString(),
+          });
+
+          broadCastStateToRoom(updatedState.id, updatedState);
 
           if (updatedState.status === GameStatus.FINISHED) {
-            broadCastToRoom(game.id, {
+            broadCastToRoom(updatedState.id, {
               type: "game_ended",
               winnerId: updatedState.winnerId!,
             });
-            // TODO : Faire persister la game en bdd et agir sur les rank pour ranked
+            await fastify.prisma.match.create({
+              data: {
+                mode: updatedState.mode,
+                players: updatedState.players.map((p) => p.userId),
+                ranking: updatedState.ranking,
+                winnerId: updatedState.winnerId!,
+                chatLog: chatLogs.get(updatedState.id) ?? [],
+                moveLog: moveLogs.get(updatedState.id) ?? [],
+              },
+            });
+            chatLogs.delete(updatedState.id);
+            moveLogs.delete(updatedState.id);
             rooms.delete(updatedState.id);
             manager.removeGame(updatedState.id);
           }
@@ -123,6 +192,15 @@ export default async function gameGateway(fastify: FastifyInstance) {
             break;
           }
           const player = game.players.find((p) => p.userId === userId);
+
+          if (!chatLogs.has(message.gameId)) chatLogs.set(message.gameId, []);
+          chatLogs.get(message.gameId)!.push({
+            userId,
+            username: player?.username ?? "",
+            content: message.content,
+            time: new Date().toISOString(),
+          });
+
           broadCastToRoom(message.gameId, {
             type: "chat_message",
             userId,

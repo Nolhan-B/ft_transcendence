@@ -38,3 +38,14 @@ model Friendship {
   @@unique([userId, friendId], name: "userId_friendId")
 }
 
+model Match {
+  id        String   @id @default(uuid())
+  mode      String
+  players   String[]
+  ranking   String[]
+  winnerId  String
+  chatLog   Json     @default("[]")
+  moveLog   Json     @default("[]")
+  startedAt DateTime @default(now())
+  endedAt   DateTime @default(now())
+}
