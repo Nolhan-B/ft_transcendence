@@ -107,6 +107,7 @@ export function playCard(
   state.topCard = playedCard;
   state.discardPile.push(playedCard);
 
+  const validColors = ["red", "yellow", "green", "blue"];
   const effect = getCardEffect(playedCard);
 
   switch (effect.type) {
@@ -126,14 +127,13 @@ export function playCard(
         advanceToNextPlayer(state);
       }
       break;
-      break;
     case "draw":
       advanceToNextPlayer(state);
       drawCardsForCurrentPlayer(state, effect.count);
       advanceToNextPlayer(state);
       break;
     case "wild":
-      if (!chosenColor) return null;
+      if (!chosenColor || !validColors.includes(chosenColor)) return null;
       state.currentColor = chosenColor as CardColor;
       advanceToNextPlayer(state);
       break;
