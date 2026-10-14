@@ -20,6 +20,15 @@ export interface ChatMessagePayload {
   content: string;
 }
 
+export interface CallUnoPayload {
+  gameId: string;
+}
+
+export interface CatchUnoPayload {
+  gameId: string;
+  targetUserId: string;
+}
+
 // Server -> Client
 export interface GameUpdatedEvent {
   type: "game_updated";
@@ -53,16 +62,25 @@ export interface ChatMessageEvent {
   content: string;
 }
 
+export interface UnoCaughtEvent {
+  type: "uno_caught";
+  targetUserId: string;
+  catcherUserId: string;
+}
+
 export type ServerEvent =
   | GameUpdatedEvent
   | PlayerJoinedEvent
   | PlayerLeftEvent
   | GameEndedEvent
   | ChatMessageEvent
-  | ErrorEvent;
+  | ErrorEvent
+  | UnoCaughtEvent;
 
 export type ClientMessage =
   | ({ type: "join_game" } & JoinGamePayload)
   | ({ type: "play_card" } & PlayCardPayload)
   | ({ type: "draw_card" } & DrawCardPayload)
-  | ({ type: "chat_message" } & ChatMessagePayload);
+  | ({ type: "chat_message" } & ChatMessagePayload)
+  | ({ type: "call_uno" } & CallUnoPayload)
+  | ({ type: "catch_uno" } & CatchUnoPayload);

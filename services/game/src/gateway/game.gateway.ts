@@ -31,6 +31,7 @@ const moveLogs: Map<
     time: string;
   }[]
 > = new Map();
+const unoTimers: Map<string, NodeJS.Timeout> = new Map();
 
 export default async function gameGateway(fastify: FastifyInstance) {
   const manager = fastify.gameManager;
@@ -111,6 +112,20 @@ export default async function gameGateway(fastify: FastifyInstance) {
 
           broadCastStateToRoom(updatedState.id, updatedState);
 
+          if (updatedState.settings.unoCallout) {
+            const playerHand = updatedState.players.find(
+              (p) => p.userId === userId,
+            )?.hand;
+            if (playerHand && playerHand.length === 1) {
+              unoTimers.set(
+                userId,
+                setTimeout(() => {
+                  unoTimers.delete(userId);
+                }, 5000),
+              );
+            }
+          }
+
           if (updatedState.status === GameStatus.FINISHED) {
             broadCastToRoom(updatedState.id, {
               type: "game_ended",
@@ -132,6 +147,43 @@ export default async function gameGateway(fastify: FastifyInstance) {
             rooms.delete(updatedState.id);
             manager.removeGame(updatedState.id);
           }
+          break;
+        }
+        case "call_uno": {
+          if (unoTimers.has(userId)) {
+            clearTimeout(unoTimers.get(userId));
+            unoTimers.delete(userId);
+          }
+          break;
+        }
+        case "catch_uno": {
+          const target = message.targetUserId;
+          if (!unoTimers.has(target)) {
+            sendError(socket, "Player already called UNO or not in UNO state");
+            break;
+          }
+          clearTimeout(unoTimers.get(target));
+          unoTimers.delete(target);
+
+          const game = manager.getGame(message.gameId);
+          if (!game) break;
+
+          const targetPlayer = game.players.find((p) => p.userId === target);
+          if (targetPlayer) {
+            for (let i = 0; i < 2; i++) {
+              if (game.drawPile.length === 0) break;
+              const card = game.drawPile.shift();
+              if (card) targetPlayer.hand.push(card);
+            }
+            game.drawPileCount = game.drawPile.length;
+          }
+
+          broadCastToRoom(message.gameId, {
+            type: "uno_caught",
+            targetUserId: target,
+            catcherUserId: userId,
+          } as ServerEvent);
+          broadCastStateToRoom(game.id, game);
           break;
         }
         case "draw_card": {
