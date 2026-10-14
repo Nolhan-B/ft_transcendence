@@ -36,15 +36,22 @@ export default async function gameGateway(fastify: FastifyInstance) {
   const manager = fastify.gameManager;
 
   fastify.get("/ws", { websocket: true }, async (socket, request) => {
-    try {
-      await request.jwtVerify();
-    } catch {
+    const token = (request.query as { token?: string }).token;
+    if (!token) {
       sendError(socket, "Unauthorized");
       socket.close();
       return;
     }
 
-    const { id: userId } = request.user as { id: string };
+    let userId: string;
+    try {
+      const payload = fastify.jwt.verify(token) as { id: string };
+      userId = payload.id;
+    } catch {
+      sendError(socket, "Invalid token");
+      socket.close();
+      return;
+    }
 
     socket.on("message", async (data: RawData) => {
       const message = JSON.parse(data.toString()) as ClientMessage;
