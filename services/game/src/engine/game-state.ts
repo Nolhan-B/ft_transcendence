@@ -8,7 +8,7 @@
 //  sevenZeroRule,
 //  jumpIn,
 //  bluffChallenge,
-//  unoCallout)
+//  unoCallout      -> DONE)
 //
 //
 //
@@ -29,6 +29,7 @@ import { getCardEffect, isValidPlay } from "./rules.js";
 
 export interface InternalGameState extends GameState {
   drawPile: Card[];
+  pendingDrawCount: number;
 }
 
 export function createGame(
@@ -58,7 +59,7 @@ export function createGame(
   }));
 
   const defaultSettings: GameSettings = {
-    stacking: false,
+    stacking: "none",
     multiplePlay: false,
     sevenZeroRule: false,
     jumpIn: false,
@@ -78,6 +79,7 @@ export function createGame(
     drawPileCount: remaining.length,
     discardPile: [topCard],
     drawPile: remaining,
+    pendingDrawCount: 0,
     ranking: [],
     winnerId: null,
   };
@@ -100,8 +102,16 @@ export function playCard(
   const playedCard: Card | undefined = getCardFromHand(player, cardId);
   if (!playedCard) return null;
 
-  if (!isValidPlay(playedCard, state.topCard, state.currentColor)) return null;
-
+  if (
+    !isValidPlay(
+      playedCard,
+      state.topCard,
+      state.currentColor,
+      state.pendingDrawCount,
+      state.settings.stacking,
+    )
+  )
+    return null;
   removeCardFromHand(player, cardId);
 
   state.topCard = playedCard;
@@ -128,9 +138,14 @@ export function playCard(
       }
       break;
     case "draw":
-      advanceToNextPlayer(state);
-      drawCardsForCurrentPlayer(state, effect.count);
-      advanceToNextPlayer(state);
+      if (state.settings.stacking === "none") {
+        advanceToNextPlayer(state);
+        drawCardsForCurrentPlayer(state, effect.count);
+        advanceToNextPlayer(state);
+      } else {
+        state.pendingDrawCount += effect.count;
+        advanceToNextPlayer(state);
+      }
       break;
     case "wild":
       if (!chosenColor || !validColors.includes(chosenColor)) return null;
@@ -140,9 +155,14 @@ export function playCard(
     case "wild_draw":
       if (!chosenColor) return null;
       state.currentColor = chosenColor as CardColor;
-      advanceToNextPlayer(state);
-      drawCardsForCurrentPlayer(state, effect.count);
-      advanceToNextPlayer(state);
+      if (state.settings.stacking === "none") {
+        advanceToNextPlayer(state);
+        drawCardsForCurrentPlayer(state, effect.count);
+        advanceToNextPlayer(state);
+      } else {
+        state.pendingDrawCount += effect.count;
+        advanceToNextPlayer(state);
+      }
       break;
   }
 
@@ -238,7 +258,9 @@ export function drawCard(
   if (!player || player.disconnected) return null;
   if (!player.isCurrentTurn) return null;
 
-  drawCardsForCurrentPlayer(state, 1);
+  const count = state.pendingDrawCount > 0 ? state.pendingDrawCount : 1;
+  drawCardsForCurrentPlayer(state, count);
+  state.pendingDrawCount = 0;
   advanceToNextPlayer(state);
 
   return state;

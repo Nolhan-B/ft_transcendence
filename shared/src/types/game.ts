@@ -42,8 +42,10 @@ export interface Player {
   disconnected: boolean;
 }
 
+export type StackingRule = "none" | "same" | "all";
+
 export interface GameSettings {
-  stacking: boolean;
+  stacking: StackingRule;
   multiplePlay: boolean;
   sevenZeroRule: boolean;
   jumpIn: boolean;

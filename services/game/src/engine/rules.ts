@@ -1,4 +1,4 @@
-import type { Card, CardColor } from "shared";
+import type { Card, CardColor, StackingRule } from "shared";
 
 export type CardEffect =
   | { type: "none" }
@@ -12,7 +12,15 @@ export function isValidPlay(
   card: Card,
   topCard: Card,
   currentColor: CardColor,
+  pendingDrawCount: number,
+  stacking: StackingRule,
 ): boolean {
+  if (pendingDrawCount > 0) {
+    if (stacking === "none") return false;
+    if (stacking === "same") return card.value === topCard.value;
+    if (stacking === "all")
+      return card.value === "draw2" || card.value === "wild_draw4";
+  }
   if (card.color === "wild") return true;
   if (card.color === currentColor) return true;
   if (card.value === topCard.value) return true;
