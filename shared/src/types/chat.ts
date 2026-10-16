@@ -1,16 +1,26 @@
-// Payload sent by the client when sending a direct message
+// Payload sent by the client when sending a direct message via WebSocket
 export interface SendDirectMessagePayload {
   type: "direct_message";
   receiverId: string;
   content: string;
 }
 
-// Payload broadcasted/sent back to the recipient and sender
-export interface DirectMessageEvent {
-  type: "direct_message";
+// Direct message entity returned by the database and REST API
+export interface DirectMessage {
   id: string;
   senderId: string;
   receiverId: string;
   content: string;
-  createdAt: string; // ISO format string
+  createdAt: string; // ISO format string in JSON
+  delivered: boolean;
+}
+
+// Real-time event dispatched over WebSocket (message entity + discriminant event type)
+export interface DirectMessageEvent extends DirectMessage {
+  type: "direct_message";
+}
+
+// Payload returned by the GET /conversations/:otherUserId/messages endpoint
+export interface GetConversationHistoryResponse {
+  messages: DirectMessage[];
 }

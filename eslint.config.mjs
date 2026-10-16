@@ -10,6 +10,7 @@ export default tseslint.config(
       "**/src/generated/**",
       "**/shared/src/generated/**",
       "**/services/game/tests/**",
+      "**/.github/scripts/**",
     ],
   },
   js.configs.recommended,
