@@ -3,10 +3,9 @@
 //
 //
 // TODO: Implémenter les settings
-// (stacking,
-//  multiplePlay,
-//  sevenZeroRule,
-//  jumpIn,
+// (stacking,       -> DONE
+//  sevenZeroRule,  -> DONE
+//  jumpIn,         -> DONE
 //  bluffChallenge,
 //  unoCallout      -> DONE)
 //
@@ -96,11 +95,21 @@ export function playCard(
   const player: Player | undefined = getPlayer(state, playerId);
 
   if (!player || player.disconnected) return null;
-
-  if (!player.isCurrentTurn) return null;
-
   const playedCard: Card | undefined = getCardFromHand(player, cardId);
   if (!playedCard) return null;
+
+  if (!player.isCurrentTurn) {
+    if (!state.settings.jumpIn) return null;
+    if (
+      playedCard.color !== state.topCard.color ||
+      playedCard.value !== state.topCard.value
+    )
+      return null;
+
+    const currentPlayer = state.players.find((p) => p.isCurrentTurn);
+    if (currentPlayer) currentPlayer.isCurrentTurn = false;
+    player.isCurrentTurn = true;
+  }
 
   if (
     !isValidPlay(
