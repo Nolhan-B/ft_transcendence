@@ -1,5 +1,6 @@
-import { WebSocket } from "ws";
 import process from "node:process";
+
+const WebSocket = globalThis.WebSocket ?? (await import("ws")).WebSocket;
 
 const API_URL = process.env.API_URL || "http://localhost:8080";
 const WS_URL = process.env.WS_URL || "ws://localhost:8080/api/chat/ws";
