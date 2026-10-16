@@ -35,7 +35,6 @@ fastify.get("/health", { logLevel: "silent" }, async () => {
   return { service: "chat", status: "ok" };
 });
 
-// IMPORTANT : Encapsuler la route WS dans register() pour attendre que @fastify/websocket soit chargé
 fastify.register(async function (fastify) {
   fastify.get("/ws", { websocket: true }, (socket: WebSocket, req) => {
     const query = req.query as { token?: string };
@@ -60,7 +59,6 @@ fastify.register(async function (fastify) {
     fastify.log.info(`User authenticated on WS: ${userId}`);
     connectedClients.set(userId, socket);
 
-    // Livraison des messages en attente
     (async () => {
       try {
         const pendingMessages = await fastify.prisma.directMessage.findMany({
@@ -70,6 +68,8 @@ fastify.register(async function (fastify) {
             senderId: true,
             receiverId: true,
             content: true,
+            messageType: true,
+            gameRoomId: true,
             createdAt: true,
           },
           orderBy: { createdAt: "asc" },
@@ -78,7 +78,7 @@ fastify.register(async function (fastify) {
         if (pendingMessages.length === 0) return;
 
         for (const msg of pendingMessages) {
-          if (socket.readyState !== 1) return; // 1 = OPEN
+          if (socket.readyState !== 1) return;
           socket.send(
             JSON.stringify({
               type: "direct_message",
@@ -86,6 +86,8 @@ fastify.register(async function (fastify) {
               senderId: msg.senderId,
               receiverId: msg.receiverId,
               content: msg.content,
+              messageType: msg.messageType,
+              gameRoomId: msg.gameRoomId,
               createdAt: msg.createdAt.toISOString(),
             }),
           );
@@ -109,7 +111,7 @@ fastify.register(async function (fastify) {
         return;
       }
 
-      const { type, receiverId, content } = parsed;
+      const { type, receiverId, content, messageType, gameRoomId } = parsed;
       if (
         type !== "direct_message" ||
         typeof receiverId !== "string" ||
@@ -120,7 +122,13 @@ fastify.register(async function (fastify) {
         return;
       }
 
-      const payload: SendDirectMessagePayload = { type, receiverId, content };
+      const payload: SendDirectMessagePayload = {
+        type,
+        receiverId,
+        content,
+        messageType: messageType === "game_invite" ? "game_invite" : "text",
+        gameRoomId: typeof gameRoomId === "string" ? gameRoomId : undefined,
+      };
 
       if (payload.receiverId === userId) {
         socket.send(
@@ -159,6 +167,8 @@ fastify.register(async function (fastify) {
             senderId: userId,
             receiverId: payload.receiverId,
             content: payload.content.trim(),
+            messageType: payload.messageType ?? "text",
+            gameRoomId: payload.gameRoomId ?? null,
             delivered: isRecipientOnline,
           },
           select: {
@@ -166,6 +176,8 @@ fastify.register(async function (fastify) {
             senderId: true,
             receiverId: true,
             content: true,
+            messageType: true,
+            gameRoomId: true,
             createdAt: true,
           },
         });
@@ -181,6 +193,8 @@ fastify.register(async function (fastify) {
         senderId: savedMessage.senderId,
         receiverId: savedMessage.receiverId,
         content: savedMessage.content,
+        messageType: savedMessage.messageType,
+        gameRoomId: savedMessage.gameRoomId,
         createdAt: savedMessage.createdAt.toISOString(),
       });
 

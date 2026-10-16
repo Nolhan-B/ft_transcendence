@@ -53,6 +53,8 @@ model DirectMessage {
   senderId   String
   receiverId String
   content    String
+  messageType String   @default("text") // "text" | "game_invite"
+  gameRoomId  String?  // Optional: UUID of gameroom 
   delivered  Boolean @default(false)
   createdAt  DateTime @default(now())
 

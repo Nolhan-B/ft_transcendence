@@ -63,8 +63,8 @@ const withTimeout = (promise, ms = 5000) => {
             );
             assert(historyRes.ok, "La récupération de l'historique REST a échoué");
             const historyData = await historyRes.json();
-			assert(historyData.messages && historyData.messages.length > 0, "L'historique des messages est vide");
-			console.log("✅ Historique REST validé !");
+            assert(historyData.messages && historyData.messages.length > 0, "L'historique des messages est vide");
+            console.log("✅ Historique REST validé !");
 
             wsAlice.close();
             wsBob.close();
@@ -119,6 +119,57 @@ const withTimeout = (promise, ms = 5000) => {
             reject(err);
           }
         });
+      });
+    }));
+
+    // ==========================================
+    // TEST 3 : Invitation de jeu (game_invite)
+    // ==========================================
+    await withTimeout(new Promise((resolve, reject) => {
+      const wsAliceGame = new WebSocket(`${WS_URL}?token=${alice.token}`);
+      const wsBobGame = new WebSocket(`${WS_URL}?token=${bob.token}`);
+      const testRoomId = "room-test-uuid-42";
+
+      wsBobGame.addEventListener("message", async (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === "direct_message" && data.messageType === "game_invite") {
+            assert(data.gameRoomId === testRoomId, `gameRoomId incorrect: attendu ${testRoomId}, reçu ${data.gameRoomId}`);
+            assert(data.content === "Viens jouer au Pong !", "Contenu de l'invitation incorrect");
+            console.log("✅ Invitation de jeu temps réel reçue par Bob avec le bon roomId !");
+
+            const historyRes = await fetch(
+              `${API_URL}/api/chat/conversations/${alice.user.id}/messages`,
+              { headers: { Authorization: `Bearer ${bob.token}` } }
+            );
+            assert(historyRes.ok, "Échec de récupération de l'historique pour l'invitation");
+            const historyData = await historyRes.json();
+            const inviteMsg = historyData.messages.find((m) => m.gameRoomId === testRoomId);
+            assert(inviteMsg !== undefined, "L'invitation de jeu n'est pas présente dans l'historique REST");
+            assert(inviteMsg.messageType === "game_invite", "Le messageType en base n'est pas 'game_invite'");
+            console.log("✅ Invitation de jeu validée dans l'historique REST !");
+
+            wsAliceGame.close();
+            wsBobGame.close();
+            resolve();
+          }
+        } catch (err) {
+          reject(err);
+        }
+      });
+
+      Promise.all([
+        new Promise((r) => wsAliceGame.addEventListener("open", r)),
+        new Promise((r) => wsBobGame.addEventListener("open", r)),
+      ]).then(() => {
+        console.log("🎮 Alice envoie une invitation de jeu à Bob...");
+        wsAliceGame.send(JSON.stringify({
+          type: "direct_message",
+          receiverId: bob.user.id,
+          content: "Viens jouer au Pong !",
+          messageType: "game_invite",
+          gameRoomId: testRoomId
+        }));
       });
     }));
 

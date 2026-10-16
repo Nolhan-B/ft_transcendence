@@ -49,6 +49,8 @@ export default async function messageHistoryRoutes(fastify: FastifyInstance) {
           senderId: true,
           receiverId: true,
           content: true,
+          messageType: true,
+          gameRoomId: true,
           createdAt: true,
           delivered: true,
         },

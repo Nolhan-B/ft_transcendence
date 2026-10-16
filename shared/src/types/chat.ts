@@ -3,6 +3,8 @@ export interface SendDirectMessagePayload {
   type: "direct_message";
   receiverId: string;
   content: string;
+  messageType?: "text" | "game_invite";
+  gameRoomId?: string;
 }
 
 // Direct message entity returned by the database and REST API
@@ -11,6 +13,8 @@ export interface DirectMessage {
   senderId: string;
   receiverId: string;
   content: string;
+  messageType: "text" | "game_invite";
+  gameRoomId?: string | null;
   createdAt: string; // ISO format string in JSON
   delivered: boolean;
 }
