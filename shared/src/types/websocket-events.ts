@@ -9,6 +9,7 @@ export interface PlayCardPayload {
   gameId: string;
   cardId: string;
   chosenColor?: CardColor; // requis pour wild / wild_draw4
+  targetUserId?: string;
 }
 
 export interface DrawCardPayload {

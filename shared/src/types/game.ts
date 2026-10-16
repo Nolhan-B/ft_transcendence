@@ -46,7 +46,6 @@ export type StackingRule = "none" | "same" | "all";
 
 export interface GameSettings {
   stacking: StackingRule;
-  multiplePlay: boolean;
   sevenZeroRule: boolean;
   jumpIn: boolean;
   bluffChallenge: boolean;

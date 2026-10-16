@@ -92,6 +92,7 @@ export default async function gameGateway(fastify: FastifyInstance) {
             userId,
             message.cardId,
             message.chosenColor,
+            message.targetUserId,
           );
           if (!updatedState) {
             sendError(socket, "Invalid move");

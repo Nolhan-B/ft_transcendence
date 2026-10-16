@@ -24,6 +24,7 @@ export class GameManager {
     playerId: string,
     cardId: string,
     chosenColor?: string,
+    targetUserId?: string,
   ): InternalGameState | null {
     const currentGameState = this.games.get(gameId);
     if (!currentGameState) return null;
@@ -33,6 +34,7 @@ export class GameManager {
       playerId,
       cardId,
       chosenColor,
+      targetUserId,
     );
 
     return actualisedGameState;

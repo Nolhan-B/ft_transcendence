@@ -60,7 +60,6 @@ export function createGame(
 
   const defaultSettings: GameSettings = {
     stacking: "none",
-    multiplePlay: false,
     sevenZeroRule: false,
     jumpIn: false,
     bluffChallenge: false,
@@ -90,6 +89,7 @@ export function playCard(
   playerId: string,
   cardId: string,
   chosenColor?: string,
+  targetUserId?: string,
 ): InternalGameState | null {
   if (state.status === GameStatus.FINISHED) return null;
 
@@ -122,6 +122,14 @@ export function playCard(
 
   switch (effect.type) {
     case "none":
+      if (state.settings.sevenZeroRule && playedCard.value === "7") {
+        if (!targetUserId) return null;
+        const target = getPlayer(state, targetUserId);
+        if (!target || target.disconnected) return null;
+        swapHands(state, player.userId, target.userId);
+      } else if (state.settings.sevenZeroRule && playedCard.value === "0") {
+        rotateHands(state);
+      }
       advanceToNextPlayer(state);
       break;
     case "skip":
@@ -202,6 +210,10 @@ function getPlayer(
   return state.players.find((p) => p.userId === playerId);
 }
 
+function getActivePlayers(state: InternalGameState): Player[] {
+  return state.players.filter((p) => !p.disconnected);
+}
+
 function getCardFromHand(player: Player, cardId: string): Card | undefined {
   return player.hand.find((c) => c.id === cardId);
 }
@@ -264,4 +276,33 @@ export function drawCard(
   advanceToNextPlayer(state);
 
   return state;
+}
+
+export function swapHands(
+  state: InternalGameState,
+  playerOneId: string,
+  playerTwoId: string,
+): void {
+  const playerOne = getPlayer(state, playerOneId);
+  const playerTwo = getPlayer(state, playerTwoId);
+
+  [playerOne!.hand, playerTwo!.hand] = [playerTwo!.hand, playerOne!.hand];
+}
+
+function rotateHands(state: InternalGameState): void {
+  const activePlayers = getActivePlayers(state);
+  if (activePlayers.length < 2) return;
+  const hands = activePlayers.map((p) => p.hand);
+
+  if (state.direction === 1) {
+    const last = hands.pop()!;
+    hands.unshift(last);
+  } else {
+    const first = hands.shift()!;
+    hands.push(first);
+  }
+
+  for (let i = 0; i < activePlayers.length; i++) {
+    activePlayers[i].hand = hands[i];
+  }
 }
