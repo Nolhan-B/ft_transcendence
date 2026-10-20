@@ -42,9 +42,10 @@ export interface Player {
   disconnected: boolean;
 }
 
+export type StackingRule = "none" | "same" | "all";
+
 export interface GameSettings {
-  stacking: boolean;
-  multiplePlay: boolean;
+  stacking: StackingRule;
   sevenZeroRule: boolean;
   jumpIn: boolean;
   bluffChallenge: boolean;
@@ -58,6 +59,7 @@ export interface GameState {
   settings: GameSettings;
   players: Player[];
   currentColor: CardColor;
+  pendingDrawCount: number;
   topCard: Card;
   direction: 1 | -1;
   drawPileCount: number;

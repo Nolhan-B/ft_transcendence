@@ -9,6 +9,23 @@ export interface PlayCardPayload {
   gameId: string;
   cardId: string;
   chosenColor?: CardColor; // requis pour wild / wild_draw4
+  targetUserId?: string;
+}
+
+export interface ChallengeBluffPayload {
+  gameId: string;
+}
+
+export interface AcceptWildDraw4Payload {
+  gameId: string;
+}
+
+export interface BluffResultEvent {
+  type: "bluff_result";
+  challengerUserId: string;
+  targetUserId: string;
+  wasBluff: boolean;
+  penaltyCount: number;
 }
 
 export interface DrawCardPayload {
@@ -18,6 +35,15 @@ export interface DrawCardPayload {
 export interface ChatMessagePayload {
   gameId: string;
   content: string;
+}
+
+export interface CallUnoPayload {
+  gameId: string;
+}
+
+export interface CatchUnoPayload {
+  gameId: string;
+  targetUserId: string;
 }
 
 // Server -> Client
@@ -53,16 +79,28 @@ export interface ChatMessageEvent {
   content: string;
 }
 
+export interface UnoCaughtEvent {
+  type: "uno_caught";
+  targetUserId: string;
+  catcherUserId: string;
+}
+
 export type ServerEvent =
   | GameUpdatedEvent
   | PlayerJoinedEvent
   | PlayerLeftEvent
   | GameEndedEvent
   | ChatMessageEvent
-  | ErrorEvent;
+  | ErrorEvent
+  | UnoCaughtEvent
+  | BluffResultEvent;
 
 export type ClientMessage =
   | ({ type: "join_game" } & JoinGamePayload)
   | ({ type: "play_card" } & PlayCardPayload)
   | ({ type: "draw_card" } & DrawCardPayload)
-  | ({ type: "chat_message" } & ChatMessagePayload);
+  | ({ type: "chat_message" } & ChatMessagePayload)
+  | ({ type: "call_uno" } & CallUnoPayload)
+  | ({ type: "catch_uno" } & CatchUnoPayload)
+  | ({ type: "challenge_bluff" } & ChallengeBluffPayload)
+  | ({ type: "accept_wild_draw4" } & AcceptWildDraw4Payload);

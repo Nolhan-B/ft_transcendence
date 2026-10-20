@@ -1,20 +1,3 @@
-//
-//
-//
-//
-// TODO: Implémenter les settings
-// (stacking,
-//  multiplePlay,
-//  sevenZeroRule,
-//  jumpIn,
-//  bluffChallenge,
-//  unoCallout)
-//
-//
-//
-//
-//
-
 import {
   GameMode,
   GameState,
@@ -29,6 +12,11 @@ import { getCardEffect, isValidPlay } from "./rules.js";
 
 export interface InternalGameState extends GameState {
   drawPile: Card[];
+  lastWildDraw4?: {
+    playerId: string;
+    hadMatchingColor: boolean;
+    previousColor: CardColor;
+  };
 }
 
 export function createGame(
@@ -58,8 +46,7 @@ export function createGame(
   }));
 
   const defaultSettings: GameSettings = {
-    stacking: false,
-    multiplePlay: false,
+    stacking: "none",
     sevenZeroRule: false,
     jumpIn: false,
     bluffChallenge: false,
@@ -78,6 +65,8 @@ export function createGame(
     drawPileCount: remaining.length,
     discardPile: [topCard],
     drawPile: remaining,
+    pendingDrawCount: 0,
+    lastWildDraw4: undefined,
     ranking: [],
     winnerId: null,
   };
@@ -88,29 +77,66 @@ export function playCard(
   playerId: string,
   cardId: string,
   chosenColor?: string,
+  targetUserId?: string,
 ): InternalGameState | null {
   if (state.status === GameStatus.FINISHED) return null;
 
   const player: Player | undefined = getPlayer(state, playerId);
 
   if (!player || player.disconnected) return null;
-
-  if (!player.isCurrentTurn) return null;
-
   const playedCard: Card | undefined = getCardFromHand(player, cardId);
   if (!playedCard) return null;
 
-  if (!isValidPlay(playedCard, state.topCard, state.currentColor)) return null;
+  if (!player.isCurrentTurn) {
+    if (!state.settings.jumpIn) return null;
+    if (
+      playedCard.color !== state.topCard.color ||
+      playedCard.value !== state.topCard.value
+    )
+      return null;
+
+    const currentPlayer = state.players.find((p) => p.isCurrentTurn);
+    if (currentPlayer) currentPlayer.isCurrentTurn = false;
+    player.isCurrentTurn = true;
+  }
+
+  if (
+    !isValidPlay(
+      playedCard,
+      state.topCard,
+      state.currentColor,
+      state.pendingDrawCount,
+      state.settings.stacking,
+    )
+  )
+    return null;
+
+  // Check bluff avant de retirer la carte de la main
+  const hadMatchingColorBeforePlay =
+    playedCard.value === "wild_draw4"
+      ? player.hand.some(
+          (c) => c.color === state.currentColor && c.id !== cardId,
+        )
+      : false;
 
   removeCardFromHand(player, cardId);
 
   state.topCard = playedCard;
   state.discardPile.push(playedCard);
 
+  const validColors = ["red", "yellow", "green", "blue"];
   const effect = getCardEffect(playedCard);
 
   switch (effect.type) {
     case "none":
+      if (state.settings.sevenZeroRule && playedCard.value === "7") {
+        if (!targetUserId) return null;
+        const target = getPlayer(state, targetUserId);
+        if (!target || target.disconnected) return null;
+        swapHands(state, player.userId, target.userId);
+      } else if (state.settings.sevenZeroRule && playedCard.value === "0") {
+        rotateHands(state);
+      }
       advanceToNextPlayer(state);
       break;
     case "skip":
@@ -126,24 +152,44 @@ export function playCard(
         advanceToNextPlayer(state);
       }
       break;
-      break;
     case "draw":
-      advanceToNextPlayer(state);
-      drawCardsForCurrentPlayer(state, effect.count);
-      advanceToNextPlayer(state);
+      if (state.settings.stacking === "none") {
+        advanceToNextPlayer(state);
+        drawCardsForCurrentPlayer(state, effect.count);
+        advanceToNextPlayer(state);
+      } else {
+        state.pendingDrawCount += effect.count;
+        advanceToNextPlayer(state);
+      }
       break;
     case "wild":
-      if (!chosenColor) return null;
+      if (!chosenColor || !validColors.includes(chosenColor)) return null;
       state.currentColor = chosenColor as CardColor;
       advanceToNextPlayer(state);
       break;
-    case "wild_draw":
+    case "wild_draw": {
       if (!chosenColor) return null;
+      const previousColor = state.currentColor;
       state.currentColor = chosenColor as CardColor;
-      advanceToNextPlayer(state);
-      drawCardsForCurrentPlayer(state, effect.count);
-      advanceToNextPlayer(state);
+
+      if (state.settings.bluffChallenge) {
+        // Stocker l'info pour un éventuel challenge, ne pas faire piocher
+        state.lastWildDraw4 = {
+          playerId: player.userId,
+          hadMatchingColor: hadMatchingColorBeforePlay,
+          previousColor,
+        };
+        advanceToNextPlayer(state);
+      } else if (state.settings.stacking === "none") {
+        advanceToNextPlayer(state);
+        drawCardsForCurrentPlayer(state, effect.count);
+        advanceToNextPlayer(state);
+      } else {
+        state.pendingDrawCount += effect.count;
+        advanceToNextPlayer(state);
+      }
       break;
+    }
   }
 
   if (effect.type !== "wild" && effect.type !== "wild_draw") {
@@ -157,8 +203,7 @@ export function playCard(
       state.winnerId = player.userId;
       state.status = GameStatus.FINISHED;
     } else {
-      // Ranked : le joueur sort, la partie continue
-      player.disconnected = true; // il ne joue plus
+      player.disconnected = true;
       const activePlayers = state.players.filter((p) => !p.disconnected);
       if (activePlayers.length <= 1) {
         if (activePlayers.length === 1) {
@@ -182,6 +227,10 @@ function getPlayer(
   return state.players.find((p) => p.userId === playerId);
 }
 
+function getActivePlayers(state: InternalGameState): Player[] {
+  return state.players.filter((p) => !p.disconnected);
+}
+
 function getCardFromHand(player: Player, cardId: string): Card | undefined {
   return player.hand.find((c) => c.id === cardId);
 }
@@ -192,7 +241,7 @@ function removeCardFromHand(player: Player, cardId: string): Card | undefined {
   return player.hand.splice(index, 1)[0];
 }
 
-function advanceToNextPlayer(state: InternalGameState): void {
+export function advanceToNextPlayer(state: InternalGameState): void {
   const currentIndex = state.players.findIndex((p) => p.isCurrentTurn);
   state.players[currentIndex].isCurrentTurn = false;
 
@@ -210,11 +259,12 @@ function changeDirection(state: InternalGameState): void {
   state.direction = state.direction === 1 ? -1 : 1;
 }
 
-function drawCardsForCurrentPlayer(
+export function drawCardsForPlayer(
   state: InternalGameState,
+  playerId: string,
   count: number,
 ): void {
-  const player = state.players.find((p) => p.isCurrentTurn);
+  const player = state.players.find((p) => p.userId === playerId);
   if (!player) return;
 
   for (let i = 0; i < count; i++) {
@@ -230,6 +280,15 @@ function drawCardsForCurrentPlayer(
   state.drawPileCount = state.drawPile.length;
 }
 
+function drawCardsForCurrentPlayer(
+  state: InternalGameState,
+  count: number,
+): void {
+  const player = state.players.find((p) => p.isCurrentTurn);
+  if (!player) return;
+  drawCardsForPlayer(state, player.userId, count);
+}
+
 export function drawCard(
   state: InternalGameState,
   playerId: string,
@@ -238,8 +297,39 @@ export function drawCard(
   if (!player || player.disconnected) return null;
   if (!player.isCurrentTurn) return null;
 
-  drawCardsForCurrentPlayer(state, 1);
+  const count = state.pendingDrawCount > 0 ? state.pendingDrawCount : 1;
+  drawCardsForCurrentPlayer(state, count);
+  state.pendingDrawCount = 0;
   advanceToNextPlayer(state);
 
   return state;
+}
+
+export function swapHands(
+  state: InternalGameState,
+  playerOneId: string,
+  playerTwoId: string,
+): void {
+  const playerOne = getPlayer(state, playerOneId);
+  const playerTwo = getPlayer(state, playerTwoId);
+
+  [playerOne!.hand, playerTwo!.hand] = [playerTwo!.hand, playerOne!.hand];
+}
+
+function rotateHands(state: InternalGameState): void {
+  const activePlayers = getActivePlayers(state);
+  if (activePlayers.length < 2) return;
+  const hands = activePlayers.map((p) => p.hand);
+
+  if (state.direction === 1) {
+    const last = hands.pop()!;
+    hands.unshift(last);
+  } else {
+    const first = hands.shift()!;
+    hands.push(first);
+  }
+
+  for (let i = 0; i < activePlayers.length; i++) {
+    activePlayers[i].hand = hands[i];
+  }
 }
