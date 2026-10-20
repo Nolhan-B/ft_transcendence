@@ -9,7 +9,11 @@ import {
   type ServerEvent,
 } from "shared";
 import { RawData } from "ws";
-import { InternalGameState } from "../engine/game-state.js";
+import {
+  InternalGameState,
+  advanceToNextPlayer,
+  drawCardsForPlayer,
+} from "../engine/game-state.js";
 
 const rooms: Map<
   string,
@@ -32,6 +36,7 @@ const moveLogs: Map<
   }[]
 > = new Map();
 const unoTimers: Map<string, NodeJS.Timeout> = new Map();
+const bluffTimers: Map<string, NodeJS.Timeout> = new Map();
 
 export default async function gameGateway(fastify: FastifyInstance) {
   const manager = fastify.gameManager;
@@ -127,6 +132,27 @@ export default async function gameGateway(fastify: FastifyInstance) {
             }
           }
 
+          if (
+            updatedState.lastWildDraw4 &&
+            updatedState.settings.bluffChallenge
+          ) {
+            const targetId = updatedState.players.find(
+              (p) => p.isCurrentTurn,
+            )?.userId;
+            if (targetId) {
+              bluffTimers.set(
+                updatedState.id,
+                setTimeout(() => {
+                  bluffTimers.delete(updatedState.id);
+                  drawCardsForPlayer(updatedState, targetId, 4);
+                  updatedState.lastWildDraw4 = undefined;
+                  advanceToNextPlayer(updatedState);
+                  broadCastStateToRoom(updatedState.id, updatedState);
+                }, 5000),
+              );
+            }
+          }
+
           if (updatedState.status === GameStatus.FINISHED) {
             broadCastToRoom(updatedState.id, {
               type: "game_ended",
@@ -184,6 +210,57 @@ export default async function gameGateway(fastify: FastifyInstance) {
             targetUserId: target,
             catcherUserId: userId,
           } as ServerEvent);
+          broadCastStateToRoom(game.id, game);
+          break;
+        }
+        case "challenge_bluff": {
+          const game = manager.getGame(message.gameId);
+          if (!game || !game.lastWildDraw4) {
+            sendError(socket, "No bluff to challenge");
+            break;
+          }
+
+          if (bluffTimers.has(game.id)) {
+            clearTimeout(bluffTimers.get(game.id));
+            bluffTimers.delete(game.id);
+          }
+
+          const { playerId: blufferId, hadMatchingColor } = game.lastWildDraw4;
+
+          if (hadMatchingColor) {
+            drawCardsForPlayer(game, blufferId, 4);
+          } else {
+            drawCardsForPlayer(game, userId, 6);
+            advanceToNextPlayer(game);
+          }
+
+          broadCastToRoom(game.id, {
+            type: "bluff_result",
+            challengerUserId: userId,
+            targetUserId: blufferId,
+            wasBluff: hadMatchingColor,
+            penaltyCount: hadMatchingColor ? 4 : 6,
+          } as ServerEvent);
+
+          game.lastWildDraw4 = undefined;
+          broadCastStateToRoom(game.id, game);
+          break;
+        }
+        case "accept_wild_draw4": {
+          const game = manager.getGame(message.gameId);
+          if (!game || !game.lastWildDraw4) {
+            sendError(socket, "Nothing to accept");
+            break;
+          }
+
+          if (bluffTimers.has(game.id)) {
+            clearTimeout(bluffTimers.get(game.id));
+            bluffTimers.delete(game.id);
+          }
+
+          drawCardsForPlayer(game, userId, 4);
+          game.lastWildDraw4 = undefined;
+          advanceToNextPlayer(game);
           broadCastStateToRoom(game.id, game);
           break;
         }

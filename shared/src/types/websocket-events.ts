@@ -92,7 +92,8 @@ export type ServerEvent =
   | GameEndedEvent
   | ChatMessageEvent
   | ErrorEvent
-  | UnoCaughtEvent;
+  | UnoCaughtEvent
+  | BluffResultEvent;
 
 export type ClientMessage =
   | ({ type: "join_game" } & JoinGamePayload)
