@@ -4,6 +4,7 @@
   "scripts": {
     "lint": "eslint . --max-warnings=0 && npx prettier --check .",
     "test-game": "npx tsx services/game/tests/engine.test.ts",
+    "test-game-integration": "npx tsx services/game/tests/integration.test.ts",
     "test-api": "bash ./.github/scripts/api_test.sh",
     "test-e2e": "bash ./.github/scripts/e2e_test.sh"
   },
@@ -14,8 +15,11 @@
   ],
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@types/ws": "^8.18.2",
     "eslint": "^10.11.0",
     "prettier": "^3.9.9",
-    "typescript-eslint": "^8.71.0"
+    "tsx": "^4.23.15",
+    "typescript-eslint": "^8.71.0",
+    "ws": "^8.22.0"
   }
 }

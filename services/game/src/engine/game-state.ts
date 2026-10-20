@@ -12,7 +12,6 @@ import { getCardEffect, isValidPlay } from "./rules.js";
 
 export interface InternalGameState extends GameState {
   drawPile: Card[];
-  pendingDrawCount: number;
   lastWildDraw4?: {
     playerId: string;
     hadMatchingColor: boolean;
