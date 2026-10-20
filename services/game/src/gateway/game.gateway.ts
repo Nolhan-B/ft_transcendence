@@ -9,7 +9,14 @@ import {
   type ServerEvent,
 } from "shared";
 import { RawData } from "ws";
-import { InternalGameState } from "../engine/game-state.js";
+import {
+  InternalGameState,
+  advanceToNextPlayer,
+  drawCardsForPlayer,
+} from "../engine/game-state.js";
+
+const TURN_TIMEOUT_MS = 20000;
+const MAX_AFK_COUNT = 2;
 
 const rooms: Map<
   string,
@@ -31,9 +38,51 @@ const moveLogs: Map<
     time: string;
   }[]
 > = new Map();
+const unoTimers: Map<string, NodeJS.Timeout> = new Map();
+const bluffTimers: Map<string, NodeJS.Timeout> = new Map();
+const turnTimers: Map<string, NodeJS.Timeout> = new Map();
+const afkCounts: Map<string, number> = new Map();
 
 export default async function gameGateway(fastify: FastifyInstance) {
   const manager = fastify.gameManager;
+
+  function startTurnTimer(gameId: string): void {
+    if (turnTimers.has(gameId)) {
+      clearTimeout(turnTimers.get(gameId));
+    }
+
+    const game = manager.getGame(gameId);
+    if (!game || game.status === GameStatus.FINISHED) return;
+
+    const currentPlayer = game.players.find((p) => p.isCurrentTurn);
+    if (!currentPlayer) return;
+
+    const timer = setTimeout(() => {
+      turnTimers.delete(gameId);
+
+      const afkKey = `${gameId}:${currentPlayer.userId}`;
+      const count = (afkCounts.get(afkKey) ?? 0) + 1;
+      afkCounts.set(afkKey, count);
+
+      if (count >= MAX_AFK_COUNT) {
+        currentPlayer.disconnected = true;
+        broadCastToRoom(gameId, {
+          type: "player_left",
+          userId: currentPlayer.userId,
+        });
+        advanceToNextPlayer(game);
+        game.drawPileCount = game.drawPile.length;
+        broadCastStateToRoom(gameId, game);
+      } else {
+        manager.drawCard(gameId, currentPlayer.userId);
+        broadCastStateToRoom(gameId, game);
+      }
+
+      startTurnTimer(gameId);
+    }, TURN_TIMEOUT_MS);
+
+    turnTimers.set(gameId, timer);
+  }
 
   fastify.get("/ws", { websocket: true }, async (socket, request) => {
     try {
@@ -78,6 +127,8 @@ export default async function gameGateway(fastify: FastifyInstance) {
             JSON.stringify({ type: "game_updated", state: playerGameState }),
           );
 
+          startTurnTimer(message.gameId);
+
           break;
         }
         case "play_card": {
@@ -91,6 +142,7 @@ export default async function gameGateway(fastify: FastifyInstance) {
             userId,
             message.cardId,
             message.chosenColor,
+            message.targetUserId,
           );
           if (!updatedState) {
             sendError(socket, "Invalid move");
@@ -111,7 +163,49 @@ export default async function gameGateway(fastify: FastifyInstance) {
 
           broadCastStateToRoom(updatedState.id, updatedState);
 
+          if (updatedState.settings.unoCallout) {
+            const playerHand = updatedState.players.find(
+              (p) => p.userId === userId,
+            )?.hand;
+            if (playerHand && playerHand.length === 1) {
+              unoTimers.set(
+                userId,
+                setTimeout(() => {
+                  unoTimers.delete(userId);
+                }, 5000),
+              );
+            }
+          }
+
+          if (
+            updatedState.lastWildDraw4 &&
+            updatedState.settings.bluffChallenge
+          ) {
+            const targetId = updatedState.players.find(
+              (p) => p.isCurrentTurn,
+            )?.userId;
+            if (targetId) {
+              bluffTimers.set(
+                updatedState.id,
+                setTimeout(() => {
+                  bluffTimers.delete(updatedState.id);
+                  drawCardsForPlayer(updatedState, targetId, 4);
+                  updatedState.lastWildDraw4 = undefined;
+                  advanceToNextPlayer(updatedState);
+                  broadCastStateToRoom(updatedState.id, updatedState);
+                }, 5000),
+              );
+            }
+          }
+
+          afkCounts.set(`${game.id}:${userId}`, 0);
+          startTurnTimer(game.id);
+
           if (updatedState.status === GameStatus.FINISHED) {
+            if (turnTimers.has(updatedState.id)) {
+              clearTimeout(turnTimers.get(updatedState.id));
+              turnTimers.delete(updatedState.id);
+            }
             broadCastToRoom(updatedState.id, {
               type: "game_ended",
               winnerId: updatedState.winnerId!,
@@ -132,6 +226,94 @@ export default async function gameGateway(fastify: FastifyInstance) {
             rooms.delete(updatedState.id);
             manager.removeGame(updatedState.id);
           }
+          break;
+        }
+        case "call_uno": {
+          if (unoTimers.has(userId)) {
+            clearTimeout(unoTimers.get(userId));
+            unoTimers.delete(userId);
+          }
+          break;
+        }
+        case "catch_uno": {
+          const target = message.targetUserId;
+          if (!unoTimers.has(target)) {
+            sendError(socket, "Player already called UNO or not in UNO state");
+            break;
+          }
+          clearTimeout(unoTimers.get(target));
+          unoTimers.delete(target);
+
+          const game = manager.getGame(message.gameId);
+          if (!game) break;
+
+          const targetPlayer = game.players.find((p) => p.userId === target);
+          if (targetPlayer) {
+            for (let i = 0; i < 2; i++) {
+              if (game.drawPile.length === 0) break;
+              const card = game.drawPile.shift();
+              if (card) targetPlayer.hand.push(card);
+            }
+            game.drawPileCount = game.drawPile.length;
+          }
+
+          broadCastToRoom(message.gameId, {
+            type: "uno_caught",
+            targetUserId: target,
+            catcherUserId: userId,
+          } as ServerEvent);
+          broadCastStateToRoom(game.id, game);
+          break;
+        }
+        case "challenge_bluff": {
+          const game = manager.getGame(message.gameId);
+          if (!game || !game.lastWildDraw4) {
+            sendError(socket, "No bluff to challenge");
+            break;
+          }
+
+          if (bluffTimers.has(game.id)) {
+            clearTimeout(bluffTimers.get(game.id));
+            bluffTimers.delete(game.id);
+          }
+
+          const { playerId: blufferId, hadMatchingColor } = game.lastWildDraw4;
+
+          if (hadMatchingColor) {
+            drawCardsForPlayer(game, blufferId, 4);
+          } else {
+            drawCardsForPlayer(game, userId, 6);
+            advanceToNextPlayer(game);
+          }
+
+          broadCastToRoom(game.id, {
+            type: "bluff_result",
+            challengerUserId: userId,
+            targetUserId: blufferId,
+            wasBluff: hadMatchingColor,
+            penaltyCount: hadMatchingColor ? 4 : 6,
+          } as ServerEvent);
+
+          game.lastWildDraw4 = undefined;
+          broadCastStateToRoom(game.id, game);
+          break;
+        }
+        case "accept_wild_draw4": {
+          const game = manager.getGame(message.gameId);
+          if (!game || !game.lastWildDraw4) {
+            sendError(socket, "Nothing to accept");
+            break;
+          }
+
+          if (bluffTimers.has(game.id)) {
+            clearTimeout(bluffTimers.get(game.id));
+            bluffTimers.delete(game.id);
+          }
+
+          drawCardsForPlayer(game, userId, 4);
+          game.lastWildDraw4 = undefined;
+          advanceToNextPlayer(game);
+          broadCastStateToRoom(game.id, game);
           break;
         }
         case "draw_card": {
@@ -164,7 +346,14 @@ export default async function gameGateway(fastify: FastifyInstance) {
 
           broadCastStateToRoom(updatedState.id, updatedState);
 
+          afkCounts.set(`${game.id}:${userId}`, 0);
+          startTurnTimer(game.id);
+
           if (updatedState.status === GameStatus.FINISHED) {
+            if (turnTimers.has(updatedState.id)) {
+              clearTimeout(turnTimers.get(updatedState.id));
+              turnTimers.delete(updatedState.id);
+            }
             broadCastToRoom(updatedState.id, {
               type: "game_ended",
               winnerId: updatedState.winnerId!,
