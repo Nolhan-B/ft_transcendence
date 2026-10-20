@@ -15,6 +15,9 @@ import {
   drawCardsForPlayer,
 } from "../engine/game-state.js";
 
+const TURN_TIMEOUT_MS = 20000;
+const MAX_AFK_COUNT = 2;
+
 const rooms: Map<
   string,
   Set<{ socket: WebSocket; userId: string }>
@@ -37,9 +40,49 @@ const moveLogs: Map<
 > = new Map();
 const unoTimers: Map<string, NodeJS.Timeout> = new Map();
 const bluffTimers: Map<string, NodeJS.Timeout> = new Map();
+const turnTimers: Map<string, NodeJS.Timeout> = new Map();
+const afkCounts: Map<string, number> = new Map();
 
 export default async function gameGateway(fastify: FastifyInstance) {
   const manager = fastify.gameManager;
+
+  function startTurnTimer(gameId: string): void {
+    if (turnTimers.has(gameId)) {
+      clearTimeout(turnTimers.get(gameId));
+    }
+
+    const game = manager.getGame(gameId);
+    if (!game || game.status === GameStatus.FINISHED) return;
+
+    const currentPlayer = game.players.find((p) => p.isCurrentTurn);
+    if (!currentPlayer) return;
+
+    const timer = setTimeout(() => {
+      turnTimers.delete(gameId);
+
+      const afkKey = `${gameId}:${currentPlayer.userId}`;
+      const count = (afkCounts.get(afkKey) ?? 0) + 1;
+      afkCounts.set(afkKey, count);
+
+      if (count >= MAX_AFK_COUNT) {
+        currentPlayer.disconnected = true;
+        broadCastToRoom(gameId, {
+          type: "player_left",
+          userId: currentPlayer.userId,
+        });
+        advanceToNextPlayer(game);
+        game.drawPileCount = game.drawPile.length;
+        broadCastStateToRoom(gameId, game);
+      } else {
+        manager.drawCard(gameId, currentPlayer.userId);
+        broadCastStateToRoom(gameId, game);
+      }
+
+      startTurnTimer(gameId);
+    }, TURN_TIMEOUT_MS);
+
+    turnTimers.set(gameId, timer);
+  }
 
   fastify.get("/ws", { websocket: true }, async (socket, request) => {
     try {
@@ -83,6 +126,8 @@ export default async function gameGateway(fastify: FastifyInstance) {
           socket.send(
             JSON.stringify({ type: "game_updated", state: playerGameState }),
           );
+
+          startTurnTimer(message.gameId);
 
           break;
         }
@@ -153,7 +198,14 @@ export default async function gameGateway(fastify: FastifyInstance) {
             }
           }
 
+          afkCounts.set(`${game.id}:${userId}`, 0);
+          startTurnTimer(game.id);
+
           if (updatedState.status === GameStatus.FINISHED) {
+            if (turnTimers.has(updatedState.id)) {
+              clearTimeout(turnTimers.get(updatedState.id));
+              turnTimers.delete(updatedState.id);
+            }
             broadCastToRoom(updatedState.id, {
               type: "game_ended",
               winnerId: updatedState.winnerId!,
@@ -294,7 +346,14 @@ export default async function gameGateway(fastify: FastifyInstance) {
 
           broadCastStateToRoom(updatedState.id, updatedState);
 
+          afkCounts.set(`${game.id}:${userId}`, 0);
+          startTurnTimer(game.id);
+
           if (updatedState.status === GameStatus.FINISHED) {
+            if (turnTimers.has(updatedState.id)) {
+              clearTimeout(turnTimers.get(updatedState.id));
+              turnTimers.delete(updatedState.id);
+            }
             broadCastToRoom(updatedState.id, {
               type: "game_ended",
               winnerId: updatedState.winnerId!,
