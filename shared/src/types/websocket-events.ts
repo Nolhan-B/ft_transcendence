@@ -12,6 +12,22 @@ export interface PlayCardPayload {
   targetUserId?: string;
 }
 
+export interface ChallengeBluffPayload {
+  gameId: string;
+}
+
+export interface AcceptWildDraw4Payload {
+  gameId: string;
+}
+
+export interface BluffResultEvent {
+  type: "bluff_result";
+  challengerUserId: string;
+  targetUserId: string;
+  wasBluff: boolean;
+  penaltyCount: number;
+}
+
 export interface DrawCardPayload {
   gameId: string;
 }
@@ -84,4 +100,6 @@ export type ClientMessage =
   | ({ type: "draw_card" } & DrawCardPayload)
   | ({ type: "chat_message" } & ChatMessagePayload)
   | ({ type: "call_uno" } & CallUnoPayload)
-  | ({ type: "catch_uno" } & CatchUnoPayload);
+  | ({ type: "catch_uno" } & CatchUnoPayload)
+  | ({ type: "challenge_bluff" } & ChallengeBluffPayload)
+  | ({ type: "accept_wild_draw4" } & AcceptWildDraw4Payload);

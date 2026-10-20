@@ -1,19 +1,3 @@
-//
-//
-//
-//
-// TODO: Implémenter les settings
-// (stacking,       -> DONE
-//  sevenZeroRule,  -> DONE
-//  jumpIn,         -> DONE
-//  bluffChallenge,
-//  unoCallout      -> DONE)
-//
-//
-//
-//
-//
-
 import {
   GameMode,
   GameState,
@@ -29,6 +13,11 @@ import { getCardEffect, isValidPlay } from "./rules.js";
 export interface InternalGameState extends GameState {
   drawPile: Card[];
   pendingDrawCount: number;
+  lastWildDraw4?: {
+    playerId: string;
+    hadMatchingColor: boolean;
+    previousColor: CardColor;
+  };
 }
 
 export function createGame(
@@ -78,6 +67,7 @@ export function createGame(
     discardPile: [topCard],
     drawPile: remaining,
     pendingDrawCount: 0,
+    lastWildDraw4: undefined,
     ranking: [],
     winnerId: null,
   };
@@ -121,6 +111,15 @@ export function playCard(
     )
   )
     return null;
+
+  // Check bluff avant de retirer la carte de la main
+  const hadMatchingColorBeforePlay =
+    playedCard.value === "wild_draw4"
+      ? player.hand.some(
+          (c) => c.color === state.currentColor && c.id !== cardId,
+        )
+      : false;
+
   removeCardFromHand(player, cardId);
 
   state.topCard = playedCard;
@@ -169,10 +168,20 @@ export function playCard(
       state.currentColor = chosenColor as CardColor;
       advanceToNextPlayer(state);
       break;
-    case "wild_draw":
+    case "wild_draw": {
       if (!chosenColor) return null;
+      const previousColor = state.currentColor;
       state.currentColor = chosenColor as CardColor;
-      if (state.settings.stacking === "none") {
+
+      if (state.settings.bluffChallenge) {
+        // Stocker l'info pour un éventuel challenge, ne pas faire piocher
+        state.lastWildDraw4 = {
+          playerId: player.userId,
+          hadMatchingColor: hadMatchingColorBeforePlay,
+          previousColor,
+        };
+        advanceToNextPlayer(state);
+      } else if (state.settings.stacking === "none") {
         advanceToNextPlayer(state);
         drawCardsForCurrentPlayer(state, effect.count);
         advanceToNextPlayer(state);
@@ -181,6 +190,7 @@ export function playCard(
         advanceToNextPlayer(state);
       }
       break;
+    }
   }
 
   if (effect.type !== "wild" && effect.type !== "wild_draw") {
@@ -194,8 +204,7 @@ export function playCard(
       state.winnerId = player.userId;
       state.status = GameStatus.FINISHED;
     } else {
-      // Ranked : le joueur sort, la partie continue
-      player.disconnected = true; // il ne joue plus
+      player.disconnected = true;
       const activePlayers = state.players.filter((p) => !p.disconnected);
       if (activePlayers.length <= 1) {
         if (activePlayers.length === 1) {
@@ -233,7 +242,7 @@ function removeCardFromHand(player: Player, cardId: string): Card | undefined {
   return player.hand.splice(index, 1)[0];
 }
 
-function advanceToNextPlayer(state: InternalGameState): void {
+export function advanceToNextPlayer(state: InternalGameState): void {
   const currentIndex = state.players.findIndex((p) => p.isCurrentTurn);
   state.players[currentIndex].isCurrentTurn = false;
 
@@ -251,11 +260,12 @@ function changeDirection(state: InternalGameState): void {
   state.direction = state.direction === 1 ? -1 : 1;
 }
 
-function drawCardsForCurrentPlayer(
+export function drawCardsForPlayer(
   state: InternalGameState,
+  playerId: string,
   count: number,
 ): void {
-  const player = state.players.find((p) => p.isCurrentTurn);
+  const player = state.players.find((p) => p.userId === playerId);
   if (!player) return;
 
   for (let i = 0; i < count; i++) {
@@ -269,6 +279,15 @@ function drawCardsForCurrentPlayer(
   }
 
   state.drawPileCount = state.drawPile.length;
+}
+
+function drawCardsForCurrentPlayer(
+  state: InternalGameState,
+  count: number,
+): void {
+  const player = state.players.find((p) => p.isCurrentTurn);
+  if (!player) return;
+  drawCardsForPlayer(state, player.userId, count);
 }
 
 export function drawCard(

@@ -1,4 +1,10 @@
-import { createGame, playCard, drawCard } from "../src/engine/game-state.js";
+import {
+  createGame,
+  playCard,
+  drawCard,
+  advanceToNextPlayer,
+  drawCardsForPlayer,
+} from "../src/engine/game-state.js";
 import { GameMode, GameStatus } from "shared";
 import type { InternalGameState } from "../src/engine/game-state.js";
 
@@ -23,7 +29,9 @@ function assert(condition: boolean, msg: string) {
   if (!condition) throw new Error(msg);
 }
 
-// === CREATION ===
+// ============================================================
+// CREATION
+// ============================================================
 
 test("createGame: crée une partie avec 2 joueurs", () => {
   const state = createGame(
@@ -47,6 +55,11 @@ test("createGame: crée une partie avec 2 joueurs", () => {
   assert(
     state.players[1].isCurrentTurn === false,
     "Joueur 2 ne doit pas jouer",
+  );
+  assert(state.pendingDrawCount === 0, "pendingDrawCount doit être 0");
+  assert(
+    state.lastWildDraw4 === undefined,
+    "lastWildDraw4 doit être undefined",
   );
 });
 
@@ -107,8 +120,7 @@ test("createGame: settings par défaut", () => {
     ],
     GameMode.CLASSIC,
   );
-  assert(state.settings.stacking === false, "stacking doit être false");
-  assert(state.settings.multiplePlay === false, "multiplePlay doit être false");
+  assert(state.settings.stacking === "none", "stacking doit être none");
   assert(
     state.settings.sevenZeroRule === false,
     "sevenZeroRule doit être false",
@@ -129,18 +141,26 @@ test("createGame: settings custom", () => {
     ],
     GameMode.CLASSIC,
     {
-      stacking: true,
-      multiplePlay: false,
-      sevenZeroRule: false,
-      jumpIn: false,
-      bluffChallenge: false,
-      unoCallout: false,
+      stacking: "all",
+      sevenZeroRule: true,
+      jumpIn: true,
+      bluffChallenge: true,
+      unoCallout: true,
     },
   );
-  assert(state.settings.stacking === true, "stacking doit être true");
+  assert(state.settings.stacking === "all", "stacking doit être all");
+  assert(state.settings.sevenZeroRule === true, "sevenZeroRule doit être true");
+  assert(state.settings.jumpIn === true, "jumpIn doit être true");
+  assert(
+    state.settings.bluffChallenge === true,
+    "bluffChallenge doit être true",
+  );
+  assert(state.settings.unoCallout === true, "unoCallout doit être true");
 });
 
-// === PLAY CARD - VALIDATIONS ===
+// ============================================================
+// PLAY CARD - VALIDATIONS
+// ============================================================
 
 test("playCard: refuse si ce n'est pas le tour du joueur", () => {
   const state = createGame(
@@ -150,7 +170,6 @@ test("playCard: refuse si ce n'est pas le tour du joueur", () => {
     ],
     GameMode.CLASSIC,
   );
-  // Force une carte jouable dans la main de B
   const playableCard = {
     id: "forced",
     color: state.currentColor,
@@ -181,7 +200,6 @@ test("playCard: refuse une carte invalide (mauvaise couleur et valeur)", () => {
     ],
     GameMode.CLASSIC,
   );
-  // Force la top card et la main
   state.topCard = { id: "top", color: "red", value: "5" };
   state.currentColor = "red";
   state.players[0].hand = [{ id: "bad", color: "blue", value: "3" }];
@@ -251,7 +269,9 @@ test("playCard: refuse si partie terminée", () => {
   assert(result === null, "Doit refuser si partie terminée");
 });
 
-// === WILD ===
+// ============================================================
+// WILD
+// ============================================================
 
 test("playCard: wild change la couleur", () => {
   const state = createGame(
@@ -278,6 +298,19 @@ test("playCard: wild refuse sans chosenColor", () => {
   state.players[0].hand = [{ id: "w", color: "wild", value: "wild" }];
   const result = playCard(state, "1", "w");
   assert(result === null, "Doit refuser wild sans couleur");
+});
+
+test("playCard: wild refuse couleur invalide", () => {
+  const state = createGame(
+    [
+      { id: "1", username: "A" },
+      { id: "2", username: "B" },
+    ],
+    GameMode.CLASSIC,
+  );
+  state.players[0].hand = [{ id: "w", color: "wild", value: "wild" }];
+  const result = playCard(state, "1", "w", "purple");
+  assert(result === null, "Doit refuser couleur invalide");
 });
 
 test("playCard: wild_draw4 fait piocher 4 et change la couleur", () => {
@@ -312,7 +345,9 @@ test("playCard: wild_draw4 refuse sans chosenColor", () => {
   assert(result === null, "Doit refuser wild_draw4 sans couleur");
 });
 
-// === EFFETS ===
+// ============================================================
+// EFFETS
+// ============================================================
 
 test("playCard: skip saute le joueur suivant", () => {
   const state = createGame(
@@ -368,7 +403,6 @@ test("playCard: reverse à 2 joueurs agit comme skip", () => {
     { id: "extra", color: "red", value: "3" },
   ];
   playCard(state, "1", "r");
-  // Avec 2 joueurs, reverse + advance = retour au même joueur
   assert(
     state.players[0].isCurrentTurn === true,
     "Avec 2 joueurs, reverse doit revenir à A",
@@ -399,7 +433,9 @@ test("playCard: draw2 fait piocher 2 au suivant et saute son tour", () => {
   );
 });
 
-// === DRAW CARD ===
+// ============================================================
+// DRAW CARD
+// ============================================================
 
 test("drawCard: joueur pioche une carte", () => {
   const state = createGame(
@@ -468,11 +504,9 @@ test("drawCard: pioche reconstruit le deck depuis la défausse", () => {
     ],
     GameMode.CLASSIC,
   );
-  // Vide la pioche
   state.discardPile.push(...state.drawPile);
   state.drawPile = [];
   state.drawPileCount = 0;
-  const discardBefore = state.discardPile.length;
   const result = drawCard(state, "1");
   assert(result !== null, "Doit réussir");
   assert(
@@ -481,7 +515,9 @@ test("drawCard: pioche reconstruit le deck depuis la défausse", () => {
   );
 });
 
-// === MODE RANKED ===
+// ============================================================
+// MODE RANKED
+// ============================================================
 
 test("ranked: la partie continue après un gagnant", () => {
   const state = createGame(
@@ -534,7 +570,6 @@ test("ranked: le classement est dans l'ordre de sortie", () => {
     ],
     GameMode.RANKED,
   );
-  // A finit en premier
   state.topCard = { id: "top", color: "red", value: "5" };
   state.currentColor = "red";
   state.players[0].hand = [{ id: "c1", color: "red", value: "3" }];
@@ -542,7 +577,6 @@ test("ranked: le classement est dans l'ordre de sortie", () => {
   assert(state.ranking[0] === "1", "A doit être 1er");
   assert(state.status === GameStatus.IN_PROGRESS, "Partie continue");
 
-  // B finit en deuxième
   state.currentColor = "red";
   state.players[1].hand = [{ id: "c2", color: "red", value: "7" }];
   state.players[1].isCurrentTurn = true;
@@ -553,7 +587,9 @@ test("ranked: le classement est dans l'ordre de sortie", () => {
   assert(state.winnerId === "1", "A reste le gagnant");
 });
 
-// === VICTOIRE CLASSIC ===
+// ============================================================
+// VICTOIRE CLASSIC
+// ============================================================
 
 test("classic: la partie se termine au premier gagnant", () => {
   const state = createGame(
@@ -574,6 +610,663 @@ test("classic: la partie se termine au premier gagnant", () => {
   assert(result!.ranking.length === 1, "Ranking a 1 seul joueur en classic");
 });
 
-// === RÉSULTATS ===
+// ============================================================
+// STACKING
+// ============================================================
+
+test("stacking none: draw2 fait piocher immédiatement", () => {
+  const state = createGame(
+    [
+      { id: "1", username: "A" },
+      { id: "2", username: "B" },
+    ],
+    GameMode.CLASSIC,
+    {
+      stacking: "none",
+      sevenZeroRule: false,
+      jumpIn: false,
+      bluffChallenge: false,
+      unoCallout: false,
+    },
+  );
+  state.topCard = { id: "top", color: "red", value: "5" };
+  state.currentColor = "red";
+  state.players[0].hand = [{ id: "d", color: "red", value: "draw2" }];
+  const bobBefore = state.players[1].hand.length;
+  playCard(state, "1", "d");
+  assert(
+    state.players[1].hand.length === bobBefore + 2,
+    "B doit piocher 2 immédiatement",
+  );
+  assert(state.pendingDrawCount === 0, "pendingDrawCount doit rester 0");
+});
+
+test("stacking same: draw2 accumule pendingDrawCount", () => {
+  const state = createGame(
+    [
+      { id: "1", username: "A" },
+      { id: "2", username: "B" },
+      { id: "3", username: "C" },
+    ],
+    GameMode.CLASSIC,
+    {
+      stacking: "same",
+      sevenZeroRule: false,
+      jumpIn: false,
+      bluffChallenge: false,
+      unoCallout: false,
+    },
+  );
+  state.topCard = { id: "top", color: "red", value: "5" };
+  state.currentColor = "red";
+  state.players[0].hand = [{ id: "d1", color: "red", value: "draw2" }];
+  playCard(state, "1", "d1");
+  assert(state.pendingDrawCount === 2, "pendingDrawCount doit être 2");
+  assert(state.players[1].isCurrentTurn === true, "Au tour de B");
+});
+
+test("stacking same: B peut répondre avec un draw2", () => {
+  const state = createGame(
+    [
+      { id: "1", username: "A" },
+      { id: "2", username: "B" },
+      { id: "3", username: "C" },
+    ],
+    GameMode.CLASSIC,
+    {
+      stacking: "same",
+      sevenZeroRule: false,
+      jumpIn: false,
+      bluffChallenge: false,
+      unoCallout: false,
+    },
+  );
+  state.topCard = { id: "top", color: "red", value: "5" };
+  state.currentColor = "red";
+  state.players[0].hand = [
+    { id: "d1", color: "red", value: "draw2" },
+    { id: "keep", color: "blue", value: "1" },
+  ];
+  playCard(state, "1", "d1");
+
+  state.players[1].hand = [
+    { id: "d2", color: "blue", value: "draw2" },
+    { id: "extra", color: "green", value: "5" },
+  ];
+  const result = playCard(state, "2", "d2");
+  assert(result !== null, "B doit pouvoir jouer un draw2");
+  assert(state.pendingDrawCount === 4, "pendingDrawCount doit être 4");
+  assert(state.players[2].isCurrentTurn === true, "Au tour de C");
+});
+
+test("stacking same: B ne peut pas jouer une carte normale quand pendingDrawCount > 0", () => {
+  const state = createGame(
+    [
+      { id: "1", username: "A" },
+      { id: "2", username: "B" },
+    ],
+    GameMode.CLASSIC,
+    {
+      stacking: "same",
+      sevenZeroRule: false,
+      jumpIn: false,
+      bluffChallenge: false,
+      unoCallout: false,
+    },
+  );
+  state.topCard = { id: "top", color: "red", value: "5" };
+  state.currentColor = "red";
+  state.players[0].hand = [{ id: "d1", color: "red", value: "draw2" }];
+  playCard(state, "1", "d1");
+
+  state.players[1].hand = [{ id: "normal", color: "red", value: "3" }];
+  const result = playCard(state, "2", "normal");
+  assert(result === null, "B ne doit pas pouvoir jouer une carte normale");
+});
+
+test("stacking same: B ne peut pas stacker un wild_draw4 sur un draw2", () => {
+  const state = createGame(
+    [
+      { id: "1", username: "A" },
+      { id: "2", username: "B" },
+    ],
+    GameMode.CLASSIC,
+    {
+      stacking: "same",
+      sevenZeroRule: false,
+      jumpIn: false,
+      bluffChallenge: false,
+      unoCallout: false,
+    },
+  );
+  state.topCard = { id: "top", color: "red", value: "5" };
+  state.currentColor = "red";
+  state.players[0].hand = [
+    { id: "d1", color: "red", value: "draw2" },
+    { id: "keep", color: "blue", value: "1" },
+  ];
+  playCard(state, "1", "d1");
+
+  state.players[1].hand = [{ id: "wd", color: "wild", value: "wild_draw4" }];
+  const result = playCard(state, "2", "wd", "blue");
+  assert(
+    result === null,
+    "B ne doit pas pouvoir stacker +4 sur +2 en mode same",
+  );
+});
+
+test("stacking all: B peut stacker un wild_draw4 sur un draw2", () => {
+  const state = createGame(
+    [
+      { id: "1", username: "A" },
+      { id: "2", username: "B" },
+      { id: "3", username: "C" },
+    ],
+    GameMode.CLASSIC,
+    {
+      stacking: "all",
+      sevenZeroRule: false,
+      jumpIn: false,
+      bluffChallenge: false,
+      unoCallout: false,
+    },
+  );
+  state.topCard = { id: "top", color: "red", value: "5" };
+  state.currentColor = "red";
+  state.players[0].hand = [
+    { id: "d1", color: "red", value: "draw2" },
+    { id: "keep", color: "blue", value: "1" },
+  ];
+  playCard(state, "1", "d1");
+
+  state.players[1].hand = [
+    { id: "wd", color: "wild", value: "wild_draw4" },
+    { id: "extra", color: "green", value: "1" },
+  ];
+  const result = playCard(state, "2", "wd", "blue");
+  assert(result !== null, "B doit pouvoir stacker +4 sur +2 en mode all");
+  assert(state.pendingDrawCount === 6, "pendingDrawCount doit être 6");
+});
+
+test("stacking: drawCard pioche le pendingDrawCount total", () => {
+  const state = createGame(
+    [
+      { id: "1", username: "A" },
+      { id: "2", username: "B" },
+    ],
+    GameMode.CLASSIC,
+    {
+      stacking: "same",
+      sevenZeroRule: false,
+      jumpIn: false,
+      bluffChallenge: false,
+      unoCallout: false,
+    },
+  );
+  state.topCard = { id: "top", color: "red", value: "5" };
+  state.currentColor = "red";
+  state.players[0].hand = [{ id: "d1", color: "red", value: "draw2" }];
+  playCard(state, "1", "d1");
+
+  const bobBefore = state.players[1].hand.length;
+  drawCard(state, "2");
+  assert(state.players[1].hand.length === bobBefore + 2, "B doit piocher 2");
+  assert(state.pendingDrawCount === 0, "pendingDrawCount doit être reset à 0");
+});
+
+// ============================================================
+// SEVEN ZERO RULE
+// ============================================================
+
+test("sevenZeroRule: 7 échange les mains entre deux joueurs", () => {
+  const state = createGame(
+    [
+      { id: "1", username: "A" },
+      { id: "2", username: "B" },
+    ],
+    GameMode.CLASSIC,
+    {
+      stacking: "none",
+      sevenZeroRule: true,
+      jumpIn: false,
+      bluffChallenge: false,
+      unoCallout: false,
+    },
+  );
+  state.topCard = { id: "top", color: "red", value: "5" };
+  state.currentColor = "red";
+  const aliceHand = [
+    { id: "s7", color: "red", value: "7" },
+    { id: "a2", color: "blue", value: "3" },
+  ];
+  const bobHand = [
+    { id: "b1", color: "green", value: "1" },
+    { id: "b2", color: "yellow", value: "9" },
+  ];
+  state.players[0].hand = [...aliceHand];
+  state.players[1].hand = [...bobHand];
+
+  playCard(state, "1", "s7", undefined, "2");
+
+  // Après le swap, Alice a la main de Bob (moins la carte jouée)
+  assert(
+    state.players[0].hand.length === 2,
+    "A doit avoir 2 cartes (main de B)",
+  );
+  assert(
+    state.players[0].hand.some((c) => c.id === "b1"),
+    "A doit avoir la carte b1 de B",
+  );
+  assert(
+    state.players[1].hand.length === 1,
+    "B doit avoir 1 carte (main de A moins le 7)",
+  );
+  assert(
+    state.players[1].hand.some((c) => c.id === "a2"),
+    "B doit avoir la carte a2 de A",
+  );
+});
+
+test("sevenZeroRule: 7 refuse sans targetUserId", () => {
+  const state = createGame(
+    [
+      { id: "1", username: "A" },
+      { id: "2", username: "B" },
+    ],
+    GameMode.CLASSIC,
+    {
+      stacking: "none",
+      sevenZeroRule: true,
+      jumpIn: false,
+      bluffChallenge: false,
+      unoCallout: false,
+    },
+  );
+  state.topCard = { id: "top", color: "red", value: "5" };
+  state.currentColor = "red";
+  state.players[0].hand = [{ id: "s7", color: "red", value: "7" }];
+  const result = playCard(state, "1", "s7");
+  assert(result === null, "Doit refuser 7 sans target");
+});
+
+test("sevenZeroRule: 7 refuse target déconnecté", () => {
+  const state = createGame(
+    [
+      { id: "1", username: "A" },
+      { id: "2", username: "B" },
+      { id: "3", username: "C" },
+    ],
+    GameMode.CLASSIC,
+    {
+      stacking: "none",
+      sevenZeroRule: true,
+      jumpIn: false,
+      bluffChallenge: false,
+      unoCallout: false,
+    },
+  );
+  state.topCard = { id: "top", color: "red", value: "5" };
+  state.currentColor = "red";
+  state.players[0].hand = [{ id: "s7", color: "red", value: "7" }];
+  state.players[1].disconnected = true;
+  const result = playCard(state, "1", "s7", undefined, "2");
+  assert(result === null, "Doit refuser target déconnecté");
+});
+
+test("sevenZeroRule: 0 fait tourner les mains (direction 1)", () => {
+  const state = createGame(
+    [
+      { id: "1", username: "A" },
+      { id: "2", username: "B" },
+      { id: "3", username: "C" },
+    ],
+    GameMode.CLASSIC,
+    {
+      stacking: "none",
+      sevenZeroRule: true,
+      jumpIn: false,
+      bluffChallenge: false,
+      unoCallout: false,
+    },
+  );
+  state.topCard = { id: "top", color: "red", value: "5" };
+  state.currentColor = "red";
+
+  state.players[0].hand = [
+    { id: "z", color: "red", value: "0" },
+    { id: "a1", color: "blue", value: "1" },
+  ];
+  state.players[1].hand = [{ id: "b1", color: "green", value: "2" }];
+  state.players[2].hand = [{ id: "c1", color: "yellow", value: "3" }];
+
+  playCard(state, "1", "z");
+
+  // Direction 1 : A reçoit main de C, B reçoit main de A, C reçoit main de B
+  assert(
+    state.players[0].hand.some((c) => c.id === "c1"),
+    "A doit avoir la carte de C",
+  );
+  assert(
+    state.players[1].hand.some((c) => c.id === "a1"),
+    "B doit avoir la carte de A",
+  );
+  assert(
+    state.players[2].hand.some((c) => c.id === "b1"),
+    "C doit avoir la carte de B",
+  );
+});
+
+test("sevenZeroRule off: 7 et 0 sont des cartes normales", () => {
+  const state = createGame(
+    [
+      { id: "1", username: "A" },
+      { id: "2", username: "B" },
+    ],
+    GameMode.CLASSIC,
+    {
+      stacking: "none",
+      sevenZeroRule: false,
+      jumpIn: false,
+      bluffChallenge: false,
+      unoCallout: false,
+    },
+  );
+  state.topCard = { id: "top", color: "red", value: "5" };
+  state.currentColor = "red";
+  state.players[0].hand = [
+    { id: "s7", color: "red", value: "7" },
+    { id: "extra", color: "red", value: "1" },
+  ];
+  const bobBefore = state.players[1].hand.length;
+  const result = playCard(state, "1", "s7");
+  assert(result !== null, "Doit accepter 7 comme carte normale");
+  assert(
+    state.players[1].hand.length === bobBefore,
+    "B ne doit pas avoir changé de main",
+  );
+});
+
+// ============================================================
+// JUMP IN
+// ============================================================
+
+test("jumpIn: permet de jouer hors tour avec carte identique", () => {
+  const state = createGame(
+    [
+      { id: "1", username: "A" },
+      { id: "2", username: "B" },
+      { id: "3", username: "C" },
+    ],
+    GameMode.CLASSIC,
+    {
+      stacking: "none",
+      sevenZeroRule: false,
+      jumpIn: true,
+      bluffChallenge: false,
+      unoCallout: false,
+    },
+  );
+  state.topCard = { id: "top", color: "red", value: "5" };
+  state.currentColor = "red";
+  // C'est le tour de A, mais C a la même carte que la topCard
+  state.players[2].hand = [
+    { id: "jump", color: "red", value: "5" },
+    { id: "extra", color: "blue", value: "1" },
+  ];
+
+  const result = playCard(state, "3", "jump");
+  assert(result !== null, "C doit pouvoir jump-in");
+  assert(result!.topCard.id === "jump", "Top card doit être la carte de C");
+});
+
+test("jumpIn: refuse hors tour si carte pas identique", () => {
+  const state = createGame(
+    [
+      { id: "1", username: "A" },
+      { id: "2", username: "B" },
+      { id: "3", username: "C" },
+    ],
+    GameMode.CLASSIC,
+    {
+      stacking: "none",
+      sevenZeroRule: false,
+      jumpIn: true,
+      bluffChallenge: false,
+      unoCallout: false,
+    },
+  );
+  state.topCard = { id: "top", color: "red", value: "5" };
+  state.currentColor = "red";
+  // Même couleur mais valeur différente
+  state.players[2].hand = [{ id: "nojump", color: "red", value: "3" }];
+
+  const result = playCard(state, "3", "nojump");
+  assert(
+    result === null,
+    "C ne doit pas pouvoir jump-in avec une carte différente",
+  );
+});
+
+test("jumpIn off: refuse hors tour même avec carte identique", () => {
+  const state = createGame(
+    [
+      { id: "1", username: "A" },
+      { id: "2", username: "B" },
+      { id: "3", username: "C" },
+    ],
+    GameMode.CLASSIC,
+    {
+      stacking: "none",
+      sevenZeroRule: false,
+      jumpIn: false,
+      bluffChallenge: false,
+      unoCallout: false,
+    },
+  );
+  state.topCard = { id: "top", color: "red", value: "5" };
+  state.currentColor = "red";
+  state.players[2].hand = [{ id: "jump", color: "red", value: "5" }];
+
+  const result = playCard(state, "3", "jump");
+  assert(result === null, "C ne doit pas pouvoir jump-in si jumpIn est off");
+});
+
+test("jumpIn: le tour reprend depuis le joueur qui jump-in", () => {
+  const state = createGame(
+    [
+      { id: "1", username: "A" },
+      { id: "2", username: "B" },
+      { id: "3", username: "C" },
+    ],
+    GameMode.CLASSIC,
+    {
+      stacking: "none",
+      sevenZeroRule: false,
+      jumpIn: true,
+      bluffChallenge: false,
+      unoCallout: false,
+    },
+  );
+  state.topCard = { id: "top", color: "red", value: "5" };
+  state.currentColor = "red";
+  state.players[2].hand = [
+    { id: "jump", color: "red", value: "5" },
+    { id: "extra", color: "blue", value: "1" },
+  ];
+
+  playCard(state, "3", "jump");
+  // Après le jump-in de C, le tour avance depuis C → direction 1 → A
+  assert(
+    state.players[0].isCurrentTurn === true,
+    "Après jump-in de C, au tour de A",
+  );
+});
+
+// ============================================================
+// BLUFF CHALLENGE
+// ============================================================
+
+test("bluffChallenge: wild_draw4 ne fait pas piocher immédiatement", () => {
+  const state = createGame(
+    [
+      { id: "1", username: "A" },
+      { id: "2", username: "B" },
+    ],
+    GameMode.CLASSIC,
+    {
+      stacking: "none",
+      sevenZeroRule: false,
+      jumpIn: false,
+      bluffChallenge: true,
+      unoCallout: false,
+    },
+  );
+  state.topCard = { id: "top", color: "red", value: "5" };
+  state.currentColor = "red";
+  state.players[0].hand = [
+    { id: "wd", color: "wild", value: "wild_draw4" },
+    { id: "extra", color: "blue", value: "1" },
+  ];
+  const bobBefore = state.players[1].hand.length;
+
+  playCard(state, "1", "wd", "blue");
+
+  assert(
+    state.players[1].hand.length === bobBefore,
+    "B ne doit PAS piocher immédiatement",
+  );
+  assert(state.lastWildDraw4 !== undefined, "lastWildDraw4 doit être défini");
+  assert(
+    state.lastWildDraw4!.playerId === "1",
+    "lastWildDraw4 doit référencer A",
+  );
+});
+
+test("bluffChallenge: stocke hadMatchingColor = true si le joueur avait la couleur", () => {
+  const state = createGame(
+    [
+      { id: "1", username: "A" },
+      { id: "2", username: "B" },
+    ],
+    GameMode.CLASSIC,
+    {
+      stacking: "none",
+      sevenZeroRule: false,
+      jumpIn: false,
+      bluffChallenge: true,
+      unoCallout: false,
+    },
+  );
+  state.topCard = { id: "top", color: "red", value: "5" };
+  state.currentColor = "red";
+  // A a un +4 ET une carte rouge → il bluff
+  state.players[0].hand = [
+    { id: "wd", color: "wild", value: "wild_draw4" },
+    { id: "redcard", color: "red", value: "3" },
+  ];
+
+  playCard(state, "1", "wd", "blue");
+
+  assert(
+    state.lastWildDraw4!.hadMatchingColor === true,
+    "hadMatchingColor doit être true",
+  );
+});
+
+test("bluffChallenge: stocke hadMatchingColor = false si le joueur n'avait pas la couleur", () => {
+  const state = createGame(
+    [
+      { id: "1", username: "A" },
+      { id: "2", username: "B" },
+    ],
+    GameMode.CLASSIC,
+    {
+      stacking: "none",
+      sevenZeroRule: false,
+      jumpIn: false,
+      bluffChallenge: true,
+      unoCallout: false,
+    },
+  );
+  state.topCard = { id: "top", color: "red", value: "5" };
+  state.currentColor = "red";
+  // A a un +4 mais PAS de carte rouge → pas de bluff
+  state.players[0].hand = [
+    { id: "wd", color: "wild", value: "wild_draw4" },
+    { id: "bluecard", color: "blue", value: "3" },
+  ];
+
+  playCard(state, "1", "wd", "blue");
+
+  assert(
+    state.lastWildDraw4!.hadMatchingColor === false,
+    "hadMatchingColor doit être false",
+  );
+});
+
+test("bluffChallenge: stocke previousColor", () => {
+  const state = createGame(
+    [
+      { id: "1", username: "A" },
+      { id: "2", username: "B" },
+    ],
+    GameMode.CLASSIC,
+    {
+      stacking: "none",
+      sevenZeroRule: false,
+      jumpIn: false,
+      bluffChallenge: true,
+      unoCallout: false,
+    },
+  );
+  state.topCard = { id: "top", color: "red", value: "5" };
+  state.currentColor = "red";
+  state.players[0].hand = [{ id: "wd", color: "wild", value: "wild_draw4" }];
+
+  playCard(state, "1", "wd", "green");
+
+  assert(
+    state.lastWildDraw4!.previousColor === "red",
+    "previousColor doit être red",
+  );
+  assert(state.currentColor === "green", "currentColor doit être green");
+});
+
+test("bluffChallenge off: wild_draw4 fait piocher normalement", () => {
+  const state = createGame(
+    [
+      { id: "1", username: "A" },
+      { id: "2", username: "B" },
+    ],
+    GameMode.CLASSIC,
+    {
+      stacking: "none",
+      sevenZeroRule: false,
+      jumpIn: false,
+      bluffChallenge: false,
+      unoCallout: false,
+    },
+  );
+  state.topCard = { id: "top", color: "red", value: "5" };
+  state.currentColor = "red";
+  state.players[0].hand = [{ id: "wd", color: "wild", value: "wild_draw4" }];
+  const bobBefore = state.players[1].hand.length;
+
+  playCard(state, "1", "wd", "blue");
+
+  assert(
+    state.players[1].hand.length === bobBefore + 4,
+    "B doit piocher 4 immédiatement",
+  );
+  assert(
+    state.lastWildDraw4 === undefined,
+    "lastWildDraw4 doit rester undefined",
+  );
+});
+
+// ============================================================
+// RÉSULTATS
+// ============================================================
+
 console.log(`\n=== ${passed} passed, ${failed} failed ===`);
 if (failed > 0) process.exit(1);
