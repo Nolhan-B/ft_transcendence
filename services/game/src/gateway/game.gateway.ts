@@ -483,6 +483,7 @@ function filterStateForPlayer(
     topCard: game.topCard,
     direction: game.direction,
     drawPileCount: game.drawPileCount,
+    pendingDrawCount: game.pendingDrawCount,
     discardPile: game.discardPile,
     ranking: game.ranking,
     winnerId: game.winnerId,

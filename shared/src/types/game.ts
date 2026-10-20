@@ -59,6 +59,7 @@ export interface GameState {
   settings: GameSettings;
   players: Player[];
   currentColor: CardColor;
+  pendingDrawCount: number;
   topCard: Card;
   direction: 1 | -1;
   drawPileCount: number;
