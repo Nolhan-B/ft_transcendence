@@ -15,8 +15,11 @@
   ],
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@types/ws": "^8.18.2",
     "eslint": "^10.11.0",
     "prettier": "^3.9.9",
-    "typescript-eslint": "^8.71.0"
+    "tsx": "^4.23.15",
+    "typescript-eslint": "^8.71.0",
+    "ws": "^8.22.0"
   }
 }

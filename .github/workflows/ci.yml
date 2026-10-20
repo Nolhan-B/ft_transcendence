@@ -90,6 +90,12 @@ jobs:
           '
           echo "All services are up and healthy!"
 
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Compiling shared
+        run: npm --prefix shared run build
+
       - name: Run Websocket game integration tests
         run: npm run test-game-integration
 
