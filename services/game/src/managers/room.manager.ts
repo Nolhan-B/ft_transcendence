@@ -68,6 +68,15 @@ export class RoomManager {
     if (room.leaderId === userId) room.leaderId = room.players[0].id;
   }
 
+  updateSettings(code: string, leaderId: string, settings: GameSettings): void {
+    const room = this.getRoom(code);
+    if (!room) return;
+
+    if (leaderId !== room.leaderId) return;
+
+    room.settings = settings;
+  }
+
   getRoom(code: string): Room | undefined {
     return this.rooms.get(code);
   }
