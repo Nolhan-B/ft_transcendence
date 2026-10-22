@@ -88,3 +88,12 @@ export interface CreateGamePayload {
   mode: GameMode;
   settings?: GameSettings;
 }
+
+interface Room {
+  code: string;
+  leaderId: string;
+  players: { id: string; username: string }[];
+  mode: GameMode;
+  settings: GameSettings;
+  createdAt: Date;
+}
