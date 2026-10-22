@@ -50,4 +50,18 @@ export default async function gameRoutes(fastify: FastifyInstance) {
 
     return reply.code(201).send({ roomCode });
   });
+
+  fastify.get("/games/rooms", async () => {
+    const rooms = fastify.roomManager.listRooms();
+    return rooms.map((r) => ({
+      code: r.code,
+      name: r.name,
+      hasPassword: !!r.password,
+      leaderId: r.leaderId,
+      maxPlayers: r.maxPlayers,
+      players: r.players,
+      mode: r.mode,
+      settings: r.settings,
+    }));
+  });
 }
