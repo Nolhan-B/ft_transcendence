@@ -5,12 +5,15 @@ import type { CardColor, GameState, GameMode, GameSettings } from "./game.js";
 // ============================================================
 
 export interface CreateRoomPayload {
+  name: string;
   mode: GameMode;
   maxPlayers: number;
+  password?: string;
 }
 
 export interface JoinRoomPayload {
   roomCode: string;
+  password?: string;
 }
 
 export interface LeaveRoomPayload {
@@ -73,6 +76,8 @@ export interface CatchUnoPayload {
 
 export interface RoomInfo {
   code: string;
+  name: string;
+  hasPassword: boolean;
   leaderId: string;
   maxPlayers: number;
   players: { id: string; username: string }[];
