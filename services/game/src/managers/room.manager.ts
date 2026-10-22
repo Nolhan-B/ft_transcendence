@@ -77,6 +77,10 @@ export class RoomManager {
     room.settings = settings;
   }
 
+  listRooms(): Room[] {
+    return Array.from(this.rooms.values());
+  }
+
   getRoom(code: string): Room | undefined {
     return this.rooms.get(code);
   }
