@@ -53,6 +53,10 @@ export class RoomManager {
 
     return roomCode;
   }
+
+  removeRoom(code: string): void {
+    this.rooms.delete(code);
+  }
 }
 
 function generateRoomCode(): string {
