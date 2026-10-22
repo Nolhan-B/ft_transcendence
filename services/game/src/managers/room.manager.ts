@@ -54,6 +54,10 @@ export class RoomManager {
     return roomCode;
   }
 
+  getRoom(code: string): Room | undefined {
+    return this.rooms.get(code);
+  }
+
   removeRoom(code: string): void {
     this.rooms.delete(code);
   }
