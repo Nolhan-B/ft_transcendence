@@ -68,6 +68,35 @@ export class RoomManager {
     if (room.leaderId === userId) room.leaderId = room.players[0].id;
   }
 
+  joinRoom(
+    code: string,
+    userId: string,
+    username: string,
+    password?: string,
+  ): { ok: true; room: Room } | { ok: false; error: string } {
+    const room = this.getRoom(code);
+    if (!room)
+      return { ok: false, error: `Can not find room with code ${code}` };
+
+    if (room.players.some((p) => p.id === userId))
+      return { ok: false, error: "Already in room" };
+
+    if (room.maxPlayers === room.players.length)
+      return {
+        ok: false,
+        error: "Max player capacity has already been reached for this room",
+      };
+
+    if (room.password) {
+      if (room.password !== password)
+        return { ok: false, error: "Password is incorrect" };
+    }
+
+    room.players.push({ id: userId, username: username });
+
+    return { ok: true, room: room };
+  }
+
   updateSettings(code: string, leaderId: string, settings: GameSettings): void {
     const room = this.getRoom(code);
     if (!room) return;
