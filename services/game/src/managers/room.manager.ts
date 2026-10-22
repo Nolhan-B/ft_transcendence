@@ -54,6 +54,20 @@ export class RoomManager {
     return roomCode;
   }
 
+  leaveRoom(code: string, userId: string): void {
+    const room = this.getRoom(code);
+    if (!room) return;
+
+    if (room.players.length === 1) {
+      this.removeRoom(code);
+      return;
+    }
+
+    room.players = room.players.filter((p) => p.id !== userId);
+
+    if (room.leaderId === userId) room.leaderId = room.players[0].id;
+  }
+
   getRoom(code: string): Room | undefined {
     return this.rooms.get(code);
   }
