@@ -67,6 +67,15 @@ export default async function gameGateway(fastify: FastifyInstance) {
     const timer = setTimeout(() => {
       turnTimers.delete(gameId);
 
+      const game = manager.getGame(gameId);
+      if (!game || game.status === GameStatus.FINISHED) return;
+
+      const room = rooms.get(gameId);
+      if (!room || room.size === 0) return;
+
+      const currentPlayer = game.players.find((p) => p.isCurrentTurn);
+      if (!currentPlayer) return;
+
       const afkKey = `${gameId}:${currentPlayer.userId}`;
       const count = (afkCounts.get(afkKey) ?? 0) + 1;
       afkCounts.set(afkKey, count);
