@@ -1,4 +1,3 @@
-// plugins/game-manager.ts
 import fp from "fastify-plugin";
 import { GameManager } from "../managers/game.manager.js";
 

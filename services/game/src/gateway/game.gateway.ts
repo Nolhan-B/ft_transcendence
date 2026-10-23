@@ -1,5 +1,5 @@
 import { FastifyInstance } from "fastify";
-import { WebSocket } from "@fastify/websocket";
+import { WebSocket } from "ws";
 import {
   CardColor,
   CardValue,
@@ -14,11 +14,17 @@ import {
   advanceToNextPlayer,
   drawCardsForPlayer,
 } from "../engine/game-state.js";
+import { Room } from "../managers/room.manager.js";
+import type { RoomInfo } from "shared";
 
 const TURN_TIMEOUT_MS = 20000;
 const MAX_AFK_COUNT = 2;
 
 const rooms: Map<
+  string,
+  Set<{ socket: WebSocket; userId: string }>
+> = new Map();
+const roomSockets: Map<
   string,
   Set<{ socket: WebSocket; userId: string }>
 > = new Map();
@@ -45,6 +51,7 @@ const afkCounts: Map<string, number> = new Map();
 
 export default async function gameGateway(fastify: FastifyInstance) {
   const manager = fastify.gameManager;
+  const roomManager = fastify.roomManager;
 
   function startTurnTimer(gameId: string): void {
     if (turnTimers.has(gameId)) {
@@ -59,6 +66,15 @@ export default async function gameGateway(fastify: FastifyInstance) {
 
     const timer = setTimeout(() => {
       turnTimers.delete(gameId);
+
+      const game = manager.getGame(gameId);
+      if (!game || game.status === GameStatus.FINISHED) return;
+
+      const room = rooms.get(gameId);
+      if (!room || room.size === 0) return;
+
+      const currentPlayer = game.players.find((p) => p.isCurrentTurn);
+      if (!currentPlayer) return;
 
       const afkKey = `${gameId}:${currentPlayer.userId}`;
       const count = (afkCounts.get(afkKey) ?? 0) + 1;
@@ -407,15 +423,173 @@ export default async function gameGateway(fastify: FastifyInstance) {
           });
           break;
         }
+        case "create_room": {
+          const user = await fastify.prisma.user.findUnique({
+            where: { id: userId },
+            select: { username: true },
+          });
+          if (!user) {
+            sendError(socket, "User not found");
+            break;
+          }
+          const roomCode = roomManager.createRoom(
+            userId,
+            user.username,
+            message.mode,
+            message.maxPlayers,
+            message.name,
+            message.password,
+          );
+          if (!roomSockets.has(roomCode)) roomSockets.set(roomCode, new Set());
+          roomSockets.get(roomCode)!.add({ socket, userId });
+          socket.send(
+            JSON.stringify({
+              type: "room_updated",
+              room: toRoomInfo(roomManager.getRoom(roomCode)!),
+            }),
+          );
+          break;
+        }
+        case "join_room": {
+          const user = await fastify.prisma.user.findUnique({
+            where: { id: userId },
+            select: { username: true },
+          });
+          if (!user) {
+            sendError(socket, "User not found");
+            break;
+          }
+
+          const room = roomManager.getRoom(message.roomCode);
+          if (!room) {
+            sendError(socket, "Room not found");
+            break;
+          }
+
+          const alreadyIn = room.players.some((p) => p.id === userId);
+
+          if (!alreadyIn) {
+            const result = roomManager.joinRoom(
+              message.roomCode,
+              userId,
+              user.username,
+              message.password,
+            );
+            if (!result.ok) {
+              sendError(socket, result.error);
+              break;
+            }
+          }
+
+          if (!roomSockets.has(message.roomCode))
+            roomSockets.set(message.roomCode, new Set());
+          roomSockets.get(message.roomCode)!.add({ socket, userId });
+          broadcastToRoomSockets(message.roomCode, {
+            type: "room_updated",
+            room: toRoomInfo(room),
+          });
+          break;
+        }
+        case "leave_room": {
+          roomManager.leaveRoom(message.roomCode, userId);
+          const roomSocketSet = roomSockets.get(message.roomCode);
+          if (roomSocketSet) {
+            for (const client of roomSocketSet) {
+              if (client.userId === userId) {
+                roomSocketSet.delete(client);
+                break;
+              }
+            }
+          }
+          const room = roomManager.getRoom(message.roomCode);
+          if (room) {
+            broadcastToRoomSockets(message.roomCode, {
+              type: "room_updated",
+              room: toRoomInfo(room),
+            });
+          } else {
+            roomSockets.delete(message.roomCode);
+          }
+          break;
+        }
+        case "update_room": {
+          roomManager.updateSettings(
+            message.roomCode,
+            userId,
+            message.settings,
+          );
+          const room = roomManager.getRoom(message.roomCode);
+          if (!room) {
+            sendError(socket, "Room not found");
+            break;
+          }
+          broadcastToRoomSockets(message.roomCode, {
+            type: "room_updated",
+            room: toRoomInfo(room),
+          });
+          break;
+        }
+        case "start_game": {
+          const room = roomManager.getRoom(message.roomCode);
+          if (!room) {
+            sendError(socket, "Room not found");
+            break;
+          }
+          if (room.leaderId !== userId) {
+            sendError(socket, "Only the leader can start");
+            break;
+          }
+          if (room.players.length < 2) {
+            sendError(socket, "Need at least 2 players");
+            break;
+          }
+          const participants = room.players.map((p) => ({
+            id: p.id,
+            username: p.username,
+          }));
+          const gameId = fastify.gameManager.createGame(
+            participants,
+            room.mode,
+            room.settings,
+          );
+          broadcastToRoomSockets(message.roomCode, {
+            type: "game_started",
+            gameId,
+          } as ServerEvent);
+          roomSockets.delete(message.roomCode);
+          roomManager.removeRoom(message.roomCode);
+          break;
+        }
       }
     });
 
     socket.on("close", () => {
+      // Clean up game sockets
       for (const [gameId, room] of rooms) {
         for (const client of room) {
           if (client.socket === socket) {
             room.delete(client);
             broadCastToRoom(gameId, { type: "player_left", userId });
+            break;
+          }
+        }
+      }
+
+      // Clean up room sockets
+      for (const [roomCode, sockets] of roomSockets) {
+        for (const client of sockets) {
+          if (client.socket === socket) {
+            sockets.delete(client);
+            roomManager.leaveRoom(roomCode, userId);
+            const room = roomManager.getRoom(roomCode);
+            if (room) {
+              broadcastToRoomSockets(roomCode, {
+                type: "room_updated",
+                room: toRoomInfo(room),
+              });
+            } else {
+              roomSockets.delete(roomCode);
+            }
             break;
           }
         }
@@ -487,5 +661,29 @@ function filterStateForPlayer(
     discardPile: game.discardPile,
     ranking: game.ranking,
     winnerId: game.winnerId,
+  };
+}
+
+function broadcastToRoomSockets(roomCode: string, event: ServerEvent): void {
+  const sockets = roomSockets.get(roomCode);
+  if (!sockets) return;
+  const data = JSON.stringify(event);
+  for (const client of sockets) {
+    if (client.socket.readyState === WebSocket.OPEN) {
+      client.socket.send(data);
+    }
+  }
+}
+
+function toRoomInfo(room: Room): RoomInfo {
+  return {
+    code: room.code,
+    name: room.name,
+    hasPassword: !!room.password,
+    leaderId: room.leaderId,
+    maxPlayers: room.maxPlayers,
+    players: room.players,
+    mode: room.mode,
+    settings: room.settings,
   };
 }
