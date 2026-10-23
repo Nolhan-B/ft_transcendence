@@ -1,0 +1,644 @@
+/* ============ GAME LAYOUT ============ */
+.app.view-game main {
+  height: calc(100vh - 64px);
+  overflow: hidden;
+}
+.game-layout {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  height: 100%;
+}
+.game-layout.chat-closed {
+  grid-template-columns: 1fr 0;
+}
+.game-layout.chat-closed .chat {
+  display: none;
+}
+
+.table {
+  position: relative;
+  overflow: hidden;
+  background: radial-gradient(ellipse at 50% 45%, #1f7a3f 0%, #125a2c 45%, #0a2e17 100%);
+  box-shadow: inset 0 0 120px rgba(0, 0, 0, 0.6);
+}
+.table-glow {
+  position: absolute;
+  left: 50%;
+  top: 45%;
+  width: 520px;
+  height: 520px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--current) 0%, transparent 65%);
+  opacity: 0.35;
+  transition: background 0.5s;
+  pointer-events: none;
+}
+
+/* ============ SEATS ============ */
+.seat {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 18px;
+  transition:
+    background 0.3s,
+    box-shadow 0.3s,
+    opacity 0.3s;
+  z-index: 5;
+}
+.seat-top {
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.seat-left {
+  left: 18px;
+  top: 30%;
+}
+.seat-right {
+  right: 18px;
+  top: 30%;
+}
+.seat.active {
+  background: rgba(0, 0, 0, 0.3);
+  box-shadow: 0 0 0 3px var(--yellow);
+  animation: pulse-ring 1.6s ease-in-out infinite;
+}
+.seat.gone {
+  opacity: 0.4;
+  filter: grayscale(1);
+}
+.seat-cards {
+  display: flex;
+  align-items: center;
+  height: 74px;
+}
+.seat-cards .more {
+  margin-left: 6px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.seat-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.4);
+  padding: 6px 12px 6px 6px;
+  border-radius: 99px;
+}
+.seat-name {
+  font-weight: 600;
+  line-height: 1.1;
+}
+.seat-count {
+  font-size: 0.78rem;
+}
+.uno-badge {
+  background: var(--red);
+  color: var(--yellow);
+  font-weight: 700;
+  font-style: italic;
+  padding: 2px 8px;
+  border-radius: 99px;
+  border: 2px solid #fff;
+  font-size: 0.8rem;
+  animation: bounce 0.8s ease-in-out infinite;
+}
+.catch {
+  animation: pop 0.3s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+
+.shake {
+  animation: shake 0.6s;
+}
+@keyframes shake {
+  10%,
+  90% {
+    translate: -2px 0;
+  }
+  20%,
+  80% {
+    translate: 4px 0;
+  }
+  30%,
+  50%,
+  70% {
+    translate: -8px 0;
+  }
+  40%,
+  60% {
+    translate: 8px 0;
+  }
+}
+@keyframes bounce {
+  50% {
+    transform: translateY(-4px) scale(1.08);
+  }
+}
+@keyframes pulse-ring {
+  50% {
+    box-shadow: 0 0 0 6px rgba(251, 192, 45, 0.35);
+  }
+}
+
+/* Turn timer bar */
+.turn-bar {
+  width: 100%;
+  height: 5px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.15);
+  overflow: hidden;
+}
+.turn-bar > div {
+  height: 100%;
+  background: linear-gradient(90deg, var(--red), var(--yellow));
+  transform-origin: left;
+  animation-name: countdown;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+.turn-bar.mine {
+  width: min(420px, 80%);
+  margin: 0 auto 6px;
+}
+@keyframes countdown {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+/* ============ CENTER ============ */
+.center-area {
+  position: absolute;
+  left: 50%;
+  top: 43%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  gap: 60px;
+  z-index: 4;
+}
+.direction {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 330px;
+  height: 330px;
+  margin: -165px 0 0 -165px;
+  display: grid;
+  place-items: start center;
+  font-size: 2.4rem;
+  color: rgba(255, 255, 255, 0.25);
+  border: 3px dashed rgba(255, 255, 255, 0.12);
+  border-radius: 50%;
+  animation: spin 14s linear infinite;
+  pointer-events: none;
+}
+.direction.ccw {
+  animation-direction: reverse;
+}
+
+.draw-pile {
+  position: relative;
+  width: 92px;
+  height: 138px;
+}
+.draw-pile .stack {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+.draw-pile .s3 {
+  transform: translate(-6px, 6px) rotate(-4deg);
+}
+.draw-pile .s2 {
+  transform: translate(-3px, 3px) rotate(-2deg);
+}
+.draw-pile.can-draw {
+  cursor: pointer;
+}
+.draw-pile.can-draw .s1 {
+  box-shadow:
+    0 0 0 3px var(--yellow),
+    0 12px 26px rgba(0, 0, 0, 0.5);
+  animation: nudge 1.4s ease-in-out infinite;
+}
+.draw-pile.can-draw:hover .s1 {
+  transform: translateY(-10px) rotate(3deg);
+  animation: none;
+}
+@keyframes nudge {
+  50% {
+    transform: translateY(-5px);
+  }
+}
+.pile-count {
+  position: absolute;
+  bottom: -26px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-weight: 600;
+  color: var(--muted);
+}
+.pile-hint {
+  position: absolute;
+  top: -28px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-weight: 700;
+  color: var(--yellow);
+  white-space: nowrap;
+  animation: bounce 1s ease-in-out infinite;
+}
+
+.discard {
+  position: relative;
+  width: 92px;
+  height: 138px;
+}
+.discard .uno-card {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+.discard .under {
+  filter: brightness(0.85);
+}
+.discard .top-card {
+  z-index: 2;
+  animation: slam 0.45s cubic-bezier(0.2, 1.3, 0.4, 1);
+}
+@keyframes slam {
+  from {
+    transform: translateY(160px) scale(1.4) rotate(-25deg);
+    opacity: 0;
+  }
+  70% {
+    transform: scale(0.95) rotate(3deg);
+    opacity: 1;
+  }
+}
+.color-ring {
+  position: absolute;
+  inset: -16px;
+  border-radius: 22px;
+  border: 5px solid var(--current);
+  box-shadow: 0 0 30px var(--current);
+  transition:
+    border-color 0.4s,
+    box-shadow 0.4s;
+}
+.pending {
+  position: absolute;
+  top: -18px;
+  right: -26px;
+  z-index: 3;
+  background: var(--red);
+  color: #fff;
+  font-weight: 700;
+  font-size: 1.3rem;
+  padding: 4px 12px;
+  border-radius: 99px;
+  border: 3px solid #fff;
+  animation: pop 0.35s cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+
+.status-banner {
+  position: absolute;
+  left: 50%;
+  top: calc(43% + 120px);
+  transform: translateX(-50%);
+  padding: 6px 18px;
+  border-radius: 99px;
+  background: rgba(0, 0, 0, 0.45);
+  font-weight: 600;
+  white-space: nowrap;
+  z-index: 4;
+  animation: fade 0.3s;
+}
+.status-banner.mine {
+  background: var(--yellow);
+  color: var(--ink);
+  animation: pop 0.35s cubic-bezier(0.2, 1.5, 0.4, 1);
+}
+
+/* ============ MY HAND ============ */
+.my-zone {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 0 20px 12px;
+  z-index: 10;
+}
+.hand {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  height: 170px;
+  padding-top: 30px;
+}
+.hand-slot {
+  transform: translateY(var(--drop)) rotate(var(--rot));
+  transform-origin: 50% 130%;
+  transition: transform 0.25s cubic-bezier(0.2, 1.3, 0.4, 1);
+}
+.hand-slot:hover {
+  transform: translateY(calc(var(--drop) - 34px)) rotate(var(--rot)) scale(1.08);
+  z-index: 999 !important;
+}
+.my-actions {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  margin-top: 6px;
+}
+.me-tag {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.4);
+  padding: 4px 14px 4px 4px;
+  border-radius: 99px;
+  font-weight: 600;
+}
+.me-tag .avatar {
+  width: 30px;
+  height: 30px;
+}
+.my-zone.active .me-tag {
+  box-shadow: 0 0 0 3px var(--yellow);
+}
+
+.uno-btn {
+  background: var(--red);
+  color: var(--yellow);
+  font-size: 1.4rem;
+  font-style: italic;
+  font-weight: 700;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  padding: 10px 22px;
+  text-shadow: 2px 2px 0 var(--ink);
+  animation: uno-pulse 0.7s ease-in-out infinite;
+}
+@keyframes uno-pulse {
+  50% {
+    transform: scale(1.12) rotate(-6deg);
+  }
+}
+
+/* ============ BLUFF ============ */
+.bluff-panel {
+  position: absolute;
+  left: 50%;
+  top: 43%;
+  transform: translate(-50%, -50%);
+  z-index: 50;
+  width: min(360px, 90%);
+  text-align: center;
+  background: rgba(10, 10, 10, 0.92);
+  border: 3px solid var(--red);
+  border-radius: 20px;
+  padding: 20px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+}
+.bluff-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin: 14px 0;
+}
+.bluff-panel .turn-bar.mine {
+  width: 100%;
+}
+
+/* ============ MODALS (game) ============ */
+.color-picker {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.color-choice {
+  aspect-ratio: 1;
+  border-radius: 22px;
+  border: 4px solid #fff;
+  transition: transform 0.15s;
+}
+.color-choice:hover {
+  transform: scale(1.06) rotate(-3deg);
+}
+.color-choice.red {
+  background: var(--red);
+}
+.color-choice.yellow {
+  background: var(--yellow);
+}
+.color-choice.green {
+  background: var(--green);
+}
+.color-choice.blue {
+  background: var(--blue);
+}
+
+.target-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.target {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 0;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.3);
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 600;
+  transition: background 0.2s;
+}
+.target:hover {
+  background: rgba(0, 0, 0, 0.5);
+}
+.target span:nth-child(2) {
+  flex: 1;
+  text-align: left;
+}
+
+/* ============ CHAT ============ */
+.chat {
+  display: flex;
+  flex-direction: column;
+  border-radius: 0;
+  border-width: 0 0 0 1px;
+  min-height: 0;
+  padding: 16px;
+}
+.chat-lines {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 8px 0;
+}
+.chat-line {
+  background: rgba(0, 0, 0, 0.3);
+  padding: 6px 10px;
+  border-radius: 12px 12px 12px 4px;
+  max-width: 90%;
+  animation: slide-in 0.25s;
+  word-break: break-word;
+}
+.chat-line b {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--yellow);
+}
+.chat-line.mine {
+  align-self: flex-end;
+  background: var(--blue);
+  border-radius: 12px 12px 4px 12px;
+}
+.chat-line.mine b {
+  color: #fff;
+}
+.chat-form {
+  display: flex;
+  gap: 6px;
+}
+.chat-form input {
+  padding: 8px 12px;
+}
+
+/* ============ END ============ */
+.end-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  display: grid;
+  place-items: center;
+  z-index: 800;
+  animation: fade 0.4s;
+}
+.end-card {
+  text-align: center;
+  background: linear-gradient(160deg, #a51d1d, #5a0c0c);
+  padding: 32px 40px;
+  min-width: 320px;
+  position: relative;
+  z-index: 2;
+}
+.end-card h2 {
+  font-size: 2rem;
+  margin: 20px 0;
+}
+.ranking {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 20px;
+  text-align: left;
+}
+.ranking li {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+.ranking li.me {
+  background: rgba(255, 255, 255, 0.12);
+}
+.medal {
+  width: 28px;
+  text-align: center;
+}
+.confetti {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.confetti i {
+  position: absolute;
+  top: -20px;
+  width: 10px;
+  height: 16px;
+  border-radius: 2px;
+  animation-name: confetti;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+@keyframes confetti {
+  to {
+    transform: translateY(110vh) rotate(720deg);
+  }
+}
+
+/* ============ LOADING ============ */
+.game-loading {
+  height: 100%;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 24px;
+}
+.shuffle {
+  position: relative;
+  width: 92px;
+  height: 138px;
+}
+.shuffle .uno-card {
+  position: absolute;
+  animation: shuffle 1.2s ease-in-out infinite;
+}
+.shuffle .uno-card:nth-child(2) {
+  animation-delay: 0.2s;
+}
+.shuffle .uno-card:nth-child(3) {
+  animation-delay: 0.4s;
+}
+@keyframes shuffle {
+  25% {
+    transform: translateX(-60px) rotate(-15deg);
+  }
+  50% {
+    transform: translateX(60px) rotate(15deg);
+  }
+  75% {
+    transform: none;
+  }
+}
+
+/* ============ RESPONSIVE ============ */
+@media (max-width: 900px) {
+  .game-layout {
+    grid-template-columns: 1fr;
+  }
+  .chat {
+    display: none;
+  }
+  .uno-card.lg {
+    --w: 70px;
+    --h: 105px;
+  }
+  .center-area {
+    gap: 30px;
+  }
+  .direction {
+    width: 240px;
+    height: 240px;
+    margin: -120px 0 0 -120px;
+  }
+}

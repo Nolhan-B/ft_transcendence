@@ -1,0 +1,188 @@
+/* ============ UNO CARD ============ */
+.uno-card {
+  --w: 90px;
+  --h: 135px;
+  --c: #222;
+  position: relative;
+  width: var(--w);
+  height: var(--h);
+  border-radius: calc(var(--w) * 0.12);
+  background: var(--c);
+  border: calc(var(--w) * 0.06) solid #fff;
+  box-shadow:
+    0 6px 14px rgba(0, 0, 0, 0.35),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+  flex-shrink: 0;
+  user-select: none;
+  transition:
+    transform 0.2s cubic-bezier(0.2, 1.3, 0.4, 1),
+    box-shadow 0.2s,
+    filter 0.2s;
+}
+.uno-card.sm {
+  --w: 44px;
+  --h: 66px;
+}
+.uno-card.md {
+  --w: 70px;
+  --h: 105px;
+}
+.uno-card.lg {
+  --w: 92px;
+  --h: 138px;
+}
+
+.uno-card.red {
+  --c: var(--red);
+}
+.uno-card.yellow {
+  --c: var(--yellow);
+}
+.uno-card.green {
+  --c: var(--green);
+}
+.uno-card.blue {
+  --c: var(--blue);
+}
+.uno-card.wild {
+  --c: #1b1b1b;
+}
+
+.uno-card .oval {
+  position: absolute;
+  inset: 12% 4%;
+  background: #fff;
+  border-radius: 50%;
+  transform: rotate(-30deg);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.uno-card .center {
+  position: relative;
+  transform: rotate(30deg);
+  font-weight: 700;
+  font-style: italic;
+  font-size: calc(var(--w) * 0.5);
+  line-height: 1;
+  color: var(--c);
+  text-shadow:
+    2px 2px 0 var(--ink),
+    -1px -1px 0 var(--ink),
+    1px -1px 0 var(--ink),
+    -1px 1px 0 var(--ink);
+  z-index: 1;
+}
+.uno-card.wild .center {
+  color: #fff;
+}
+
+.uno-card .corner {
+  position: absolute;
+  font-weight: 700;
+  font-style: italic;
+  font-size: calc(var(--w) * 0.2);
+  color: #fff;
+  text-shadow: 1px 1px 0 var(--ink);
+  line-height: 1;
+}
+.uno-card .corner.tl {
+  top: 5%;
+  left: 8%;
+}
+.uno-card .corner.br {
+  bottom: 5%;
+  right: 8%;
+  transform: rotate(180deg);
+}
+.uno-card.sm .corner {
+  display: none;
+}
+
+/* Wild 4-color wheel */
+.wild-wheel {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+}
+.wild-wheel i:nth-child(1) {
+  background: var(--red);
+}
+.wild-wheel i:nth-child(2) {
+  background: var(--blue);
+}
+.wild-wheel i:nth-child(3) {
+  background: var(--yellow);
+}
+.wild-wheel i:nth-child(4) {
+  background: var(--green);
+}
+.uno-card.wild .oval {
+  background: #1b1b1b;
+}
+
+/* Back */
+.uno-card.back {
+  --c: #111;
+  background: radial-gradient(circle at 50% 50%, #2a2a2a, #0d0d0d);
+}
+.uno-card.back .oval {
+  background: var(--red);
+}
+.uno-card.back .logo-text {
+  transform: rotate(30deg);
+  font-weight: 700;
+  font-style: italic;
+  font-size: calc(var(--w) * 0.3);
+  color: var(--yellow);
+  text-shadow: 2px 2px 0 var(--ink);
+}
+.uno-card.back.sm .logo-text {
+  font-size: calc(var(--w) * 0.26);
+  text-shadow: 1px 1px 0 var(--ink);
+}
+
+/* States */
+.uno-card.clickable {
+  cursor: pointer;
+}
+.uno-card.playable {
+  box-shadow:
+    0 0 0 3px var(--yellow),
+    0 10px 24px rgba(251, 192, 45, 0.45);
+}
+.uno-card.dimmed {
+  filter: brightness(0.55) saturate(0.6);
+}
+
+.uno-card.wiggle {
+  animation: wiggle 0.4s;
+}
+@keyframes wiggle {
+  20% {
+    transform: translateX(-6px) rotate(-4deg);
+  }
+  40% {
+    transform: translateX(6px) rotate(4deg);
+  }
+  60% {
+    transform: translateX(-4px) rotate(-2deg);
+  }
+  80% {
+    transform: translateX(3px);
+  }
+}
+
+.uno-card.deal-in {
+  animation: deal-in 0.45s cubic-bezier(0.2, 1.2, 0.4, 1) both;
+}
+@keyframes deal-in {
+  from {
+    opacity: 0;
+    transform: translateY(-120px) rotate(-25deg) scale(0.6);
+  }
+}
