@@ -99,6 +99,9 @@ jobs:
       - name: Run Websocket game integration tests
         run: npm run test-game-integration
 
+      - name: Run Room integration tests
+        run: npm run test-rooms
+
       - name: Run E2E Smoke & Route Tests
         run: npm run test-e2e
 

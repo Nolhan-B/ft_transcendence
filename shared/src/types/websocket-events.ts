@@ -1,6 +1,38 @@
-import type { CardColor, GameState } from "./game.js";
+import type { CardColor, GameState, GameMode, GameSettings } from "./game.js";
 
-// Client -> Server
+// ============================================================
+// ROOM - Client -> Server
+// ============================================================
+
+export interface CreateRoomPayload {
+  name: string;
+  mode: GameMode;
+  maxPlayers: number;
+  password?: string;
+}
+
+export interface JoinRoomPayload {
+  roomCode: string;
+  password?: string;
+}
+
+export interface LeaveRoomPayload {
+  roomCode: string;
+}
+
+export interface UpdateRoomPayload {
+  roomCode: string;
+  settings: GameSettings;
+}
+
+export interface StartGamePayload {
+  roomCode: string;
+}
+
+// ============================================================
+// GAME - Client -> Server
+// ============================================================
+
 export interface JoinGamePayload {
   gameId: string;
 }
@@ -8,7 +40,7 @@ export interface JoinGamePayload {
 export interface PlayCardPayload {
   gameId: string;
   cardId: string;
-  chosenColor?: CardColor; // requis pour wild / wild_draw4
+  chosenColor?: CardColor;
   targetUserId?: string;
 }
 
@@ -18,14 +50,6 @@ export interface ChallengeBluffPayload {
 
 export interface AcceptWildDraw4Payload {
   gameId: string;
-}
-
-export interface BluffResultEvent {
-  type: "bluff_result";
-  challengerUserId: string;
-  targetUserId: string;
-  wasBluff: boolean;
-  penaltyCount: number;
 }
 
 export interface DrawCardPayload {
@@ -46,7 +70,35 @@ export interface CatchUnoPayload {
   targetUserId: string;
 }
 
-// Server -> Client
+// ============================================================
+// ROOM - Server -> Client
+// ============================================================
+
+export interface RoomInfo {
+  code: string;
+  name: string;
+  hasPassword: boolean;
+  leaderId: string;
+  maxPlayers: number;
+  players: { id: string; username: string }[];
+  mode: GameMode;
+  settings: GameSettings;
+}
+
+export interface RoomUpdatedEvent {
+  type: "room_updated";
+  room: RoomInfo;
+}
+
+export interface GameStartedEvent {
+  type: "game_started";
+  gameId: string;
+}
+
+// ============================================================
+// GAME - Server -> Client
+// ============================================================
+
 export interface GameUpdatedEvent {
   type: "game_updated";
   state: GameState;
@@ -85,7 +137,21 @@ export interface UnoCaughtEvent {
   catcherUserId: string;
 }
 
+export interface BluffResultEvent {
+  type: "bluff_result";
+  challengerUserId: string;
+  targetUserId: string;
+  wasBluff: boolean;
+  penaltyCount: number;
+}
+
+// ============================================================
+// UNIONS
+// ============================================================
+
 export type ServerEvent =
+  | RoomUpdatedEvent
+  | GameStartedEvent
   | GameUpdatedEvent
   | PlayerJoinedEvent
   | PlayerLeftEvent
@@ -96,6 +162,11 @@ export type ServerEvent =
   | BluffResultEvent;
 
 export type ClientMessage =
+  | ({ type: "create_room" } & CreateRoomPayload)
+  | ({ type: "join_room" } & JoinRoomPayload)
+  | ({ type: "leave_room" } & LeaveRoomPayload)
+  | ({ type: "update_room" } & UpdateRoomPayload)
+  | ({ type: "start_game" } & StartGamePayload)
   | ({ type: "join_game" } & JoinGamePayload)
   | ({ type: "play_card" } & PlayCardPayload)
   | ({ type: "draw_card" } & DrawCardPayload)
