@@ -4,12 +4,16 @@ WORKDIR /app
 
 RUN apk add --no-cache wget
 
-COPY services/chat/package*.json ./
-RUN npm install
+COPY package*.json ./
+COPY shared/ ./shared/
+COPY services/chat/package*.json ./services/chat/
 
-COPY services/chat/ ./
+RUN npm install --workspace=chat-service --workspace=shared
 
-COPY shared/prisma ./shared/prisma
+COPY services/chat/ ./services/chat/
+
+
+WORKDIR /app/services/chat
 
 RUN npx prisma generate
 

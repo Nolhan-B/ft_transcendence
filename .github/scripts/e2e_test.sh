@@ -1,5 +1,7 @@
 WORKDIR=$(mktemp -d)
 
+BASE_URL="${BASE_URL:-https://127.0.0.1:8443}"
+
 cleanup() {
   rm -rf "$WORKDIR"
   docker compose exec -T postgres psql -U transcendence_user -d transcendence_db \
@@ -13,10 +15,10 @@ USERNAME="cibot_${SUFFIX}"
 PASSWORD="securepassword123"
 
 echo "=== 1. Checking Gateway Routing ==="
-FRONTEND_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8080/)
-USER_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8080/api/user/health)
-GAME_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8080/api/game/health)
-CHAT_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8080/api/chat/health)
+FRONTEND_STATUS=$(curl -k -s -o /dev/null -w "%{http_code}" "$BASE_URL/")
+USER_STATUS=$(curl -k -s -o /dev/null -w "%{http_code}" "$BASE_URL/api/user/health")
+GAME_STATUS=$(curl -k -s -o /dev/null -w "%{http_code}" "$BASE_URL/api/game/health")
+CHAT_STATUS=$(curl -k -s -o /dev/null -w "%{http_code}" "$BASE_URL/api/chat/health")
 
 echo "Frontend: $FRONTEND_STATUS | User: $USER_STATUS | Game: $GAME_STATUS | Chat: $CHAT_STATUS"
 
@@ -26,7 +28,7 @@ if [ "$FRONTEND_STATUS" -ne 200 ] || [ "$USER_STATUS" -ne 200 ] || [ "$GAME_STAT
 fi
 
 echo "=== 2. Testing User Signup (Positive: 201) ==="
-SIGNUP_STATUS=$(curl -s -o "$WORKDIR/signup.json" -w "%{http_code}" -X POST http://127.0.0.1:8080/api/auth/signup \
+SIGNUP_STATUS=$(curl -k -s -o "$WORKDIR/signup.json" -w "%{http_code}" -X POST "$BASE_URL/api/auth/signup" \
   -H "Content-Type: application/json" \
   -d "{\"email\":\"$EMAIL\",\"username\":\"$USERNAME\",\"password\":\"$PASSWORD\"}")
 echo "Signup HTTP Status: $SIGNUP_STATUS"
@@ -38,7 +40,7 @@ if [ "$SIGNUP_STATUS" -ne 201 ]; then
 fi
 
 echo "=== 3. Testing Duplicate Signup (Negative: 409) ==="
-DUP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST http://127.0.0.1:8080/api/auth/signup \
+DUP_STATUS=$(curl -k -s -o /dev/null -w "%{http_code}" -X POST "$BASE_URL/api/auth/signup" \
   -H "Content-Type: application/json" \
   -d "{\"email\":\"$EMAIL\",\"username\":\"$USERNAME\",\"password\":\"$PASSWORD\"}")
 echo "Duplicate Signup HTTP Status: $DUP_STATUS"
@@ -48,7 +50,7 @@ if [ "$DUP_STATUS" -ne 409 ]; then
 fi
 
 echo "=== 4. Testing Invalid Login (Negative: 401) ==="
-INVALID_LOGIN_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST http://127.0.0.1:8080/api/auth/login \
+INVALID_LOGIN_STATUS=$(curl -k -s -o /dev/null -w "%{http_code}" -X POST "$BASE_URL/api/auth/login" \
   -H "Content-Type: application/json" \
   -d "{\"email\":\"$EMAIL\",\"password\":\"wrongpassword\"}")
 echo "Invalid Login HTTP Status: $INVALID_LOGIN_STATUS"
@@ -58,7 +60,7 @@ if [ "$INVALID_LOGIN_STATUS" -ne 401 ]; then
 fi
 
 echo "=== 5. Testing Valid User Login (Positive: 200) ==="
-LOGIN_STATUS=$(curl -s -o "$WORKDIR/login.json" -w "%{http_code}" -X POST http://127.0.0.1:8080/api/auth/login \
+LOGIN_STATUS=$(curl -k -s -o "$WORKDIR/login.json" -w "%{http_code}" -X POST "$BASE_URL/api/auth/login" \
   -H "Content-Type: application/json" \
   -d "{\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\"}")
 echo "Login HTTP Status: $LOGIN_STATUS"
@@ -72,7 +74,7 @@ fi
 TOKEN=$(node -e "console.log(JSON.parse(require('fs').readFileSync(process.argv[1])).token)" "$WORKDIR/login.json")
 
 echo "=== 6. Testing Protected Route /me (Positive: 200) ==="
-ME_STATUS=$(curl -s -o "$WORKDIR/me.json" -w "%{http_code}" -X GET http://127.0.0.1:8080/api/auth/me \
+ME_STATUS=$(curl -k -s -o "$WORKDIR/me.json" -w "%{http_code}" -X GET "$BASE_URL/api/auth/me" \
   -H "Authorization: Bearer $TOKEN")
 echo "Me HTTP Status: $ME_STATUS"
 cat "$WORKDIR/me.json"

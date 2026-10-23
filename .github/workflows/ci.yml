@@ -42,7 +42,6 @@ jobs:
       - name: Run Game engine tests
         run: npm run test-game
 
-
   security:
     name: Check Secrets
     runs-on: ubuntu-latest
@@ -53,8 +52,6 @@ jobs:
       - uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-
 
   docker-build:
     name: Build & Validate Docker Stack
@@ -70,6 +67,13 @@ jobs:
           echo "dummy_password" > secrets/db_password.txt
           echo "postgresql://transcendence_user:dummy_password@postgres:5432/transcendence_db?schema=public" > secrets/db_url.txt
           echo "dummy_jwt_secret" > secrets/jwt_secret.txt
+          mkdir -p gateway/ssl
+          openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+            -keyout gateway/ssl/transcendence.key \
+            -out gateway/ssl/transcendence.crt \
+            -subj "/C=FR/ST=GrandEst/L=Mulhouse/O=42/CN=localhost"
+          chmod 600 gateway/ssl/transcendence.key
+          chmod 644 gateway/ssl/transcendence.crt
 
       - name: Build Docker images
         run: |
@@ -107,6 +111,9 @@ jobs:
 
       - name: Run API smoke tests
         run: npm run test-api
+
+      - name: Run Chat E2E tests
+        run: npm run test-chat
 
       - name: Dump Docker logs on failure
         if: failure()
