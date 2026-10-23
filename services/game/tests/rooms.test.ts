@@ -1,10 +1,15 @@
+import process from "node:process";
 import WebSocket from "ws";
 
-const API = "http://localhost:8080/api";
-const WS_URL = "ws://localhost:8080/api/game/ws";
+// Accepte le certificat SSL auto-signé pour fetch et WebSocket
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+
+const API = process.env.API_URL || "https://localhost:8443/api";
+const WS_URL = process.env.WS_URL || "wss://localhost:8443/api/game/ws";
 
 let passed = 0;
 let failed = 0;
+const activeSockets: WebSocket[] = [];
 
 function assert(condition: boolean, msg: string) {
   if (!condition) throw new Error(msg);
@@ -22,15 +27,33 @@ async function post(path: string, body: object, token?: string) {
     method: "POST",
     headers,
     body: JSON.stringify(body),
+    signal: AbortSignal.timeout(5000),
   });
-  return res.json();
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(
+      `Invalid JSON on POST ${path} (HTTP ${res.status}): ${text.slice(0, 120)}`,
+    );
+  }
 }
 
 async function get(path: string, token?: string) {
   const headers: Record<string, string> = {};
   if (token) headers["Authorization"] = `Bearer ${token}`;
-  const res = await fetch(`${API}${path}`, { headers });
-  return res.json();
+  const res = await fetch(`${API}${path}`, {
+    headers,
+    signal: AbortSignal.timeout(5000),
+  });
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(
+      `Invalid JSON on GET ${path} (HTTP ${res.status}): ${text.slice(0, 120)}`,
+    );
+  }
 }
 
 function createClient(token: string): Promise<{
@@ -39,17 +62,26 @@ function createClient(token: string): Promise<{
   send: (msg: object) => void;
 }> {
   return new Promise((resolve, reject) => {
-    const ws = new WebSocket(`${WS_URL}?token=${token}`);
+    const ws = new WebSocket(`${WS_URL}?token=${token}`, {
+      rejectUnauthorized: false,
+      handshakeTimeout: 5000,
+    });
+    activeSockets.push(ws);
+
     const pending: any[] = [];
     const waiters: { type: string; resolve: (msg: any) => void }[] = [];
+
     ws.on("message", (data) => {
       const msg = JSON.parse(data.toString());
       const i = waiters.findIndex((w) => w.type === msg.type);
       if (i !== -1) {
         waiters[i].resolve(msg);
         waiters.splice(i, 1);
-      } else pending.push(msg);
+      } else {
+        pending.push(msg);
+      }
     });
+
     ws.on("open", () =>
       resolve({
         ws,
@@ -62,10 +94,11 @@ function createClient(token: string): Promise<{
             return Promise.resolve(m);
           }
           return new Promise((res, rej) => {
-            const t = setTimeout(
-              () => rej(new Error(`Timeout waiting for ${type}`)),
-              timeout,
-            );
+            const t = setTimeout(() => {
+              const idx = waiters.findIndex((w) => w.resolve === res);
+              if (idx !== -1) waiters.splice(idx, 1);
+              rej(new Error(`Timeout waiting for ${type}`));
+            }, timeout);
             waiters.push({
               type,
               resolve: (msg) => {
@@ -77,6 +110,7 @@ function createClient(token: string): Promise<{
         },
       }),
     );
+
     ws.on("error", reject);
   });
 }
@@ -89,6 +123,17 @@ async function test(name: string, fn: () => Promise<void>) {
   } catch (e: unknown) {
     console.log(`❌ ${name}: ${e instanceof Error ? e.message : String(e)}`);
     failed++;
+  } finally {
+    while (activeSockets.length > 0) {
+      const ws = activeSockets.pop();
+      if (
+        ws &&
+        (ws.readyState === WebSocket.OPEN ||
+          ws.readyState === WebSocket.CONNECTING)
+      ) {
+        ws.close();
+      }
+    }
   }
 }
 
@@ -375,7 +420,6 @@ await test("update_room rejects non-leader", async () => {
       unoCallout: false,
     },
   });
-  // No room_updated should come, settings unchanged
   const rooms = await get("/game/games/rooms");
   const room = rooms.find((r: any) => r.code === res.roomCode);
   assert(room.settings.stacking === "none", "Settings should not change");
@@ -501,7 +545,6 @@ await test("last player leaves, room is deleted", async () => {
   await aliceClient.waitFor("room_updated");
 
   aliceClient.send({ type: "leave_room", roomCode: res.roomCode });
-  // Small delay for processing
   await new Promise((r) => setTimeout(r, 200));
 
   const rooms = await get("/game/games/rooms");
@@ -582,10 +625,11 @@ await test("after start_game, game is playable", async () => {
   assert(aliceState.players.length === 2, "Should have 2 players");
   assert(bobState.id === gameId, "Bob should see the same game");
 
-  // Try to play a turn
-  const isAliceTurn = aliceState.players.find(
-    (p: any) => p.userId,
-  )?.isCurrentTurn;
+  // Identify whose turn it is by checking Alice's own player entry (the one with visible cards)
+  const aliceMe = aliceState.players.find((p: any) =>
+    p.hand.some((c: any) => c.id !== ""),
+  );
+  const isAliceTurn = Boolean(aliceMe?.isCurrentTurn);
   const currentClient = isAliceTurn ? aliceClient : bobClient;
   const currentState = isAliceTurn ? aliceState : bobState;
   const me = currentState.players.find((p: any) =>

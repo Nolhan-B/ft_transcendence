@@ -9,7 +9,7 @@
     "test-api": "bash ./.github/scripts/api_test.sh",
     "test-e2e": "bash ./.github/scripts/e2e_test.sh",
     "test-chat": "node ./.github/scripts/chat_test.js",
-    "test-all": "npm run test-api && npm run test-e2e && npm run test-game && npm run lint && npm run test-chat"
+    "test-all": "npm run test-api && npm run test-e2e && npm run test-game && npm run lint && npm run test-chat && npm run test-game-integration && npm run test-game && npm run test-rooms"
   },
   "workspaces": [
     "services/*",

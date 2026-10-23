@@ -1,7 +1,11 @@
+import process from "node:process";
 import WebSocket from "ws";
 
-const API = "http://localhost:8080/api";
-const WS_URL = "ws://localhost:8080/api/game/ws";
+// Accepte le certificat SSL auto-signé pour fetch et ws en local / CI
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+
+const API = process.env.API_URL || "https://localhost:8443/api";
+const WS_URL = process.env.WS_URL || "wss://localhost:8443/api/game/ws";
 
 let passed = 0;
 let failed = 0;
@@ -33,7 +37,9 @@ function createClient(token: string): Promise<{
   send: (msg: object) => void;
 }> {
   return new Promise((resolve, reject) => {
-    const ws = new WebSocket(`${WS_URL}?token=${token}`);
+    const ws = new WebSocket(`${WS_URL}?token=${token}`, {
+      rejectUnauthorized: false,
+    });
     const pending: any[] = [];
     const waiters: {
       type: string;
@@ -112,8 +118,10 @@ async function playFullGame(
   let turns = 0;
 
   while (turns < maxTurns) {
-    const firstState = states.get(clients[0].id)!;
-    if (firstState.status === "finished") break;
+    const isFinished = Array.from(states.values()).some(
+      (s) => s?.status === "finished",
+    );
+    if (isFinished) break;
 
     turns++;
 
@@ -163,9 +171,12 @@ async function playFullGame(
     }
   }
 
-  const finalState = states.get(clients[0].id)!;
+  const finishedState =
+    Array.from(states.values()).find((s) => s?.status === "finished") ||
+    states.get(clients[0].id)!;
+
   return {
-    winner: finalState.winnerId,
+    winner: finishedState.winnerId,
     turns,
     states: Array.from(states.values()),
   };
