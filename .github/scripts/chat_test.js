@@ -1,9 +1,12 @@
 import process from "node:process";
 
+// Autorise les certificats auto-signés pour fetch et WebSocket en local
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+
 const WebSocket = globalThis.WebSocket ?? (await import("ws")).WebSocket;
 
-const API_URL = process.env.API_URL || "http://localhost:8080";
-const WS_URL = process.env.WS_URL || "ws://localhost:8080/api/chat/ws";
+const API_URL = process.env.API_URL || "https://localhost:8443";
+const WS_URL = process.env.WS_URL || "wss://localhost:8443/api/chat/ws";
 
 const assert = (condition, message) => {
   if (!condition) {

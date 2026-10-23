@@ -50,3 +50,8 @@ me.json
 profile.json
 login.json
 signup.json
+
+# SSL certificates
+gateway/ssl/
+*.key
+*.crt

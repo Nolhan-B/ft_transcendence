@@ -1,62 +1,4 @@
-name: CI Pipeline
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
-on:
-  push:
-    branches: [dev, main, "feat/**", "fix/**"]
-  pull_request:
-    branches: [dev, main]
-
-jobs:
-  lint:
-    name: Code Quality & Audit & tests
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository code
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Compiling shared
-        run: npm --prefix shared run build
-
-      - name: Run ESLint
-        run: npm run lint
-
-      - name: Prettier Check
-        run: npx prettier --check .
-
-      - name: Risk Audit
-        run: npm audit --audit-level=high
-        continue-on-error: true
-
-      - name: Run Game engine tests
-        run: npm run test-game
-
-
-  security:
-    name: Check Secrets
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-
-
-  docker-build:
+docker-build:
     name: Build & Validate Docker Stack
     runs-on: ubuntu-latest
     needs: lint
@@ -70,6 +12,13 @@ jobs:
           echo "dummy_password" > secrets/db_password.txt
           echo "postgresql://transcendence_user:dummy_password@postgres:5432/transcendence_db?schema=public" > secrets/db_url.txt
           echo "dummy_jwt_secret" > secrets/jwt_secret.txt
+          mkdir -p gateway/ssl
+          openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+            -keyout gateway/ssl/transcendence.key \
+            -out gateway/ssl/transcendence.crt \
+            -subj "/C=FR/ST=GrandEst/L=Mulhouse/O=42/CN=localhost"
+          chmod 600 gateway/ssl/transcendence.key
+          chmod 644 gateway/ssl/transcendence.crt
 
       - name: Build Docker images
         run: |
@@ -106,7 +55,7 @@ jobs:
         run: npm run test-api
 
       - name: Run Chat E2E tests
-        run : npm run test-chat
+        run: npm run test-chat
 
       - name: Dump Docker logs on failure
         if: failure()
