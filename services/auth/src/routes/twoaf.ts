@@ -8,7 +8,6 @@ import type {
   JwtPayload,
 } from "shared";
 
-
 const COOKIE_OPTIONS = {
   path: "/",
   httpOnly: true,
