@@ -6,10 +6,10 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "npx --yes prisma@7.10.1 generate && tsc"
+    "build": "npx --yes prisma@7.10.0 generate && tsc"
   },
   "devDependencies": {
-    "prisma": "^7.10.1",
+    "prisma": "^7.10.0",
     "typescript": "^5.0.0"
   }
 }
