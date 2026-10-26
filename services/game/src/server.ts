@@ -3,6 +3,7 @@ import gameGateway from "./gateway/game.gateway.js";
 import websocket from "@fastify/websocket";
 import gameRoutes from "./routes/game.js";
 import gameManager from "./plugins/game.manager.js";
+import cookie from "@fastify/cookie";
 import jwt from "@fastify/jwt";
 import prismaPlugin from "./plugins/prisma.js";
 import roomManager from "./plugins/room.manager.js";
@@ -19,7 +20,15 @@ fastify.get(
   async () => ({ service: "game", status: "ok" }),
 );
 
-fastify.register(jwt, { secret: process.env.JWT_SECRET ?? "dev-secret" });
+// Register cookie before jwt to enable cookie verification
+fastify.register(cookie);
+fastify.register(jwt, {
+  secret: process.env.JWT_SECRET ?? "dev-secret",
+  cookie: {
+    cookieName: "access_token",
+    signed: false,
+  },
+});
 
 fastify.register(prismaPlugin);
 fastify.register(websocket);
