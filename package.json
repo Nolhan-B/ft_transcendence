@@ -24,5 +24,8 @@
     "tsx": "^4.23.15",
     "typescript-eslint": "^8.71.0",
     "ws": "^8.22.0"
+  },
+  "dependencies": {
+    "@fastify/cookie": "^11.1.3"
   }
 }

@@ -8,6 +8,15 @@ import type {
   JwtPayload,
 } from "shared";
 
+
+const COOKIE_OPTIONS = {
+  path: "/",
+  httpOnly: true,
+  secure: true,
+  sameSite: "lax" as const,
+  maxAge: 7 * 24 * 60 * 60,
+};
+
 export default async function twofaRoutes(fastify: FastifyInstance) {
   fastify.post("/2fa/enable", async (request, reply) => {
     await request.jwtVerify();
@@ -41,7 +50,13 @@ export default async function twofaRoutes(fastify: FastifyInstance) {
     );
     if (!user) return reply.code(401).send({ error: "Invalid code" });
 
-    const token = fastify.jwt.sign({ id: user.id, email: user.email });
+    const token = fastify.jwt.sign(
+      { id: user.id, email: user.email },
+      { expiresIn: "7d" },
+    );
+
+    reply.setCookie("access_token", token, COOKIE_OPTIONS);
+
     return reply.send({ token, user });
   });
 
