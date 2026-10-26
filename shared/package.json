@@ -6,7 +6,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc"
+    "build": "npx prisma generate && tsc"
   },
   "devDependencies": {
     "typescript": "^5.0.0"
