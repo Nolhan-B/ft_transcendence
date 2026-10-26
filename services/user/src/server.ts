@@ -1,5 +1,6 @@
 import Fastify from "fastify";
 import prismaPlugin from "./plugins/prisma.js";
+import cookie from "@fastify/cookie";
 import jwt from "@fastify/jwt";
 import profileRoutes from "./routes/profiles.js";
 import friendsRoutes from "./routes/friends.js";
@@ -23,9 +24,15 @@ fastify.register(staticPlugin, {
 
 fastify.register(prismaPlugin);
 fastify.register(multipart, { limits: { fileSize: 5 * 1024 * 1024 } }); // 5MB max
-fastify.register(jwt, { secret: process.env.JWT_SECRET ?? "dev-secret" });
+fastify.register(cookie);
+fastify.register(jwt, {
+  secret: process.env.JWT_SECRET ?? "dev-secret",
+  cookie: {
+    cookieName: "access_token",
+    signed: false,
+  },
+});
 
-// Enregistrement des routes
 fastify.register(profileRoutes);
 fastify.register(friendsRoutes);
 

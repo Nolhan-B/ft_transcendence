@@ -177,3 +177,5 @@ secrets:
     file: ./secrets/db_password.txt
   db_url:
     file: ./secrets/db_url.txt
+  jwt_secret:
+    file: ./secrets/jwt_secret.txt

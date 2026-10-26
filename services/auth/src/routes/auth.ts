@@ -7,6 +7,14 @@ import type {
   JwtPayload,
 } from "shared";
 
+const COOKIE_OPTIONS = {
+  path: "/",
+  httpOnly: true,
+  secure: true,
+  sameSite: "lax" as const,
+  maxAge: 7 * 24 * 60 * 60,
+};
+
 export default async function authRoutes(fastify: FastifyInstance) {
   fastify.post(
     "/signup",
@@ -37,6 +45,9 @@ export default async function authRoutes(fastify: FastifyInstance) {
           { id: user.id, email: user.email },
           { expiresIn: "7d" },
         );
+
+        reply.setCookie("access_token", token, COOKIE_OPTIONS);
+
         return reply.code(201).send({ token, user });
       } catch (err: unknown) {
         const prismaError = err as { code?: string };
@@ -74,7 +85,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
       if (user.twoFactorSecretEnabled) {
         const tempToken = fastify.jwt.sign(
           { id: user.id, requires2FA: true },
-          { expiresIn: "7d" },
+          { expiresIn: "10m" },
         );
         return reply.send({
           requiresTwoFactor: true,
@@ -86,9 +97,17 @@ export default async function authRoutes(fastify: FastifyInstance) {
         { id: user.id, email: user.email },
         { expiresIn: "7d" },
       );
-      return { token, user };
+
+      reply.setCookie("access_token", token, COOKIE_OPTIONS);
+
+      return reply.send({ token, user });
     },
   );
+
+  fastify.post("/logout", async (_request, reply) => {
+    reply.clearCookie("access_token", { path: "/" });
+    return reply.send({ message: "Logged out" });
+  });
 
   fastify.get("/health", { logLevel: "silent" }, async () => ({
     service: "auth",
@@ -121,6 +140,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
     if (!deleted)
       return reply.code(401).send({ error: "Invalid password or 2FA code" });
 
+    reply.clearCookie("access_token", { path: "/" });
     return reply.send({ message: "Account deleted" });
   });
 }

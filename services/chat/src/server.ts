@@ -1,6 +1,7 @@
 import Fastify from "fastify";
 import fs from "node:fs";
 import process from "node:process";
+import cookie from "@fastify/cookie";
 import jwt from "@fastify/jwt";
 import websocket from "@fastify/websocket";
 import type { WebSocket } from "ws";
@@ -20,8 +21,14 @@ const fastify = Fastify({
 
 export const connectedClients = new Map<string, WebSocket>();
 
+// Register cookie before jwt to enable cookie verification
+fastify.register(cookie);
 fastify.register(jwt, {
   secret: process.env.JWT_SECRET ?? "dev-secret",
+  cookie: {
+    cookieName: "access_token",
+    signed: false,
+  },
 });
 fastify.register(websocket);
 fastify.register(prismaPlugin);
@@ -38,7 +45,7 @@ fastify.get("/health", { logLevel: "silent" }, async () => {
 fastify.register(async function (fastify) {
   fastify.get("/ws", { websocket: true }, (socket: WebSocket, req) => {
     const query = req.query as { token?: string };
-    const token = query?.token;
+    const token = query?.token ?? req.cookies?.access_token;
 
     if (!token) {
       fastify.log.warn("WS connection rejected: missing token");
