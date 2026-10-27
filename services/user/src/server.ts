@@ -36,7 +36,12 @@ fastify.register(jwt, {
 fastify.register(profileRoutes);
 fastify.register(friendsRoutes);
 
-fastify.get("/health", async () => ({ service: "user", status: "ok" }));
+fastify.route({
+  method: ["GET", "HEAD"],
+  url: "/health",
+  logLevel: "silent",
+  handler: async () => ({ service: "user", status: "ok" }),
+});
 
 fastify.get("/", async () => {
   return { service: "user", status: "ok" };

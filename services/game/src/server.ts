@@ -12,13 +12,12 @@ const fastify = Fastify({
   logger: true,
 });
 
-fastify.get(
-  "/health",
-  {
-    logLevel: "silent",
-  },
-  async () => ({ service: "game", status: "ok" }),
-);
+fastify.route({
+  method: ["GET", "HEAD"],
+  url: "/health",
+  logLevel: "silent",
+  handler: async () => ({ service: "game", status: "ok" }),
+});
 
 // Register cookie before jwt to enable cookie verification
 fastify.register(cookie);
