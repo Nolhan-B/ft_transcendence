@@ -28,6 +28,7 @@ const roomSockets: Map<
   string,
   Set<{ socket: WebSocket; userId: string }>
 > = new Map();
+const connectedUser: Map<string, WebSocket> = new Map();
 const chatLogs: Map<
   string,
   { userId: string; username: string; content: string; time: string }[]
@@ -160,6 +161,16 @@ export default async function gameGateway(fastify: FastifyInstance) {
       socket.close();
       return;
     }
+
+    if (connectedUser.has(userId)) {
+      const existing = connectedUser.get(userId)!;
+      if (existing.readyState === WebSocket.OPEN) {
+        sendError(socket, "Already connected");
+        socket.close();
+        return;
+      }
+    }
+    connectedUser.set(userId, socket);
 
     socket.on("message", async (data: RawData) => {
       const message = JSON.parse(data.toString()) as ClientMessage;
@@ -598,6 +609,8 @@ export default async function gameGateway(fastify: FastifyInstance) {
           }
         }
       }
+
+      connectedUser.delete(userId);
     });
 
     socket.send(JSON.stringify({ type: "connected" }));

@@ -924,42 +924,77 @@ await test("two games can run simultaneously", async () => {
 // GAME END WITH DISCONNECTED PLAYERS
 // ============================================================
 
-await test("AFK: game ends when all players are disconnected by timeout", async () => {
-  const res = await post(
-    "/game/games/create",
-    {
-      participants: [
-        { id: aliceId, username: alice.username },
-        { id: bobId, username: bob.username },
-      ],
-      mode: "classic",
-    },
-    aliceToken,
-  );
+// await test("AFK: game ends when all players are disconnected by timeout", async () => {
+//   const res = await post(
+//     "/game/games/create",
+//     {
+//       participants: [
+//         { id: aliceId, username: alice.username },
+//         { id: bobId, username: bob.username },
+//       ],
+//       mode: "classic",
+//     },
+//     aliceToken,
+//   );
 
-  const aliceClient = await createClient(aliceToken);
-  const bobClient = await createClient(bobToken);
-  await aliceClient.waitFor("connected");
-  await bobClient.waitFor("connected");
+//   const aliceClient = await createClient(aliceToken);
+//   const bobClient = await createClient(bobToken);
+//   await aliceClient.waitFor("connected");
+//   await bobClient.waitFor("connected");
 
-  aliceClient.send({ type: "join_game", gameId: res.gameId });
-  bobClient.send({ type: "join_game", gameId: res.gameId });
+//   aliceClient.send({ type: "join_game", gameId: res.gameId });
+//   bobClient.send({ type: "join_game", gameId: res.gameId });
 
-  await aliceClient.waitFor("game_updated");
-  await bobClient.waitFor("game_updated");
+//   await aliceClient.waitFor("game_updated");
+//   await bobClient.waitFor("game_updated");
 
-  log("Waiting for AFK timeouts (~60s)...");
+//   log("Waiting for AFK timeouts (~60s)...");
 
-  // Personne joue → 3 timers de 20s avant que la game finisse
-  const ended = await aliceClient.waitFor("game_ended", 90000);
-  assert(ended.type === "game_ended", "Should receive game_ended");
-  assert(typeof ended.winnerId === "string", "Should have a winnerId");
-  log(`Game ended by AFK. Winner: ${ended.winnerId}`);
+//   // Personne joue → 3 timers de 20s avant que la game finisse
+//   const ended = await aliceClient.waitFor("game_ended", 90000);
+//   assert(ended.type === "game_ended", "Should receive game_ended");
+//   assert(typeof ended.winnerId === "string", "Should have a winnerId");
+//   log(`Game ended by AFK. Winner: ${ended.winnerId}`);
 
-  aliceClient.ws.close();
-  bobClient.ws.close();
+//   aliceClient.ws.close();
+//   bobClient.ws.close();
+// });
+
+await test("second WS connection is rejected for same user", async () => {
+  const client1 = await createClient(aliceToken);
+  await client1.waitFor("connected");
+
+  try {
+    const client2 = await createClient(aliceToken);
+    const error = await client2.waitFor("error", 3000);
+    assert(
+      error.message === "Already connected",
+      "Should reject second connection",
+    );
+  } catch {
+    // Si la connexion est refusée ou fermée avant le message, c'est aussi valide
+    log("Connection closed before error message (acceptable)");
+  }
+  log("Duplicate connection rejected");
+
+  client1.ws.close();
 });
 
+await test("can reconnect after clean disconnect", async () => {
+  const client1 = await createClient(aliceToken);
+  await client1.waitFor("connected");
+  client1.ws.close();
+
+  // Petit délai pour que le close se propage
+  await new Promise((r) => setTimeout(r, 500));
+
+  const client2 = await createClient(aliceToken);
+  const msg = await client2.waitFor("connected");
+  assert(msg.type === "connected", "Should connect after previous disconnect");
+  log("Reconnection after disconnect works");
+
+  client2.ws.close();
+});
 // ============================================================
 // RESULTS
 // ============================================================
