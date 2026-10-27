@@ -221,12 +221,21 @@ const charlie = {
   password: "test1234",
 };
 
+const david = {
+  email: `david-${Date.now()}@test.com`,
+  username: `david${Date.now()}`,
+  password: "test1234",
+};
+
 let aliceToken = "";
 let bobToken = "";
 let charlieToken = "";
+let davidToken = "";
+
 let aliceId = "";
 let bobId = "";
 let charlieId = "";
+let davidId = "";
 
 // ============================================================
 // AUTH
@@ -254,6 +263,14 @@ await test("signup charlie", async () => {
   charlieToken = res.token;
   charlieId = res.user.id;
   log(`Charlie ID: ${charlieId}`);
+});
+
+await test("signup david", async () => {
+  const res = await post("/auth/signup", david);
+  assert(res.token, "David should get a token");
+  davidToken = res.token;
+  davidId = res.user.id;
+  log(`David ID: ${davidId}`);
 });
 
 // ============================================================
@@ -335,6 +352,43 @@ await test("invalid token is rejected", async () => {
     // Connection refused or closed is also acceptable
     log("Connection rejected (expected)");
   }
+});
+
+// ============================================================
+// INPUT VALIDATION
+// ============================================================
+
+await test("invalid JSON is rejected", async () => {
+  const client = await createClient(aliceToken);
+  await client.waitFor("connected");
+  client.ws.send("not json at all");
+  const error = await client.waitFor("error");
+  assert(error.message === "Invalid JSON", "Should reject invalid JSON");
+  client.ws.close();
+});
+
+await test("missing fields are rejected", async () => {
+  const client = await createClient(aliceToken);
+  await client.waitFor("connected");
+  client.ws.send(JSON.stringify({ type: "play_card" }));
+  const error = await client.waitFor("error");
+  assert(
+    error.message === "Invalid message format",
+    "Should reject missing fields",
+  );
+  client.ws.close();
+});
+
+await test("unknown message type is rejected", async () => {
+  const client = await createClient(aliceToken);
+  await client.waitFor("connected");
+  client.ws.send(JSON.stringify({ type: "hack_game" }));
+  const error = await client.waitFor("error");
+  assert(
+    error.message === "Invalid message format",
+    "Should reject unknown type",
+  );
+  client.ws.close();
 });
 
 // ============================================================
@@ -882,12 +936,12 @@ await test("two games can run simultaneously", async () => {
     "/game/games/create",
     {
       participants: [
-        { id: aliceId, username: alice.username },
         { id: charlieId, username: charlie.username },
+        { id: davidId, username: david.username },
       ],
       mode: "classic",
     },
-    aliceToken,
+    charlieToken,
   );
 
   assert(res1.gameId !== res2.gameId, "Should be different games");
@@ -902,13 +956,13 @@ await test("two games can run simultaneously", async () => {
   const state1 = (await a1.waitFor("game_updated")).state;
 
   // Join game 2
-  const a2 = await createClient(aliceToken);
   const c2 = await createClient(charlieToken);
-  await a2.waitFor("connected");
+  const d2 = await createClient(davidToken);
   await c2.waitFor("connected");
-  a2.send({ type: "join_game", gameId: res2.gameId });
+  await d2.waitFor("connected");
   c2.send({ type: "join_game", gameId: res2.gameId });
-  const state2 = (await a2.waitFor("game_updated")).state;
+  d2.send({ type: "join_game", gameId: res2.gameId });
+  const state2 = (await c2.waitFor("game_updated")).state;
 
   assert(state1.id === res1.gameId, "Game 1 state should match");
   assert(state2.id === res2.gameId, "Game 2 state should match");
@@ -916,8 +970,8 @@ await test("two games can run simultaneously", async () => {
 
   a1.ws.close();
   b1.ws.close();
-  a2.ws.close();
   c2.ws.close();
+  d2.ws.close();
 });
 
 // ============================================================

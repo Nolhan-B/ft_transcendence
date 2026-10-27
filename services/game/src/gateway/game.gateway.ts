@@ -173,7 +173,19 @@ export default async function gameGateway(fastify: FastifyInstance) {
     connectedUser.set(userId, socket);
 
     socket.on("message", async (data: RawData) => {
-      const message = JSON.parse(data.toString()) as ClientMessage;
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(data.toString());
+      } catch {
+        sendError(socket, "Invalid JSON");
+        return;
+      }
+
+      const message = validateMessage(parsed);
+      if (!message) {
+        sendError(socket, "Invalid message format");
+        return;
+      }
 
       switch (message.type) {
         case "join_game": {
@@ -703,4 +715,55 @@ function toRoomInfo(room: Room): RoomInfo {
     mode: room.mode,
     settings: room.settings,
   };
+}
+
+function validateMessage(raw: unknown): ClientMessage | null {
+  if (typeof raw !== "object" || raw === null || !("type" in raw)) return null;
+  const msg = raw as Record<string, unknown>;
+
+  switch (msg.type) {
+    case "join_game":
+    case "draw_card":
+    case "chat_message":
+      if (typeof msg.gameId !== "string") return null;
+      if (msg.type === "chat_message" && typeof msg.content !== "string")
+        return null;
+      break;
+    case "play_card":
+      if (typeof msg.gameId !== "string" || typeof msg.cardId !== "string")
+        return null;
+      if (msg.chosenColor && typeof msg.chosenColor !== "string") return null;
+      break;
+    case "call_uno":
+      break;
+    case "catch_uno":
+      if (
+        typeof msg.gameId !== "string" ||
+        typeof msg.targetUserId !== "string"
+      )
+        return null;
+      break;
+    case "challenge_bluff":
+    case "accept_wild_draw4":
+      if (typeof msg.gameId !== "string") return null;
+      break;
+    case "create_room":
+      if (typeof msg.mode !== "string" || typeof msg.maxPlayers !== "number")
+        return null;
+      if (typeof msg.name !== "string") return null;
+      break;
+    case "join_room":
+    case "leave_room":
+    case "start_game":
+      if (typeof msg.roomCode !== "string") return null;
+      break;
+    case "update_room":
+      if (typeof msg.roomCode !== "string" || typeof msg.settings !== "object")
+        return null;
+      break;
+    default:
+      return null;
+  }
+
+  return msg as unknown as ClientMessage;
 }
