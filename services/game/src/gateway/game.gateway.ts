@@ -64,7 +64,7 @@ export default async function gameGateway(fastify: FastifyInstance) {
     const currentPlayer = game.players.find((p) => p.isCurrentTurn);
     if (!currentPlayer) return;
 
-    const timer = setTimeout(() => {
+    const timer = setTimeout(async () => {
       turnTimers.delete(gameId);
 
       const game = manager.getGame(gameId);
@@ -82,10 +82,17 @@ export default async function gameGateway(fastify: FastifyInstance) {
 
       if (count >= MAX_AFK_COUNT) {
         currentPlayer.disconnected = true;
+
+        const activePlayers = game.players.filter((p) => !p.disconnected);
+        if (activePlayers.length <= 1) {
+          await endGame(gameId, game);
+          return;
+        }
         broadCastToRoom(gameId, {
           type: "player_left",
           userId: currentPlayer.userId,
         });
+
         advanceToNextPlayer(game);
         game.drawPileCount = game.drawPile.length;
         broadCastStateToRoom(gameId, game);
@@ -98,6 +105,42 @@ export default async function gameGateway(fastify: FastifyInstance) {
     }, TURN_TIMEOUT_MS);
 
     turnTimers.set(gameId, timer);
+  }
+
+  async function endGame(
+    gameId: string,
+    game: InternalGameState,
+  ): Promise<void> {
+    game.status = GameStatus.FINISHED;
+
+    if (turnTimers.has(gameId)) {
+      clearTimeout(turnTimers.get(gameId));
+      turnTimers.delete(gameId);
+    }
+
+    const activePlayers = game.players.filter((p) => !p.disconnected);
+    game.winnerId = activePlayers.length === 1 ? activePlayers[0].userId : null;
+
+    broadCastToRoom(gameId, {
+      type: "game_ended",
+      winnerId: game.winnerId ?? "",
+    });
+
+    await fastify.prisma.match.create({
+      data: {
+        mode: game.mode,
+        players: game.players.map((p) => p.userId),
+        ranking: game.ranking,
+        winnerId: game.winnerId ?? "",
+        chatLog: chatLogs.get(gameId) ?? [],
+        moveLog: moveLogs.get(gameId) ?? [],
+      },
+    });
+
+    chatLogs.delete(gameId);
+    moveLogs.delete(gameId);
+    rooms.delete(gameId);
+    manager.removeGame(gameId);
   }
 
   fastify.get("/ws", { websocket: true }, async (socket, request) => {
@@ -222,33 +265,14 @@ export default async function gameGateway(fastify: FastifyInstance) {
           }
 
           afkCounts.set(`${game.id}:${userId}`, 0);
-          startTurnTimer(game.id);
 
           if (updatedState.status === GameStatus.FINISHED) {
-            if (turnTimers.has(updatedState.id)) {
-              clearTimeout(turnTimers.get(updatedState.id));
-              turnTimers.delete(updatedState.id);
-            }
-            broadCastToRoom(updatedState.id, {
-              type: "game_ended",
-              winnerId: updatedState.winnerId!,
-            });
-            await fastify.prisma.match.create({
-              data: {
-                mode: updatedState.mode,
-                players: updatedState.players.map((p) => p.userId),
-                ranking: updatedState.ranking,
-                winnerId: updatedState.winnerId!,
-                chatLog: chatLogs.get(updatedState.id) ?? [],
-                moveLog: moveLogs.get(updatedState.id) ?? [],
-              },
-            });
-            chatLogs.delete(updatedState.id);
-            moveLogs.delete(updatedState.id);
-
-            rooms.delete(updatedState.id);
-            manager.removeGame(updatedState.id);
+            await endGame(updatedState.id, updatedState);
+            break;
           }
+
+          startTurnTimer(game.id);
+
           break;
         }
         case "call_uno": {
@@ -373,28 +397,8 @@ export default async function gameGateway(fastify: FastifyInstance) {
           startTurnTimer(game.id);
 
           if (updatedState.status === GameStatus.FINISHED) {
-            if (turnTimers.has(updatedState.id)) {
-              clearTimeout(turnTimers.get(updatedState.id));
-              turnTimers.delete(updatedState.id);
-            }
-            broadCastToRoom(updatedState.id, {
-              type: "game_ended",
-              winnerId: updatedState.winnerId!,
-            });
-            await fastify.prisma.match.create({
-              data: {
-                mode: updatedState.mode,
-                players: updatedState.players.map((p) => p.userId),
-                ranking: updatedState.ranking,
-                winnerId: updatedState.winnerId!,
-                chatLog: chatLogs.get(updatedState.id) ?? [],
-                moveLog: moveLogs.get(updatedState.id) ?? [],
-              },
-            });
-            chatLogs.delete(updatedState.id);
-            moveLogs.delete(updatedState.id);
-            rooms.delete(updatedState.id);
-            manager.removeGame(updatedState.id);
+            await endGame(updatedState.id, updatedState);
+            break;
           }
 
           break;
