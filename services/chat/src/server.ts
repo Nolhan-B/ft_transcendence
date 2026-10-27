@@ -38,8 +38,11 @@ fastify.get("/", async () => {
   return { service: "chat", status: "ok" };
 });
 
-fastify.get("/health", { logLevel: "silent" }, async () => {
-  return { service: "chat", status: "ok" };
+fastify.route({
+  method: ["GET", "HEAD"],
+  url: "/health",
+  logLevel: "silent",
+  handler: async () => ({ service: "chat", status: "ok" }),
 });
 
 fastify.register(async function (fastify) {

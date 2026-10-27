@@ -7,7 +7,8 @@ services:
     volumes:
       - ./services/auth/src:/app/src
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3001/health || exit 1"]
+      test:
+        ["CMD-SHELL", "wget -q --spider http://127.0.0.1:3001/health || exit 1"]
       interval: 5s
       timeout: 3s
       retries: 3
@@ -35,7 +36,8 @@ services:
       - db_password
       - db_url
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3002/health || exit 1"]
+      test:
+        ["CMD-SHELL", "wget -q --spider http://127.0.0.1:3002/health || exit 1"]
       interval: 5s
       timeout: 3s
       retries: 3
@@ -56,7 +58,8 @@ services:
       - db_password
       - db_url
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3003/health || exit 1"]
+      test:
+        ["CMD-SHELL", "wget -q --spider http://127.0.0.1:3003/health || exit 1"]
       interval: 5s
       timeout: 3s
       retries: 3
@@ -78,7 +81,8 @@ services:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3004/health || exit 1"]
+      test:
+        ["CMD-SHELL", "wget -q --spider http://127.0.0.1:3004/health || exit 1"]
       interval: 5s
       timeout: 3s
       retries: 3
@@ -94,7 +98,7 @@ services:
     environment:
       - NODE_ENV=development
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:5173/ || exit 1"]
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:5173/ || exit 1"]
       interval: 10s
       timeout: 3s
       retries: 3
@@ -114,7 +118,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "wget -qO- --no-check-certificate https://127.0.0.1/ || exit 1",
+          "wget -q --spider --no-check-certificate https://127.0.0.1/ || exit 1",
         ]
       interval: 10s
       timeout: 3s
@@ -161,7 +165,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          'php -r ''file_get_contents("http://127.0.0.1:8080");'' || exit 1',
+          'php -r ''fclose(fsockopen("127.0.0.1", 8080));'' || exit 1',
         ]
       interval: 15s
       timeout: 3s
