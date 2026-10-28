@@ -1,21 +1,33 @@
 import { FastifyInstance } from "fastify";
 import { WebSocket } from "ws";
-import {
-  CardColor,
-  CardValue,
-  GameStatus,
-  type ClientMessage,
-  type GameState,
-  type ServerEvent,
-} from "shared";
+import { GameStatus, type ServerEvent } from "shared";
 import { RawData } from "ws";
+import { InternalGameState } from "../engine/game-state.js";
 import {
-  InternalGameState,
-  advanceToNextPlayer,
-  drawCardsForPlayer,
-} from "../engine/game-state.js";
-import { Room } from "../managers/room.manager.js";
-import type { RoomInfo } from "shared";
+  sendError,
+  validateMessage,
+  filterStateForPlayer,
+  toRoomInfo,
+} from "./utils.js";
+import {
+  handleJoinGame,
+  handlePlayCard,
+  handleDrawCard,
+  handleCallUno,
+  handleCatchUno,
+  handleChallengeBluff,
+  handleAcceptWildDraw4,
+} from "./handlers/game/index.js";
+import {
+  handleCreateRoom,
+  handleJoinRoom,
+  handleLeaveRoom,
+  handleUpdateRoom,
+  handleStartGame,
+} from "./handlers/room/index.js";
+import { handleChatMessage } from "./handlers/chat/index.js";
+import type { GatewayContext } from "./types.js";
+import { advanceToNextPlayer } from "../engine/game-state.js";
 
 const TURN_TIMEOUT_MS = 20000;
 const MAX_AFK_COUNT = 2;
@@ -54,26 +66,61 @@ export default async function gameGateway(fastify: FastifyInstance) {
   const manager = fastify.gameManager;
   const roomManager = fastify.roomManager;
 
+  function broadCastToRoom(
+    gameId: string,
+    event: ServerEvent,
+    excludeUserId?: string,
+  ): void {
+    const room = rooms.get(gameId);
+    if (!room) return;
+    const data = JSON.stringify(event);
+    for (const client of room) {
+      if (client.userId !== excludeUserId) {
+        client.socket.send(data);
+      }
+    }
+  }
+
+  function broadCastStateToRoom(
+    gameId: string,
+    state: InternalGameState,
+  ): void {
+    const room = rooms.get(gameId);
+    if (!room) return;
+    for (const client of room) {
+      const playerGameState = filterStateForPlayer(state, client.userId);
+      client.socket.send(
+        JSON.stringify({ type: "game_updated", state: playerGameState }),
+      );
+    }
+  }
+
+  function broadcastToRoomSockets(roomCode: string, event: ServerEvent): void {
+    const sockets = roomSockets.get(roomCode);
+    if (!sockets) return;
+    const data = JSON.stringify(event);
+    for (const client of sockets) {
+      if (client.socket.readyState === WebSocket.OPEN) {
+        client.socket.send(data);
+      }
+    }
+  }
+
   function startTurnTimer(gameId: string): void {
     if (turnTimers.has(gameId)) {
       clearTimeout(turnTimers.get(gameId));
     }
-
     const game = manager.getGame(gameId);
     if (!game || game.status === GameStatus.FINISHED) return;
-
     const currentPlayer = game.players.find((p) => p.isCurrentTurn);
     if (!currentPlayer) return;
 
     const timer = setTimeout(async () => {
       turnTimers.delete(gameId);
-
       const game = manager.getGame(gameId);
       if (!game || game.status === GameStatus.FINISHED) return;
-
       const room = rooms.get(gameId);
       if (!room || room.size === 0) return;
-
       const currentPlayer = game.players.find((p) => p.isCurrentTurn);
       if (!currentPlayer) return;
 
@@ -83,7 +130,6 @@ export default async function gameGateway(fastify: FastifyInstance) {
 
       if (count >= MAX_AFK_COUNT) {
         currentPlayer.disconnected = true;
-
         const activePlayers = game.players.filter((p) => !p.disconnected);
         if (activePlayers.length <= 1) {
           await endGame(gameId, game);
@@ -93,7 +139,6 @@ export default async function gameGateway(fastify: FastifyInstance) {
           type: "player_left",
           userId: currentPlayer.userId,
         });
-
         advanceToNextPlayer(game);
         game.drawPileCount = game.drawPile.length;
         broadCastStateToRoom(gameId, game);
@@ -113,20 +158,16 @@ export default async function gameGateway(fastify: FastifyInstance) {
     game: InternalGameState,
   ): Promise<void> {
     game.status = GameStatus.FINISHED;
-
     if (turnTimers.has(gameId)) {
       clearTimeout(turnTimers.get(gameId));
       turnTimers.delete(gameId);
     }
-
     const activePlayers = game.players.filter((p) => !p.disconnected);
     game.winnerId = activePlayers.length === 1 ? activePlayers[0].userId : null;
-
     broadCastToRoom(gameId, {
       type: "game_ended",
       winnerId: game.winnerId ?? "",
     });
-
     await fastify.prisma.match.create({
       data: {
         mode: game.mode,
@@ -137,7 +178,6 @@ export default async function gameGateway(fastify: FastifyInstance) {
         moveLog: moveLogs.get(gameId) ?? [],
       },
     });
-
     chatLogs.delete(gameId);
     moveLogs.delete(gameId);
     rooms.delete(gameId);
@@ -172,6 +212,29 @@ export default async function gameGateway(fastify: FastifyInstance) {
     }
     connectedUser.set(userId, socket);
 
+    const ctx: GatewayContext = {
+      fastify,
+      socket,
+      userId,
+      manager,
+      roomManager,
+      rooms,
+      roomSockets,
+      chatLogs,
+      moveLogs,
+      unoTimers,
+      bluffTimers,
+      turnTimers,
+      afkCounts,
+      broadCastToRoom,
+      broadCastStateToRoom,
+      broadcastToRoomSockets,
+      sendError,
+      startTurnTimer,
+      endGame,
+      toRoomInfo,
+    };
+
     socket.on("message", async (data: RawData) => {
       let parsed: unknown;
       try {
@@ -188,410 +251,49 @@ export default async function gameGateway(fastify: FastifyInstance) {
       }
 
       switch (message.type) {
-        case "join_game": {
-          const game = manager.getGame(message.gameId);
-          if (game === undefined) {
-            sendError(socket, "Game not found");
-            break;
-          }
-          const isPlayer = game.players.some((p) => p.userId === userId);
-          if (!isPlayer) {
-            sendError(socket, "You are not part of this game");
-            break;
-          }
-          if (!rooms.has(message.gameId)) {
-            rooms.set(message.gameId, new Set());
-          }
-          rooms.get(message.gameId)!.add({ socket, userId });
-
-          broadCastToRoom(
-            message.gameId,
-            { type: "player_joined", userId },
-            userId,
-          );
-
-          const playerGameState = filterStateForPlayer(game, userId);
-
-          socket.send(
-            JSON.stringify({ type: "game_updated", state: playerGameState }),
-          );
-
-          startTurnTimer(message.gameId);
-
+        case "join_game":
+          await handleJoinGame(ctx, message);
           break;
-        }
-        case "play_card": {
-          const game = manager.getGame(message.gameId);
-          if (game === undefined) {
-            sendError(socket, "Game not found");
-            break;
-          }
-          const updatedState = manager.playCard(
-            game.id,
-            userId,
-            message.cardId,
-            message.chosenColor,
-            message.targetUserId,
-          );
-          if (!updatedState) {
-            sendError(socket, "Invalid move");
-            break;
-          }
-
-          if (!moveLogs.has(updatedState.id)) moveLogs.set(updatedState.id, []);
-
-          moveLogs.get(updatedState.id)!.push({
-            userId,
-            action: "play_card",
-            cardId: message.cardId,
-            cardColor: updatedState.topCard.color,
-            cardValue: updatedState.topCard.value,
-            chosenColor: message.chosenColor,
-            time: new Date().toISOString(),
-          });
-
-          broadCastStateToRoom(updatedState.id, updatedState);
-
-          if (updatedState.settings.unoCallout) {
-            const playerHand = updatedState.players.find(
-              (p) => p.userId === userId,
-            )?.hand;
-            if (playerHand && playerHand.length === 1) {
-              unoTimers.set(
-                userId,
-                setTimeout(() => {
-                  unoTimers.delete(userId);
-                }, 5000),
-              );
-            }
-          }
-
-          if (
-            updatedState.lastWildDraw4 &&
-            updatedState.settings.bluffChallenge
-          ) {
-            const targetId = updatedState.players.find(
-              (p) => p.isCurrentTurn,
-            )?.userId;
-            if (targetId) {
-              bluffTimers.set(
-                updatedState.id,
-                setTimeout(() => {
-                  bluffTimers.delete(updatedState.id);
-                  drawCardsForPlayer(updatedState, targetId, 4);
-                  updatedState.lastWildDraw4 = undefined;
-                  advanceToNextPlayer(updatedState);
-                  broadCastStateToRoom(updatedState.id, updatedState);
-                }, 5000),
-              );
-            }
-          }
-
-          afkCounts.set(`${game.id}:${userId}`, 0);
-
-          if (updatedState.status === GameStatus.FINISHED) {
-            await endGame(updatedState.id, updatedState);
-            break;
-          }
-
-          startTurnTimer(game.id);
-
+        case "play_card":
+          await handlePlayCard(ctx, message);
           break;
-        }
-        case "call_uno": {
-          if (unoTimers.has(userId)) {
-            clearTimeout(unoTimers.get(userId));
-            unoTimers.delete(userId);
-          }
+        case "draw_card":
+          await handleDrawCard(ctx, message);
           break;
-        }
-        case "catch_uno": {
-          const target = message.targetUserId;
-          if (!unoTimers.has(target)) {
-            sendError(socket, "Player already called UNO or not in UNO state");
-            break;
-          }
-          clearTimeout(unoTimers.get(target));
-          unoTimers.delete(target);
-
-          const game = manager.getGame(message.gameId);
-          if (!game) break;
-
-          const targetPlayer = game.players.find((p) => p.userId === target);
-          if (targetPlayer) {
-            for (let i = 0; i < 2; i++) {
-              if (game.drawPile.length === 0) break;
-              const card = game.drawPile.shift();
-              if (card) targetPlayer.hand.push(card);
-            }
-            game.drawPileCount = game.drawPile.length;
-          }
-
-          broadCastToRoom(message.gameId, {
-            type: "uno_caught",
-            targetUserId: target,
-            catcherUserId: userId,
-          } as ServerEvent);
-          broadCastStateToRoom(game.id, game);
+        case "call_uno":
+          handleCallUno(ctx);
           break;
-        }
-        case "challenge_bluff": {
-          const game = manager.getGame(message.gameId);
-          if (!game || !game.lastWildDraw4) {
-            sendError(socket, "No bluff to challenge");
-            break;
-          }
-
-          if (bluffTimers.has(game.id)) {
-            clearTimeout(bluffTimers.get(game.id));
-            bluffTimers.delete(game.id);
-          }
-
-          const { playerId: blufferId, hadMatchingColor } = game.lastWildDraw4;
-
-          if (hadMatchingColor) {
-            drawCardsForPlayer(game, blufferId, 4);
-          } else {
-            drawCardsForPlayer(game, userId, 6);
-            advanceToNextPlayer(game);
-          }
-
-          broadCastToRoom(game.id, {
-            type: "bluff_result",
-            challengerUserId: userId,
-            targetUserId: blufferId,
-            wasBluff: hadMatchingColor,
-            penaltyCount: hadMatchingColor ? 4 : 6,
-          } as ServerEvent);
-
-          game.lastWildDraw4 = undefined;
-          broadCastStateToRoom(game.id, game);
+        case "catch_uno":
+          handleCatchUno(ctx, message);
           break;
-        }
-        case "accept_wild_draw4": {
-          const game = manager.getGame(message.gameId);
-          if (!game || !game.lastWildDraw4) {
-            sendError(socket, "Nothing to accept");
-            break;
-          }
-
-          if (bluffTimers.has(game.id)) {
-            clearTimeout(bluffTimers.get(game.id));
-            bluffTimers.delete(game.id);
-          }
-
-          drawCardsForPlayer(game, userId, 4);
-          game.lastWildDraw4 = undefined;
-          advanceToNextPlayer(game);
-          broadCastStateToRoom(game.id, game);
+        case "challenge_bluff":
+          await handleChallengeBluff(ctx, message);
           break;
-        }
-        case "draw_card": {
-          const game = manager.getGame(message.gameId);
-          if (!game) {
-            sendError(socket, "Game not found");
-            break;
-          }
-          const updatedState = manager.drawCard(game.id, userId);
-          if (!updatedState) {
-            sendError(socket, "Cannot draw card");
-            break;
-          }
-
-          if (!moveLogs.has(updatedState.id)) moveLogs.set(updatedState.id, []);
-
-          const currentPlayer = updatedState.players.find(
-            (p) => p.userId === userId,
-          );
-          const drawnCard = currentPlayer?.hand[currentPlayer.hand.length - 1];
-
-          moveLogs.get(updatedState.id)!.push({
-            userId,
-            action: "draw_card",
-            cardId: drawnCard?.id,
-            cardColor: drawnCard?.color,
-            cardValue: drawnCard?.value,
-            time: new Date().toISOString(),
-          });
-
-          broadCastStateToRoom(updatedState.id, updatedState);
-
-          afkCounts.set(`${game.id}:${userId}`, 0);
-          startTurnTimer(game.id);
-
-          if (updatedState.status === GameStatus.FINISHED) {
-            await endGame(updatedState.id, updatedState);
-            break;
-          }
-
+        case "accept_wild_draw4":
+          handleAcceptWildDraw4(ctx, message);
           break;
-        }
-        case "chat_message": {
-          const game = manager.getGame(message.gameId);
-          if (!game) {
-            sendError(socket, "Game not found");
-            break;
-          }
-          const player = game.players.find((p) => p.userId === userId);
-
-          if (!chatLogs.has(message.gameId)) chatLogs.set(message.gameId, []);
-          chatLogs.get(message.gameId)!.push({
-            userId,
-            username: player?.username ?? "",
-            content: message.content,
-            time: new Date().toISOString(),
-          });
-
-          broadCastToRoom(message.gameId, {
-            type: "chat_message",
-            userId,
-            username: player?.username ?? "",
-            content: message.content,
-          });
+        case "chat_message":
+          handleChatMessage(ctx, message);
           break;
-        }
-        case "create_room": {
-          const user = await fastify.prisma.user.findUnique({
-            where: { id: userId },
-            select: { username: true },
-          });
-          if (!user) {
-            sendError(socket, "User not found");
-            break;
-          }
-          const roomCode = roomManager.createRoom(
-            userId,
-            user.username,
-            message.mode,
-            message.maxPlayers,
-            message.name,
-            message.password,
-          );
-          if (!roomSockets.has(roomCode)) roomSockets.set(roomCode, new Set());
-          roomSockets.get(roomCode)!.add({ socket, userId });
-          socket.send(
-            JSON.stringify({
-              type: "room_updated",
-              room: toRoomInfo(roomManager.getRoom(roomCode)!),
-            }),
-          );
+        case "create_room":
+          await handleCreateRoom(ctx, message);
           break;
-        }
-        case "join_room": {
-          const user = await fastify.prisma.user.findUnique({
-            where: { id: userId },
-            select: { username: true },
-          });
-          if (!user) {
-            sendError(socket, "User not found");
-            break;
-          }
-
-          const room = roomManager.getRoom(message.roomCode);
-          if (!room) {
-            sendError(socket, "Room not found");
-            break;
-          }
-
-          const alreadyIn = room.players.some((p) => p.id === userId);
-
-          if (!alreadyIn) {
-            const result = roomManager.joinRoom(
-              message.roomCode,
-              userId,
-              user.username,
-              message.password,
-            );
-            if (!result.ok) {
-              sendError(socket, result.error);
-              break;
-            }
-          }
-
-          if (!roomSockets.has(message.roomCode))
-            roomSockets.set(message.roomCode, new Set());
-          roomSockets.get(message.roomCode)!.add({ socket, userId });
-          broadcastToRoomSockets(message.roomCode, {
-            type: "room_updated",
-            room: toRoomInfo(room),
-          });
+        case "join_room":
+          await handleJoinRoom(ctx, message);
           break;
-        }
-        case "leave_room": {
-          roomManager.leaveRoom(message.roomCode, userId);
-          const roomSocketSet = roomSockets.get(message.roomCode);
-          if (roomSocketSet) {
-            for (const client of roomSocketSet) {
-              if (client.userId === userId) {
-                roomSocketSet.delete(client);
-                break;
-              }
-            }
-          }
-          const room = roomManager.getRoom(message.roomCode);
-          if (room) {
-            broadcastToRoomSockets(message.roomCode, {
-              type: "room_updated",
-              room: toRoomInfo(room),
-            });
-          } else {
-            roomSockets.delete(message.roomCode);
-          }
+        case "leave_room":
+          handleLeaveRoom(ctx, message);
           break;
-        }
-        case "update_room": {
-          roomManager.updateSettings(
-            message.roomCode,
-            userId,
-            message.settings,
-          );
-          const room = roomManager.getRoom(message.roomCode);
-          if (!room) {
-            sendError(socket, "Room not found");
-            break;
-          }
-          broadcastToRoomSockets(message.roomCode, {
-            type: "room_updated",
-            room: toRoomInfo(room),
-          });
+        case "update_room":
+          handleUpdateRoom(ctx, message);
           break;
-        }
-        case "start_game": {
-          const room = roomManager.getRoom(message.roomCode);
-          if (!room) {
-            sendError(socket, "Room not found");
-            break;
-          }
-          if (room.leaderId !== userId) {
-            sendError(socket, "Only the leader can start");
-            break;
-          }
-          if (room.players.length < 2) {
-            sendError(socket, "Need at least 2 players");
-            break;
-          }
-          const participants = room.players.map((p) => ({
-            id: p.id,
-            username: p.username,
-          }));
-          const gameId = fastify.gameManager.createGame(
-            participants,
-            room.mode,
-            room.settings,
-          );
-          broadcastToRoomSockets(message.roomCode, {
-            type: "game_started",
-            gameId,
-          } as ServerEvent);
-          roomSockets.delete(message.roomCode);
-          roomManager.removeRoom(message.roomCode);
+        case "start_game":
+          handleStartGame(ctx, message);
           break;
-        }
       }
     });
 
     socket.on("close", async () => {
-      // Clean up game sockets
       for (const [gameId, room] of rooms) {
         for (const client of room) {
           if (client.socket === socket) {
@@ -600,13 +302,9 @@ export default async function gameGateway(fastify: FastifyInstance) {
             break;
           }
         }
-
-        // Lazy cleanup - room vide
         if (room.size === 0) {
           rooms.delete(gameId);
         }
-
-        // Lazy cleanup - game zombie
         const game = manager.getGame(gameId);
         if (game && game.status === GameStatus.IN_PROGRESS) {
           const activePlayers = game.players.filter((p) => !p.disconnected);
@@ -616,7 +314,6 @@ export default async function gameGateway(fastify: FastifyInstance) {
         }
       }
 
-      // Clean up room sockets
       for (const [roomCode, sockets] of roomSockets) {
         for (const client of sockets) {
           if (client.socket === socket) {
@@ -641,143 +338,4 @@ export default async function gameGateway(fastify: FastifyInstance) {
 
     socket.send(JSON.stringify({ type: "connected" }));
   });
-}
-
-function broadCastToRoom(
-  gameId: string,
-  event: ServerEvent,
-  excludeUserId?: string,
-): void {
-  const room = rooms.get(gameId);
-  if (!room) return;
-
-  const data = JSON.stringify(event);
-  for (const client of room) {
-    if (client.userId !== excludeUserId) {
-      client.socket.send(data);
-    }
-  }
-}
-
-function broadCastStateToRoom(gameId: string, state: InternalGameState): void {
-  const room = rooms.get(gameId);
-  if (!room) return;
-
-  for (const client of room) {
-    const playerGameState = filterStateForPlayer(state, client.userId);
-
-    client.socket.send(
-      JSON.stringify({ type: "game_updated", state: playerGameState }),
-    );
-  }
-}
-
-function sendError(socket: WebSocket, message: string): void {
-  socket.send(JSON.stringify({ type: "error", message }));
-}
-
-function filterStateForPlayer(
-  game: InternalGameState,
-  userId: string,
-): GameState {
-  return {
-    id: game.id,
-    mode: game.mode,
-    status: game.status,
-    settings: game.settings,
-    players: game.players.map((p) => ({
-      ...p,
-      hand:
-        p.userId === userId
-          ? p.hand
-          : p.hand.map(() => ({
-              id: "",
-              color: "wild" as CardColor,
-              value: "wild" as CardValue,
-            })),
-    })),
-    currentColor: game.currentColor,
-    topCard: game.topCard,
-    direction: game.direction,
-    drawPileCount: game.drawPileCount,
-    pendingDrawCount: game.pendingDrawCount,
-    discardPile: game.discardPile,
-    ranking: game.ranking,
-    winnerId: game.winnerId,
-  };
-}
-
-function broadcastToRoomSockets(roomCode: string, event: ServerEvent): void {
-  const sockets = roomSockets.get(roomCode);
-  if (!sockets) return;
-  const data = JSON.stringify(event);
-  for (const client of sockets) {
-    if (client.socket.readyState === WebSocket.OPEN) {
-      client.socket.send(data);
-    }
-  }
-}
-
-function toRoomInfo(room: Room): RoomInfo {
-  return {
-    code: room.code,
-    name: room.name,
-    hasPassword: !!room.password,
-    leaderId: room.leaderId,
-    maxPlayers: room.maxPlayers,
-    players: room.players,
-    mode: room.mode,
-    settings: room.settings,
-  };
-}
-
-function validateMessage(raw: unknown): ClientMessage | null {
-  if (typeof raw !== "object" || raw === null || !("type" in raw)) return null;
-  const msg = raw as Record<string, unknown>;
-
-  switch (msg.type) {
-    case "join_game":
-    case "draw_card":
-    case "chat_message":
-      if (typeof msg.gameId !== "string") return null;
-      if (msg.type === "chat_message" && typeof msg.content !== "string")
-        return null;
-      break;
-    case "play_card":
-      if (typeof msg.gameId !== "string" || typeof msg.cardId !== "string")
-        return null;
-      if (msg.chosenColor && typeof msg.chosenColor !== "string") return null;
-      break;
-    case "call_uno":
-      break;
-    case "catch_uno":
-      if (
-        typeof msg.gameId !== "string" ||
-        typeof msg.targetUserId !== "string"
-      )
-        return null;
-      break;
-    case "challenge_bluff":
-    case "accept_wild_draw4":
-      if (typeof msg.gameId !== "string") return null;
-      break;
-    case "create_room":
-      if (typeof msg.mode !== "string" || typeof msg.maxPlayers !== "number")
-        return null;
-      if (typeof msg.name !== "string") return null;
-      break;
-    case "join_room":
-    case "leave_room":
-    case "start_game":
-      if (typeof msg.roomCode !== "string") return null;
-      break;
-    case "update_room":
-      if (typeof msg.roomCode !== "string" || typeof msg.settings !== "object")
-        return null;
-      break;
-    default:
-      return null;
-  }
-
-  return msg as unknown as ClientMessage;
 }
