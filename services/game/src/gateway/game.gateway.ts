@@ -590,7 +590,7 @@ export default async function gameGateway(fastify: FastifyInstance) {
       }
     });
 
-    socket.on("close", () => {
+    socket.on("close", async () => {
       // Clean up game sockets
       for (const [gameId, room] of rooms) {
         for (const client of room) {
@@ -598,6 +598,20 @@ export default async function gameGateway(fastify: FastifyInstance) {
             room.delete(client);
             broadCastToRoom(gameId, { type: "player_left", userId });
             break;
+          }
+        }
+
+        // Lazy cleanup - room vide
+        if (room.size === 0) {
+          rooms.delete(gameId);
+        }
+
+        // Lazy cleanup - game zombie
+        const game = manager.getGame(gameId);
+        if (game && game.status === GameStatus.IN_PROGRESS) {
+          const activePlayers = game.players.filter((p) => !p.disconnected);
+          if (activePlayers.length <= 1) {
+            await endGame(gameId, game);
           }
         }
       }
