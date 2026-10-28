@@ -64,4 +64,25 @@ export default async function gameRoutes(fastify: FastifyInstance) {
       settings: r.settings,
     }));
   });
+
+  fastify.get("/games/history", async (request, reply) => {
+    await request.jwtVerify();
+    const { id } = request.user as JwtPayload;
+
+    const matches = await fastify.prisma.match.findMany({
+      where: { players: { has: id } },
+      orderBy: { endedAt: "desc" },
+      select: {
+        id: true,
+        mode: true,
+        players: true,
+        ranking: true,
+        winnerId: true,
+        startedAt: true,
+        endedAt: true,
+      },
+    });
+
+    return reply.send(matches);
+  });
 }

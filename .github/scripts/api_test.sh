@@ -2,8 +2,10 @@
 set -euo pipefail
 
 BASE_URL="${BASE_URL:-https://localhost:8443}"
+WORKDIR=$(mktemp -d)
 
 cleanup() {
+  rm -rf "$WORKDIR"
   docker compose exec -T postgres psql -U transcendence_user -d transcendence_db \
     -c "DELETE FROM \"User\" WHERE email LIKE 'alice\_%@test.com' OR email LIKE 'bob\_%@test.com';" >/dev/null 2>&1 || true
 }
@@ -109,6 +111,26 @@ if echo "$ALICE_FRIENDS_AFTER" | grep -q "$BOB_ID"; then
   echo "Amis d'Alice: $ALICE_FRIENDS_AFTER"
   exit 1
 fi
+
+echo ""
+echo "=== 4. Match History ==="
+
+# Re-add friendship for game creation
+curl -k -fsSL -X POST "$BASE_URL/api/user/friends/request/$BOB_ID" \
+  -H "Authorization: Bearer $ALICE_TOKEN" > /dev/null
+curl -k -fsSL -X POST "$BASE_URL/api/user/friends/accept/$ALICE_ID" \
+  -H "Authorization: Bearer $BOB_TOKEN" > /dev/null
+
+echo "GET match history pour Alice..."
+HISTORY_STATUS=$(curl -k -s -o "$WORKDIR/history.json" -w "%{http_code}" \
+  "$BASE_URL/api/game/games/history" \
+  -H "Authorization: Bearer $ALICE_TOKEN")
+
+if [ "$HISTORY_STATUS" -ne 200 ]; then
+  echo "Échec du match history (code HTTP $HISTORY_STATUS)"
+  exit 1
+fi
+echo "Match history OK (200)"
 
 echo ""
 echo "Tous les tests d'API sont validés !"
