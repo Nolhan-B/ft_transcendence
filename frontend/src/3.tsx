@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 
 const PAPER = "#f3e7cc";
-const INK = "#111013";
+
 const CINNABAR = "#c8372d";
 
 export function App() {
@@ -20,7 +20,11 @@ export function App() {
     if (tab === "login") {
       console.log("Login attempt:", { loginUsername, loginPassword });
     } else {
-      console.log("Registration attempt:", { regEmail, regUsername, regPassword });
+      console.log("Registration attempt:", {
+        regEmail,
+        regUsername,
+        regPassword,
+      });
     }
   };
 
@@ -32,7 +36,12 @@ export function App() {
         xmlns="http://www.w3.org/2000/svg"
       >
         <defs>
-          <pattern id="seigaiha-bg" width="80" height="40" patternUnits="userSpaceOnUse">
+          <pattern
+            id="seigaiha-bg"
+            width="80"
+            height="40"
+            patternUnits="userSpaceOnUse"
+          >
             <path
               d="M 0,40 A 40,40 0 0,1 80,40 M 10,40 A 30,30 0 0,1 70,40 M 20,40 A 20,20 0 0,1 60,40 M 30,40 A 10,10 0 0,1 50,40 M 40,40 A 0.5,0.5 0 0,1 40,40 M -40,20 A 40,40 0 0,1 40,20 M -30,20 A 30,30 0 0,1 30,20 M -20,20 A 20,20 0 0,1 20,20 M -10,20 A 10,10 0 0,1 10,20 M 40,20 A 40,40 0 0,1 120,20 M 50,20 A 30,30 0 0,1 110,20 M 60,20 A 20,20 0 0,1 100,20 M 70,20 A 10,10 0 0,1 90,20"
               fill="none"
@@ -87,8 +96,12 @@ export function App() {
               backgroundColor: CINNABAR,
             }}
           >
-            <span className="text-[10px] font-black leading-none text-[#f3e7cc]">宇</span>
-            <span className="text-[10px] font-black leading-none text-[#f3e7cc] mt-0.5">野</span>
+            <span className="text-[10px] font-black leading-none text-[#f3e7cc]">
+              宇
+            </span>
+            <span className="text-[10px] font-black leading-none text-[#f3e7cc] mt-0.5">
+              野
+            </span>
           </div>
         </div>
       </div>
@@ -134,7 +147,10 @@ export function App() {
         </div>
 
         {/* Dynamic form */}
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4 relative z-10">
+        <form
+          onSubmit={handleSubmit}
+          className="flex flex-col gap-4 relative z-10"
+        >
           {tab === "register" && (
             <div className="flex flex-col gap-1.5">
               <label className="text-[10px] font-mono uppercase tracking-[0.2em] text-[#f3e7cc]/70">
