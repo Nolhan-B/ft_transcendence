@@ -24,6 +24,7 @@ import {
   handleLeaveRoom,
   handleUpdateRoom,
   handleStartGame,
+  handleAddBot,
 } from "./handlers/room/index.js";
 import { handleChatMessage } from "./handlers/chat/index.js";
 import type { GatewayContext } from "./types.js";
@@ -289,6 +290,9 @@ export default async function gameGateway(fastify: FastifyInstance) {
           break;
         case "start_game":
           handleStartGame(ctx, message);
+          break;
+        case "add_bot":
+          handleAddBot(ctx, message);
           break;
       }
     });
