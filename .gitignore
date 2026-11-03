@@ -55,3 +55,5 @@ signup.json
 gateway/ssl/
 *.key
 *.crt
+
+.docs/
