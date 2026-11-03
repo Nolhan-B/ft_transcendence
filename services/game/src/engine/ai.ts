@@ -6,22 +6,21 @@ export function chooseCard(
   topCard: Card,
   currentColor: CardColor,
   pendingDrawCount: number,
-  StackingRule: StackingRule,
+  stackingRule: StackingRule,
 ): Card | null {
   const playableCards = hand.filter((c) =>
-    isValidPlay(c, topCard, currentColor, pendingDrawCount, StackingRule),
+    isValidPlay(c, topCard, currentColor, pendingDrawCount, stackingRule),
   );
 
   if (pendingDrawCount > 0) {
     let stackCards: Card[] = [];
-    if (StackingRule === "same") {
+    if (stackingRule === "same") {
       stackCards = playableCards.filter((c) => c.value === topCard.value);
-    } else if (StackingRule === "all") {
+    } else if (stackingRule === "all") {
       stackCards = playableCards.filter(
         (c) => c.value === "draw2" || c.value === "wild_draw4",
       );
     }
-
     if (stackCards.length > 0) {
       return Math.random() > 0.05
         ? stackCards[Math.floor(Math.random() * stackCards.length)]
@@ -75,4 +74,14 @@ export function shouldChallengeBluff(
 export function shouldCallUno(hand: Card[]): boolean {
   if (hand.length !== 1) return false;
   return Math.random() > 0.1;
+}
+
+export function chooseSwapTarget(
+  players: { userId: string; handCount: number }[],
+  botId: string,
+): string {
+  const others = players.filter((p) => p.userId !== botId);
+  others.sort((a, b) => a.handCount - b.handCount);
+
+  return others[0].userId;
 }

@@ -1,5 +1,6 @@
 import { GatewayContext } from "../../types.js";
 import { GameStatus } from "shared";
+import { scheduleBotTurnIfNeeded } from "./bot-turn.js";
 
 export async function handleDrawCard(
   ctx: GatewayContext,
@@ -35,10 +36,16 @@ export async function handleDrawCard(
   ctx.broadCastStateToRoom(updatedState.id, updatedState);
 
   ctx.afkCounts.set(`${game.id}:${ctx.userId}`, 0);
-  ctx.startTurnTimer(game.id);
+
+  scheduleBotTurnIfNeeded(ctx, updatedState, updatedState.id);
 
   if (updatedState.status === GameStatus.FINISHED) {
     await ctx.endGame(updatedState.id, updatedState);
     return;
+  }
+
+  const nextPlayer = updatedState.players.find((p) => p.isCurrentTurn);
+  if (!nextPlayer?.userId.startsWith("bot_")) {
+    ctx.startTurnTimer(game.id);
   }
 }
