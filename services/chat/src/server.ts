@@ -8,6 +8,7 @@ import type { WebSocket } from "ws";
 import type { SendDirectMessagePayload } from "shared";
 import prismaPlugin from "./plugins/prisma.js";
 import messageHistoryRoutes from "./routes/message_history.js";
+import { setupMetrics } from "shared"
 
 if (fs.existsSync("/run/secrets/db_url")) {
   process.env.DATABASE_URL = fs
@@ -18,6 +19,8 @@ if (fs.existsSync("/run/secrets/db_url")) {
 const fastify = Fastify({
   logger: true,
 });
+
+setupMetrics(fastify, "chat-services");
 
 export const connectedClients = new Map<string, WebSocket>();
 

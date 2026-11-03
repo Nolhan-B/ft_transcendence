@@ -17,6 +17,8 @@ if (fs.existsSync("/run/secrets/db_url")) {
 }
 const fastify = Fastify({ logger: true });
 
+setupMetrics(fastify, "user-service");
+
 fastify.register(staticPlugin, {
   root: path.join(process.cwd(), "uploads"),
   prefix: "/uploads/",
@@ -32,6 +34,7 @@ fastify.register(jwt, {
     signed: false,
   },
 });
+import { setupMetrics } from "shared";
 
 fastify.register(profileRoutes);
 fastify.register(friendsRoutes);
@@ -56,5 +59,6 @@ const start = async () => {
     process.exit(1);
   }
 };
+
 
 start();

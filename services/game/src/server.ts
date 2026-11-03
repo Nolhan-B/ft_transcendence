@@ -7,10 +7,13 @@ import cookie from "@fastify/cookie";
 import jwt from "@fastify/jwt";
 import prismaPlugin from "./plugins/prisma.js";
 import roomManager from "./plugins/room.manager.js";
+import { setupMetrics } from "shared";
 
 const fastify = Fastify({
   logger: true,
 });
+
+setupMetrics(fastify, "game-service");
 
 fastify.route({
   method: ["GET", "HEAD"],
@@ -45,5 +48,6 @@ const start = async () => {
     process.exit(1);
   }
 };
+
 
 start();
