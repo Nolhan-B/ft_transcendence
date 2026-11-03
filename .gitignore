@@ -57,3 +57,5 @@ gateway/ssl/
 *.crt
 
 .docs/
+transcendence.crt
+transcendence.key
