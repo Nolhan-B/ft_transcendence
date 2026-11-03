@@ -11,10 +11,6 @@ install:
 		echo "Copying secrets folder..."; \
 		cp -r secrets.example secrets; \
 	fi
-	npm install --prefix services/auth
-	npm install --prefix services/chat
-	npm install --prefix services/game
-	npm install --prefix services/user
 	openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
 	-keyout gateway/ssl/transcendence.key \
 	-out gateway/ssl/transcendence.crt \
