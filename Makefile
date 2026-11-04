@@ -19,3 +19,9 @@ install:
 	chmod 600 gateway/ssl/transcendence.key
 	chmod 644 gateway/ssl/transcendence.crt
 	docker compose up --build
+
+up:
+	docker compose up
+
+down:
+	docker compose down
