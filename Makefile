@@ -8,7 +8,7 @@ install:
 	-subj "/C=FR/ST=GrandEst/L=Mulhouse/O=42/CN=localhost"
 	chmod 600 gateway/ssl/transcendence.key
 	chmod 644 gateway/ssl/transcendence.crt
-	docker compose up --build
+	docker compose build
 
 up:
 	docker compose up
