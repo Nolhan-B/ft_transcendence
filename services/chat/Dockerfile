@@ -10,8 +10,9 @@ COPY services/chat/package*.json ./services/chat/
 
 RUN npm install --workspace=chat-service --workspace=shared
 
-COPY services/chat/ ./services/chat/
+RUN npm --workspace=shared run build
 
+COPY services/chat/ ./services/chat/
 
 WORKDIR /app/services/chat
 

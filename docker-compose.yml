@@ -36,6 +36,7 @@ services:
     secrets:
       - db_password
       - db_url
+      - jwt_secret
     healthcheck:
       test:
         ["CMD-SHELL", "wget -q --spider http://127.0.0.1:3002/health || exit 1"]
@@ -58,6 +59,7 @@ services:
     secrets:
       - db_password
       - db_url
+      - jwt_secret
     healthcheck:
       test:
         ["CMD-SHELL", "wget -q --spider http://127.0.0.1:3003/health || exit 1"]
@@ -78,6 +80,7 @@ services:
     secrets:
       - db_password
       - db_url
+      - jwt_secret
     depends_on:
       postgres:
         condition: service_healthy
@@ -185,8 +188,8 @@ services:
       - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
     command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
 
   grafana:
     image: grafana/grafana:11.1.0

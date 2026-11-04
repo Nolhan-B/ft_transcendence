@@ -8,6 +8,20 @@ import jwt from "@fastify/jwt";
 import prismaPlugin from "./plugins/prisma.js";
 import roomManager from "./plugins/room.manager.js";
 import { setupMetrics } from "shared";
+import fs from "node:fs";
+import process from "node:process";
+
+if (fs.existsSync("/run/secrets/db_url")) {
+  process.env.DATABASE_URL = fs
+    .readFileSync("/run/secrets/db_url", "utf-8")
+    .trim();
+}
+
+if (fs.existsSync("/run/secrets/jwt_secret")) {
+  process.env.JWT_SECRET = fs
+    .readFileSync("/run/secrets/jwt_secret", "utf-8")
+    .trim();
+}
 
 const fastify = Fastify({
   logger: true,
@@ -22,7 +36,6 @@ fastify.route({
   handler: async () => ({ service: "game", status: "ok" }),
 });
 
-// Register cookie before jwt to enable cookie verification
 fastify.register(cookie);
 fastify.register(jwt, {
   secret: process.env.JWT_SECRET ?? "dev-secret",
@@ -48,6 +61,5 @@ const start = async () => {
     process.exit(1);
   }
 };
-
 
 start();

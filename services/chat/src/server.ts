@@ -8,11 +8,17 @@ import type { WebSocket } from "ws";
 import type { SendDirectMessagePayload } from "shared";
 import prismaPlugin from "./plugins/prisma.js";
 import messageHistoryRoutes from "./routes/message_history.js";
-import { setupMetrics } from "shared"
+import { setupMetrics } from "shared";
 
 if (fs.existsSync("/run/secrets/db_url")) {
   process.env.DATABASE_URL = fs
     .readFileSync("/run/secrets/db_url", "utf-8")
+    .trim();
+}
+
+if (fs.existsSync("/run/secrets/jwt_secret")) {
+  process.env.JWT_SECRET = fs
+    .readFileSync("/run/secrets/jwt_secret", "utf-8")
     .trim();
 }
 
@@ -24,7 +30,6 @@ setupMetrics(fastify, "chat-services");
 
 export const connectedClients = new Map<string, WebSocket>();
 
-// Register cookie before jwt to enable cookie verification
 fastify.register(cookie);
 fastify.register(jwt, {
   secret: process.env.JWT_SECRET ?? "dev-secret",

@@ -1,5 +1,5 @@
 import client from "prom-client";
-import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
+import type { FastifyInstance } from "fastify";
 
 const register = client.register;
 

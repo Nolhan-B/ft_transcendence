@@ -92,10 +92,7 @@
       "id": 1,
       "options": {
         "legend": {
-          "calcs": [
-            "max",
-            "last"
-          ],
+          "calcs": ["max", "last"],
           "displayMode": "table",
           "placement": "bottom",
           "showLegend": true
@@ -136,13 +133,7 @@
     "to": "now"
   },
   "timepicker": {
-    "refresh_intervals": [
-      "5s",
-      "10s",
-      "30s",
-      "1m",
-      "5m"
-    ]
+    "refresh_intervals": ["5s", "10s", "30s", "1m", "5m"]
   },
   "refresh": "5s",
   "timezone": "browser",
