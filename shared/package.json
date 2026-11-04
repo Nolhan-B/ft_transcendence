@@ -1,0 +1,15 @@
+{
+  "name": "shared",
+  "private": true,
+  "type": "module",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "npx --yes prisma@7.10.0 generate && tsc"
+  },
+  "devDependencies": {
+    "prisma": "^7.10.0",
+    "typescript": "^5.0.0"
+  }
+}

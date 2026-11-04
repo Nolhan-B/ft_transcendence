@@ -6,6 +6,9 @@ node_modules/
 .env.local
 .env.*.local
 
+# Secrets
+secrets/
+
 # Build outputs
 dist/
 build/
@@ -25,5 +28,36 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
+
+#from Prisma
+skills-lock.json
+.agents/
+.claude/
+.windsurf/
+
+#Prettier
+.prettierrc
+
+
+shared/src/generated/
+services/*/src/generated/
+
+generated/
+shared/src/generated/
+services/user/uploads/*services/user/uploads/
+
+me.json
+profile.json
+login.json
+signup.json
+
+# SSL certificates
+gateway/ssl/
+*.key
+*.crt
+
+.docs/
+transcendence.crt
+transcendence.key
 
 docs

@@ -1,0 +1,49 @@
+import Fastify from "fastify";
+import gameGateway from "./gateway/game.gateway.js";
+import websocket from "@fastify/websocket";
+import gameRoutes from "./routes/game.js";
+import gameManager from "./plugins/game.manager.js";
+import cookie from "@fastify/cookie";
+import jwt from "@fastify/jwt";
+import prismaPlugin from "./plugins/prisma.js";
+import roomManager from "./plugins/room.manager.js";
+
+const fastify = Fastify({
+  logger: true,
+});
+
+fastify.route({
+  method: ["GET", "HEAD"],
+  url: "/health",
+  logLevel: "silent",
+  handler: async () => ({ service: "game", status: "ok" }),
+});
+
+// Register cookie before jwt to enable cookie verification
+fastify.register(cookie);
+fastify.register(jwt, {
+  secret: process.env.JWT_SECRET ?? "dev-secret",
+  cookie: {
+    cookieName: "access_token",
+    signed: false,
+  },
+});
+
+fastify.register(prismaPlugin);
+fastify.register(websocket);
+fastify.register(gameManager);
+fastify.register(roomManager);
+
+fastify.register(gameGateway);
+fastify.register(gameRoutes);
+
+const start = async () => {
+  try {
+    await fastify.listen({ port: 3002, host: "0.0.0.0" });
+  } catch (err) {
+    fastify.log.error(err);
+    process.exit(1);
+  }
+};
+
+start();
