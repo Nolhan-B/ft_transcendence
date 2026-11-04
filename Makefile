@@ -1,6 +1,7 @@
 
 install:
 	@echo "=== Installation ==="
+	cp -r secrets.example secrets
 	mkdir -p gateway/ssl
 	openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
 	-keyout gateway/ssl/transcendence.key \
