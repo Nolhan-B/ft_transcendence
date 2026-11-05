@@ -7,6 +7,7 @@
     "test-game-integration": "npx tsx services/game/tests/integration.test.ts",
     "test-rooms": "npx tsx services/game/tests/rooms.test.ts",
     "test-ai": "npx tsx services/game/tests/ai.test.ts",
+    "test-ai-e2e": "npx tsx services/game/tests/e2e-bot.test.ts",
     "test-api": "bash ./.github/scripts/api_test.sh",
     "test-e2e": "bash ./.github/scripts/e2e_test.sh",
     "test-chat": "node ./.github/scripts/chat_test.js",

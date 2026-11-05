@@ -109,6 +109,9 @@ jobs:
       - name: Run ai unitary tests
         run: npm run test-ai
 
+      - name : Run ai e2e tests
+        run: npm run test-ai-e2e
+
       - name: Run E2E Smoke & Route Tests
         run: npm run test-e2e
 
