@@ -101,6 +101,13 @@ export function validateMessage(raw: unknown): ClientMessage | null {
       if (typeof msg.roomCode !== "string" || typeof msg.settings !== "object")
         return null;
       break;
+    case "add_bot":
+      if (typeof msg.roomCode !== "string") return null;
+      break;
+    case "remove_bot":
+      if (typeof msg.roomCode !== "string" || typeof msg.botId !== "string")
+        return null;
+      break;
     default:
       return null;
   }

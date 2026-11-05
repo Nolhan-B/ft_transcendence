@@ -7,6 +7,7 @@ import authRoutes from "./routes/auth.js";
 import twofaRoutes from "./routes/twoaf.js";
 import fs from "node:fs";
 import process from "node:process";
+import { setupMetrics } from "shared";
 
 if (fs.existsSync("/run/secrets/db_url")) {
   process.env.DATABASE_URL = fs
@@ -20,6 +21,8 @@ if (fs.existsSync("/run/secrets/jwt_secret")) {
 }
 
 const app = Fastify({ logger: true });
+
+setupMetrics(app, "auth-service");
 
 async function start() {
   try {

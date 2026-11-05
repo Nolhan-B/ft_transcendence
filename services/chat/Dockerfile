@@ -1,21 +1,29 @@
-FROM node:22-alpine
-
+# 1. Base stage: shared dependencies and toolchain
+FROM node:22-alpine AS base
 WORKDIR /app
-
 RUN apk add --no-cache wget
 
+# Copy workspace package manifests
 COPY package*.json ./
-COPY shared/ ./shared/
+COPY shared/package*.json ./shared/
 COPY services/chat/package*.json ./services/chat/
 
-RUN npm install --workspace=chat-service --workspace=shared
+# Mount host npm cache to install dependencies via workspaces
+RUN --mount=type=cache,target=/root/.npm \
+    npm install --workspace=chat-service --workspace=shared
 
-COPY services/chat/ ./services/chat/
+# Build shared package (generates Prisma Client and compiles shared TS)
+COPY shared ./shared
+RUN cd shared && npm run build
 
+# 2. Development stage
+FROM base AS dev
+ENV NODE_ENV=development
+
+# Copy chat source code last to preserve cache on previous layers
+COPY services/chat ./services/chat
 
 WORKDIR /app/services/chat
-
-RUN npx prisma generate
 
 EXPOSE 3003
 

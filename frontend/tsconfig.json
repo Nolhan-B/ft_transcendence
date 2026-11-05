@@ -1,24 +1,40 @@
 {
-    "compilerOptions": {
-        "target": "ES2022",
-        "lib": [
-            "ES2022",
-            "DOM",
-            "DOM.Iterable"
-        ],
-        "module": "ESNext",
-        "moduleResolution": "Bundler",
-        "jsx": "react-jsx",
-        "strict": true,
-        "noEmit": true,
-        "isolatedModules": true,
-        "esModuleInterop": true,
-        "skipLibCheck": true,
-        "types": [
-            "vite/client"
-        ]
-    },
-    "include": [
-        "src"
-    ]
+  // `tsc` ne sert qu'à VÉRIFIER les types (script "build" : `tsc && vite build`).
+  // Vite fait la vraie compilation, d'où `noEmit` : tsc n'écrit aucun fichier.
+  "compilerOptions": {
+    // Version de JavaScript visée : Chrome stable la gère nativement (exigence du sujet).
+    "target": "ES2020",
+    // Sémantique moderne des champs de classe (valeur standard des templates Vite).
+    "useDefineForClassFields": true,
+    // Types disponibles : DOM = document, fetch, WebSocket, localStorage...
+    // DOM.Iterable = boucler sur les NodeList.
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    // Garde les import/export modernes (Vite attend de l'ESM).
+    "module": "ESNext",
+    // Ne vérifie pas les types des librairies : build plus rapide, moins d'erreurs hors de notre code.
+    "skipLibCheck": true,
+
+    // Comment TS retrouve un `import` : imite Vite (pas besoin d'écrire `.js` dans les imports).
+    "moduleResolution": "bundler",
+    // Autorise `import "./x.ts"`. Pas indispensable pour l'instant.
+    "allowImportingTsExtensions": true,
+    // Autorise `import data from "./data.json"`. Pas indispensable pour l'instant.
+    "resolveJsonModule": true,
+    // Interdit ce qui ne marche pas fichier par fichier : nécessaire car Vite compile chaque fichier séparément.
+    "isolatedModules": true,
+    // tsc n'écrit rien : il vérifie seulement.
+    "noEmit": true,
+    // Gère le JSX sans `import React` dans chaque fichier.
+    "jsx": "react-jsx",
+
+    // Active toutes les vérifications strictes (null, `any` implicite...). Cohérent avec le lint de la CI.
+    "strict": true,
+    // Erreur si une variable ou un paramètre n'est pas utilisé. Discutable : le lint le signale déjà en warning.
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    // Interdit un `case` qui tombe dans le suivant (bug classique).
+    "noFallthroughCasesInSwitch": true
+  },
+  // Fichiers vérifiés : le code et la config Vite.
+  "include": ["src", "vite.config.ts"]
 }

@@ -4,6 +4,7 @@ import {
   advanceToNextPlayer,
   drawCardsForPlayer,
 } from "../../../engine/game-state.js";
+import { scheduleBotTurnIfNeeded } from "./bot-turn.js";
 
 export async function handleChallengeBluff(
   ctx: GatewayContext,
@@ -39,4 +40,11 @@ export async function handleChallengeBluff(
 
   game.lastWildDraw4 = undefined;
   ctx.broadCastStateToRoom(game.id, game);
+
+  scheduleBotTurnIfNeeded(ctx, game, game.id);
+
+  const nextPlayer = game.players.find((p) => p.isCurrentTurn);
+  if (!nextPlayer?.userId.startsWith("bot_")) {
+    ctx.startTurnTimer(game.id);
+  }
 }

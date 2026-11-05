@@ -33,6 +33,7 @@ export interface GatewayContext {
   bluffTimers: Map<string, NodeJS.Timeout>;
   turnTimers: Map<string, NodeJS.Timeout>;
   afkCounts: Map<string, number>;
+  disconnectTimers: Map<string, NodeJS.Timeout>;
   broadCastToRoom: (
     gameId: string,
     event: ServerEvent,

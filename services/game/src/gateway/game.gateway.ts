@@ -24,10 +24,13 @@ import {
   handleLeaveRoom,
   handleUpdateRoom,
   handleStartGame,
+  handleAddBot,
+  handleRemoveBot,
 } from "./handlers/room/index.js";
 import { handleChatMessage } from "./handlers/chat/index.js";
 import type { GatewayContext } from "./types.js";
 import { advanceToNextPlayer } from "../engine/game-state.js";
+import { scheduleBotTurnIfNeeded } from "./handlers/game/bot-turn.js";
 
 const TURN_TIMEOUT_MS = 20000;
 const MAX_AFK_COUNT = 2;
@@ -61,6 +64,9 @@ const unoTimers: Map<string, NodeJS.Timeout> = new Map();
 const bluffTimers: Map<string, NodeJS.Timeout> = new Map();
 const turnTimers: Map<string, NodeJS.Timeout> = new Map();
 const afkCounts: Map<string, number> = new Map();
+
+const disconnectTimers: Map<string, NodeJS.Timeout> = new Map();
+const RECONNECT_GRACE_MS = Number(process.env.RECONNECT_GRACE_MS) || 30000;
 
 export default async function gameGateway(fastify: FastifyInstance) {
   const manager = fastify.gameManager;
@@ -162,6 +168,19 @@ export default async function gameGateway(fastify: FastifyInstance) {
       clearTimeout(turnTimers.get(gameId));
       turnTimers.delete(gameId);
     }
+    for (const [key, timer] of disconnectTimers) {
+      if (key.startsWith(`${gameId}:`)) {
+        clearTimeout(timer);
+        disconnectTimers.delete(key);
+      }
+    }
+    for (const key of afkCounts.keys()) {
+      if (key.startsWith(`${gameId}:`)) afkCounts.delete(key);
+    }
+    if (bluffTimers.has(gameId)) {
+      clearTimeout(bluffTimers.get(gameId));
+      bluffTimers.delete(gameId);
+    }
     const activePlayers = game.players.filter((p) => !p.disconnected);
     game.winnerId = activePlayers.length === 1 ? activePlayers[0].userId : null;
     broadCastToRoom(gameId, {
@@ -185,7 +204,7 @@ export default async function gameGateway(fastify: FastifyInstance) {
   }
 
   fastify.get("/ws", { websocket: true }, async (socket, request) => {
-    const token = (request.query as { token?: string }).token;
+    const token = request.cookies.access_token;
     if (!token) {
       sendError(socket, "Unauthorized");
       socket.close();
@@ -226,6 +245,7 @@ export default async function gameGateway(fastify: FastifyInstance) {
       bluffTimers,
       turnTimers,
       afkCounts,
+      disconnectTimers,
       broadCastToRoom,
       broadCastStateToRoom,
       broadcastToRoomSockets,
@@ -290,28 +310,71 @@ export default async function gameGateway(fastify: FastifyInstance) {
         case "start_game":
           handleStartGame(ctx, message);
           break;
+        case "add_bot":
+          handleAddBot(ctx, message);
+          break;
+        case "remove_bot":
+          handleRemoveBot(ctx, message);
+          break;
       }
     });
 
     socket.on("close", async () => {
       for (const [gameId, room] of rooms) {
+        let found = false;
         for (const client of room) {
           if (client.socket === socket) {
             room.delete(client);
-            broadCastToRoom(gameId, { type: "player_left", userId });
+            found = true;
             break;
           }
         }
-        if (room.size === 0) {
-          rooms.delete(gameId);
-        }
-        const game = manager.getGame(gameId);
-        if (game && game.status === GameStatus.IN_PROGRESS) {
-          const activePlayers = game.players.filter((p) => !p.disconnected);
-          if (activePlayers.length <= 1) {
-            await endGame(gameId, game);
-          }
-        }
+        if (!found) continue;
+
+        broadCastToRoom(gameId, { type: "player_left", userId });
+
+        const key = `${gameId}:${userId}`;
+        if (disconnectTimers.has(key)) clearTimeout(disconnectTimers.get(key));
+
+        disconnectTimers.set(
+          key,
+          setTimeout(async () => {
+            disconnectTimers.delete(key);
+            const game = manager.getGame(gameId);
+            if (!game || game.status !== GameStatus.IN_PROGRESS) return;
+
+            // Le joueur est revenu entre temps
+            const currentRoom = rooms.get(gameId);
+            if (
+              currentRoom &&
+              [...currentRoom].some((c) => c.userId === userId)
+            )
+              return;
+
+            const player = game.players.find((p) => p.userId === userId);
+            if (player) player.disconnected = true;
+
+            const activePlayers = game.players.filter((p) => !p.disconnected);
+            if (
+              activePlayers.length <= 1 ||
+              !currentRoom ||
+              currentRoom.size === 0
+            ) {
+              await endGame(gameId, game);
+              return;
+            }
+
+            // C'etait son tour : on passe au suivant sans attendre l'AFK
+            if (player?.isCurrentTurn) {
+              advanceToNextPlayer(game);
+              game.drawPileCount = game.drawPile.length;
+              broadCastStateToRoom(gameId, game);
+              scheduleBotTurnIfNeeded(ctx, game, gameId);
+              const next = game.players.find((p) => p.isCurrentTurn);
+              if (!next?.userId.startsWith("bot_")) startTurnTimer(gameId);
+            }
+          }, RECONNECT_GRACE_MS),
+        );
       }
 
       for (const [roomCode, sockets] of roomSockets) {

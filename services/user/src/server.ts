@@ -9,13 +9,23 @@ import process from "node:process";
 import multipart from "@fastify/multipart";
 import staticPlugin from "@fastify/static";
 import path from "path";
+import { setupMetrics } from "shared";
 
 if (fs.existsSync("/run/secrets/db_url")) {
   process.env.DATABASE_URL = fs
     .readFileSync("/run/secrets/db_url", "utf-8")
     .trim();
 }
+
+if (fs.existsSync("/run/secrets/jwt_secret")) {
+  process.env.JWT_SECRET = fs
+    .readFileSync("/run/secrets/jwt_secret", "utf-8")
+    .trim();
+}
+
 const fastify = Fastify({ logger: true });
+
+setupMetrics(fastify, "user-service");
 
 fastify.register(staticPlugin, {
   root: path.join(process.cwd(), "uploads"),

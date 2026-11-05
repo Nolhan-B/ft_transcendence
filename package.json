@@ -6,10 +6,14 @@
     "test-game": "npx tsx services/game/tests/engine.test.ts",
     "test-game-integration": "npx tsx services/game/tests/integration.test.ts",
     "test-rooms": "npx tsx services/game/tests/rooms.test.ts",
+    "test-ai": "npx tsx services/game/tests/ai.test.ts",
+    "test-ai-e2e": "npx tsx services/game/tests/e2e-bot.test.ts",
+    "test-reconnect": "npx tsx services/game/tests/e2e-reconnect.test.ts",
+    "test-game-all": "npm run test-game && npm run test-game-integration && npm run test-rooms && npm run test-ai && npm run test-ai-e2e && npm run test-reconnect",
     "test-api": "bash ./.github/scripts/api_test.sh",
     "test-e2e": "bash ./.github/scripts/e2e_test.sh",
     "test-chat": "node ./.github/scripts/chat_test.js",
-    "test-all": "npm run test-api && npm run test-e2e && npm run test-game && npm run lint && npm run test-chat && npm run test-game-integration && npm run test-game && npm run test-rooms"
+    "test-all": "npm run lint && npm run test-game-all && npm run test-chat && npm run test-api && npm run test-e2e"
   },
   "workspaces": [
     "services/*",
@@ -26,6 +30,8 @@
     "ws": "^8.22.0"
   },
   "dependencies": {
-    "@fastify/cookie": "^11.1.3"
+    "@fastify/cookie": "^11.1.3",
+    "prom-client": "^15.1.3",
+    "tdigest": "^0.1.3"
   }
 }

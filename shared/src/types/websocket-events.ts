@@ -29,6 +29,14 @@ export interface StartGamePayload {
   roomCode: string;
 }
 
+export interface AddBotPayload {
+  roomCode: string;
+}
+export interface RemoveBotPayload {
+  roomCode: string;
+  botId: string;
+}
+
 // ============================================================
 // GAME - Client -> Server
 // ============================================================
@@ -174,4 +182,6 @@ export type ClientMessage =
   | ({ type: "call_uno" } & CallUnoPayload)
   | ({ type: "catch_uno" } & CatchUnoPayload)
   | ({ type: "challenge_bluff" } & ChallengeBluffPayload)
-  | ({ type: "accept_wild_draw4" } & AcceptWildDraw4Payload);
+  | ({ type: "accept_wild_draw4" } & AcceptWildDraw4Payload)
+  | ({ type: "add_bot" } & AddBotPayload)
+  | ({ type: "remove_bot" } & RemoveBotPayload);
