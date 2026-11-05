@@ -8,14 +8,13 @@ COPY package*.json ./
 COPY shared/package*.json ./shared/
 COPY services/chat/package*.json ./services/chat/
 
-# Mount host npm cache to avoid writing /root/.npm into image layer
+# Mount host npm cache to install dependencies via workspaces
 RUN --mount=type=cache,target=/root/.npm \
     npm install --workspace=chat-service --workspace=shared
 
 # Build shared package (generates Prisma Client and compiles shared TS)
 COPY shared ./shared
-RUN --mount=type=cache,target=/root/.npm \
-    cd shared && npm run build
+RUN cd shared && npm run build
 
 # 2. Development stage
 FROM base AS dev

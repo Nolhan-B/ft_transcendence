@@ -14,8 +14,7 @@ RUN --mount=type=cache,target=/root/.npm \
 
 # Build shared package (generates Prisma Client and compiles shared TS)
 COPY shared ./shared
-RUN --mount=type=cache,target=/root/.npm \
-    cd shared && npm run build
+RUN cd shared && npm run build
 
 # 2. Development stage
 FROM base AS dev

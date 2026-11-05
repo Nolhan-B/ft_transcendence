@@ -6,7 +6,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "npx --yes prisma@7.10.0 generate && tsc"
+    "build": "prisma generate && tsc"
   },
   "devDependencies": {
     "fastify": "^5.12.8",
