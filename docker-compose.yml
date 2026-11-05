@@ -1,3 +1,11 @@
+# Variables communes à tous les services qui parlent à la base (valeurs lues dans .env, défauts si absent).
+# Le mot de passe, lui, vient du Docker secret db_password.
+x-db-env: &db-env
+  DB_HOST: ${DB_HOST:-postgres}
+  DB_PORT: ${DB_PORT:-5432}
+  DB_NAME: ${DB_NAME:-transcendence_db}
+  DB_USER: ${DB_USER:-transcendence_user}
+
 services:
   auth:
     build:
@@ -6,6 +14,8 @@ services:
       target: dev
     volumes:
       - ./services/auth/src:/app/src
+    environment:
+      <<: *db-env
     healthcheck:
       test:
         ["CMD-SHELL", "wget -q --spider http://127.0.0.1:3001/health || exit 1"]
@@ -29,7 +39,8 @@ services:
     volumes:
       - ./services/game/src:/app/src
     environment:
-      - NODE_ENV=development
+      <<: *db-env
+      NODE_ENV: development
     depends_on:
       postgres:
         condition: service_healthy
@@ -52,7 +63,8 @@ services:
     volumes:
       - ./services/chat/src:/app/src
     environment:
-      - NODE_ENV=development
+      <<: *db-env
+      NODE_ENV: development
     depends_on:
       postgres:
         condition: service_healthy
@@ -76,7 +88,8 @@ services:
       - ./services/user/src:/app/src
       - user_uploads:/app/uploads
     environment:
-      - NODE_ENV=development
+      <<: *db-env
+      NODE_ENV: development
     secrets:
       - db_password
       - db_url
@@ -115,8 +128,8 @@ services:
       context: ./gateway
       dockerfile: Dockerfile
     ports:
-      - "8080:80"
-      - "8443:443"
+      - "${HTTP_PORT:-8080}:80"
+      - "${HTTPS_PORT:-8443}:443"
     volumes:
       - ./gateway/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./gateway/ssl:/etc/nginx/ssl:ro
@@ -148,16 +161,15 @@ services:
     image: postgres:16-alpine
     restart: always
     environment:
-      POSTGRES_USER: transcendence_user
+      POSTGRES_USER: ${DB_USER:-transcendence_user}
       POSTGRES_PASSWORD_FILE: /run/secrets/db_password
-      POSTGRES_DB: transcendence_db
+      POSTGRES_DB: ${DB_NAME:-transcendence_db}
     secrets:
       - db_password
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test:
-        ["CMD-SHELL", "pg_isready -U transcendence_user -d transcendence_db"]
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s
       timeout: 3s
       retries: 5
