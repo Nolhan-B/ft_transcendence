@@ -106,6 +106,9 @@ jobs:
       - name: Run Room integration tests
         run: npm run test-rooms
 
+      - name: Run ai unitary tests
+        run: npm run test-ai
+
       - name: Run E2E Smoke & Route Tests
         run: npm run test-e2e
 
