@@ -62,9 +62,10 @@ function createClient(token: string): Promise<{
   send: (msg: object) => void;
 }> {
   return new Promise((resolve, reject) => {
-    const ws = new WebSocket(`${WS_URL}?token=${token}`, {
+    const ws = new WebSocket(WS_URL, {
       rejectUnauthorized: false,
       handshakeTimeout: 5000,
+      headers: { Cookie: `access_token=${token}` },
     });
     activeSockets.push(ws);
 
