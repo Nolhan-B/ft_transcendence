@@ -15,6 +15,13 @@ export async function handleJoinGame(
     ctx.sendError(ctx.socket, "You are not part of this game");
     return;
   }
+  const key = `${msg.gameId}:${ctx.userId}`;
+  const pending = ctx.disconnectTimers.get(key);
+  if (pending) {
+    clearTimeout(pending);
+    ctx.disconnectTimers.delete(key);
+  }
+
   if (!ctx.rooms.has(msg.gameId)) {
     ctx.rooms.set(msg.gameId, new Set());
   }
