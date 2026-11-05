@@ -78,7 +78,9 @@ function connectWs(
   token: string,
 ): Promise<{ ws: WebSocket; firstMsg: any }> {
   return new Promise((resolve, reject) => {
-    const ws = new WebSocket(`ws://127.0.0.1:${port}/ws?token=${token}`);
+    const ws = new WebSocket(`ws://127.0.0.1:${port}/ws`, {
+      headers: { Cookie: `access_token=${token}` },
+    });
     ws.once("message", (data) => {
       resolve({ ws, firstMsg: JSON.parse(data.toString()) });
     });
