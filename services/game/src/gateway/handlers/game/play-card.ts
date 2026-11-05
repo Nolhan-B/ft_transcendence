@@ -4,6 +4,7 @@ import {
   advanceToNextPlayer,
   drawCardsForPlayer,
 } from "../../../engine/game-state.js";
+import { scheduleBotTurnIfNeeded } from "./bot-turn.js";
 
 export async function handlePlayCard(
   ctx: GatewayContext,
@@ -82,5 +83,10 @@ export async function handlePlayCard(
     return;
   }
 
-  ctx.startTurnTimer(game.id);
+  scheduleBotTurnIfNeeded(ctx, updatedState, updatedState.id);
+
+  const nextPlayer = updatedState.players.find((p) => p.isCurrentTurn);
+  if (!nextPlayer?.userId.startsWith("bot_")) {
+    ctx.startTurnTimer(game.id);
+  }
 }
