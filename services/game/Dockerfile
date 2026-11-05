@@ -6,15 +6,14 @@ COPY package*.json ./
 COPY shared/package*.json ./shared/
 COPY services/game/package*.json ./services/game/
 
-RUN npm install --workspace=game-service --workspace=shared
+RUN --mount=type=cache,target=/root/.npm \
+    npm install --workspace=game-service --workspace=shared
 
 COPY shared ./shared
-RUN cd shared && npm run build
+RUN --mount=type=cache,target=/root/.npm \
+    cd shared && npm run build
 
-COPY shared/prisma ./shared/prisma
 COPY services/game/prisma* ./services/game/
-
-RUN npx --workspace=game-service prisma generate --schema=/app/shared/prisma/schema.prisma
 
 FROM base AS dev
 ENV NODE_ENV=development
