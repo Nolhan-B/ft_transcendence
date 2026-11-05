@@ -8,6 +8,7 @@ import {
 import { InternalGameState } from "../engine/game-state.js";
 import { Room } from "../managers/room.manager.js";
 import type { RoomInfo } from "shared";
+import { handleRemoveBot } from "./handlers/room/add-bot.js";
 
 export function sendError(socket: WebSocket, message: string): void {
   socket.send(JSON.stringify({ type: "error", message }));
@@ -99,6 +100,13 @@ export function validateMessage(raw: unknown): ClientMessage | null {
       break;
     case "update_room":
       if (typeof msg.roomCode !== "string" || typeof msg.settings !== "object")
+        return null;
+      break;
+    case "add_bot":
+      if (typeof msg.roomCode !== "string") return null;
+      break;
+    case "remove_bot":
+      if (typeof msg.roomCode !== "string" || typeof msg.botId !== "string")
         return null;
       break;
     default:

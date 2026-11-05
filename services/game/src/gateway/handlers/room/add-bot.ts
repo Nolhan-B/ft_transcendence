@@ -8,7 +8,7 @@ export function handleAddBot(ctx: GatewayContext, msg: { roomCode: string }) {
   if (room.leaderId !== ctx.userId)
     return ctx.sendError(ctx.socket, "Only the owner can add bots");
 
-  if (room.maxPlayers <= room.players.length + 1)
+  if (room.players.length >= room.maxPlayers)
     return ctx.sendError(
       ctx.socket,
       "Max player capacity has already been reached for this room",

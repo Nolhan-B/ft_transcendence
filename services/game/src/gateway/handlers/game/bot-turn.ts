@@ -28,14 +28,15 @@ export function scheduleBotTurnIfNeeded(
         (p) => p.isCurrentTurn === true,
       )!;
 
-      ctx.userId = botPlayer.userId;
+      // Copie du ctx pour le bot : le ctx de l'humain n'est jamais modif
+      const botCtx: GatewayContext = { ...ctx, userId: botPlayer.userId };
 
       if (gameState.lastWildDraw4) {
         if (shouldChallengeBluff(botPlayer.hand, gameState.currentColor)) {
-          handleChallengeBluff(ctx, { gameId: gameId });
+          handleChallengeBluff(botCtx, { gameId: gameId });
           return;
         }
-        handleAcceptWildDraw4(ctx, { gameId: gameId });
+        handleAcceptWildDraw4(botCtx, { gameId: gameId });
         return;
       }
 
@@ -48,13 +49,13 @@ export function scheduleBotTurnIfNeeded(
       );
 
       if (!cardToPlay) {
-        handleDrawCard(ctx, { gameId: gameId });
+        handleDrawCard(botCtx, { gameId: gameId });
         return;
       }
 
       switch (cardToPlay.value) {
         case "7": {
-          handlePlayCard(ctx, {
+          handlePlayCard(botCtx, {
             gameId: gameId,
             cardId: cardToPlay.id,
             targetUserId: chooseSwapTarget(
@@ -68,7 +69,7 @@ export function scheduleBotTurnIfNeeded(
         }
         case "wild":
         case "wild_draw4": {
-          handlePlayCard(ctx, {
+          handlePlayCard(botCtx, {
             gameId: gameId,
             cardId: cardToPlay.id,
             chosenColor: chooseColor(botPlayer.hand),
@@ -76,7 +77,7 @@ export function scheduleBotTurnIfNeeded(
           break;
         }
         default: {
-          handlePlayCard(ctx, { gameId: gameId, cardId: cardToPlay.id });
+          handlePlayCard(botCtx, { gameId: gameId, cardId: cardToPlay.id });
           break;
         }
       }
