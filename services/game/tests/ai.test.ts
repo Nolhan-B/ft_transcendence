@@ -5,7 +5,7 @@ import {
   shouldCallUno,
   chooseSwapTarget,
 } from "../src/engine/ai.js";
-import type { Card, CardColor, StackingRule } from "shared";
+import type { Card } from "shared";
 
 let passed = 0;
 let failed = 0;
