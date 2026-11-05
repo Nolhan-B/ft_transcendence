@@ -55,3 +55,9 @@ signup.json
 gateway/ssl/
 *.key
 *.crt
+
+.docs/
+transcendence.crt
+transcendence.key
+
+docs

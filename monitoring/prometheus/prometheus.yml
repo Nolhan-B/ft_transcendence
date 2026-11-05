@@ -1,0 +1,24 @@
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+scrape_configs:
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  - job_name: "auth-service"
+    static_configs:
+      - targets: ["auth:3001"]
+
+  - job_name: "game-service"
+    static_configs:
+      - targets: ["game:3002"]
+
+  - job_name: "chat-service"
+    static_configs:
+      - targets: ["chat:3003"]
+
+  - job_name: "user-service"
+    static_configs:
+      - targets: ["user:3004"]

@@ -9,7 +9,11 @@
     "build": "npx --yes prisma@7.10.0 generate && tsc"
   },
   "devDependencies": {
+    "fastify": "^5.12.8",
     "prisma": "^7.10.0",
     "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "prom-client": "^15.1.3"
   }
 }
