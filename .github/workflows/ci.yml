@@ -29,11 +29,8 @@ jobs:
       - name: Compiling shared
         run: npm --prefix shared run build
 
-      - name: Run ESLint
+      - name: Run ESLint & Prettier
         run: npm run lint
-
-      - name: Prettier Check
-        run: npx prettier --check .
 
       - name: Risk Audit
         run: npm audit --audit-level=high
@@ -41,6 +38,15 @@ jobs:
 
       - name: Run Game engine tests
         run: npm run test-game
+
+      - name: Run AI unit tests
+        run: npm run test-ai
+
+      - name: Run bot integration tests
+        run: npm run test-ai-e2e
+
+      - name: Run reconnect integration tests
+        run: npm run test-reconnect
 
   security:
     name: Check Secrets
@@ -76,12 +82,10 @@ jobs:
           chmod 644 gateway/ssl/transcendence.crt
 
       - name: Build Docker images
-        run: |
-          docker compose build
+        run: docker compose build
 
       - name: Start Docker containers
-        run: |
-          docker compose up -d
+        run: docker compose up -d
 
       - name: Wait for services to be healthy
         run: |
@@ -93,6 +97,11 @@ jobs:
             done
           '
           echo "All services are up and healthy!"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
 
       - name: Install dependencies
         run: npm ci
@@ -106,12 +115,6 @@ jobs:
       - name: Run Room integration tests
         run: npm run test-rooms
 
-      - name: Run ai unitary tests
-        run: npm run test-ai
-
-      - name : Run ai e2e tests
-        run: npm run test-ai-e2e
-
       - name: Run E2E Smoke & Route Tests
         run: npm run test-e2e
 
@@ -123,10 +126,8 @@ jobs:
 
       - name: Dump Docker logs on failure
         if: failure()
-        run: |
-          docker compose logs
+        run: docker compose logs
 
       - name: Stop containers
         if: always()
-        run: |
-          docker compose down -v
+        run: docker compose down -v

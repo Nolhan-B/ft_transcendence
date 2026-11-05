@@ -66,7 +66,7 @@ const turnTimers: Map<string, NodeJS.Timeout> = new Map();
 const afkCounts: Map<string, number> = new Map();
 
 const disconnectTimers: Map<string, NodeJS.Timeout> = new Map();
-const RECONNECT_GRACE_MS = 30000;
+const RECONNECT_GRACE_MS = Number(process.env.RECONNECT_GRACE_MS) || 30000;
 
 export default async function gameGateway(fastify: FastifyInstance) {
   const manager = fastify.gameManager;

@@ -8,7 +8,6 @@ import {
 import { InternalGameState } from "../engine/game-state.js";
 import { Room } from "../managers/room.manager.js";
 import type { RoomInfo } from "shared";
-import { handleRemoveBot } from "./handlers/room/add-bot.js";
 
 export function sendError(socket: WebSocket, message: string): void {
   socket.send(JSON.stringify({ type: "error", message }));

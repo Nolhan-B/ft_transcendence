@@ -8,10 +8,12 @@
     "test-rooms": "npx tsx services/game/tests/rooms.test.ts",
     "test-ai": "npx tsx services/game/tests/ai.test.ts",
     "test-ai-e2e": "npx tsx services/game/tests/e2e-bot.test.ts",
+    "test-reconnect": "npx tsx services/game/tests/e2e-reconnect.test.ts",
+    "test-game-all": "npm run test-game && npm run test-game-integration && npm run test-rooms && npm run test-ai && npm run test-ai-e2e && npm run test-reconnect",
     "test-api": "bash ./.github/scripts/api_test.sh",
     "test-e2e": "bash ./.github/scripts/e2e_test.sh",
     "test-chat": "node ./.github/scripts/chat_test.js",
-    "test-all": "npm run test-api && npm run test-e2e && npm run test-game && npm run lint && npm run test-chat && npm run test-game-integration && npm run test-game && npm run test-rooms && npm run test-ai"
+    "test-all": "npm run lint && npm run test-game-all && npm run test-chat && npm run test-api && npm run test-e2e"
   },
   "workspaces": [
     "services/*",
