@@ -58,14 +58,15 @@ export class RoomManager {
     const room = this.getRoom(code);
     if (!room) return;
 
-    if (room.players.length === 1) {
+    room.players = room.players.filter((p) => p.id !== userId);
+
+    const humans = room.players.filter((p) => !p.id.startsWith("bot_"));
+    if (humans.length === 0) {
       this.removeRoom(code);
       return;
     }
 
-    room.players = room.players.filter((p) => p.id !== userId);
-
-    if (room.leaderId === userId) room.leaderId = room.players[0].id;
+    if (room.leaderId === userId) room.leaderId = humans[0].id;
   }
 
   joinRoom(
