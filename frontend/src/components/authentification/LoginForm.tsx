@@ -1,28 +1,39 @@
 import React, { useState } from "react";
 import { useLogin } from "../../hooks/auth/useLogin";
+import { useNavigate } from "react-router-dom";
 
 export function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const { submit, loading, error } = useLogin();
+  const navigate = useNavigate();
 
-  function handleSubmit(e: React.FormEvent) {
-    console.log("logging in...")
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault(); // Anti browser reloading
-    submit({email, password});
+    const success = await submit({ email, password });
+    if (success) navigate("/");
   }
 
   return (
     <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
-      {
-        error && (
-          <div role="alert" className="alert alert-error">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 shrink-0 stroke-current" fill="none" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span>{error}</span>
-          </div>)
-      }
+      {error && (
+        <div role="alert" className="alert alert-error">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-6 w-6 shrink-0 stroke-current"
+            fill="none"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+              d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
+          </svg>
+          <span>{error}</span>
+        </div>
+      )}
 
       <div className="flex flex-col gap-3">
         <label className="floating-label">
@@ -45,11 +56,20 @@ export function LoginForm() {
         </label>
       </div>
       <div className="flex gap-3">
-        <button type="submit" disabled={loading} className="btn flex-1 btn-neutral">
-          {loading && (<span className="loading loading-spinner loading-xs"></span>)}
-          Login
+        <button
+          type="submit"
+          disabled={loading}
+          className="btn flex-1 btn-neutral"
+        >
+          {loading && (
+            <span className="loading loading-spinner loading-xs"></span>
+          )}
+          Sign-in
         </button>
-        <button className="btn flex-1 bg-white text-black border-[#e5e5e5]">
+        <button
+          type="button"
+          className="btn flex-1 bg-white text-black border-[#e5e5e5]"
+        >
           <svg
             aria-label="Google logo"
             width="16"
