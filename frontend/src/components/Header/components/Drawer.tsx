@@ -38,7 +38,7 @@ export function Drawer() {
           aria-label="close sidebar"
           className="drawer-overlay"
         ></label>
-        <ul className="menu bg-base-200 min-h-full w-80 p-4">
+        <ul className="menu bg-base-200 min-h-full w-80 p-4 gap-3">
           {/* Sidebar content here */}
           <li>
             <Link to="/home">{HOME_PAGE_TITLE}</Link>
@@ -58,8 +58,12 @@ export function Drawer() {
           <li>
             <Link to="/terms">{TERMS_PAGE_TITLE}</Link>
           </li>
+          <li>
+            <button className="btn btn-soft btn-error">Disconnect</button>
+          </li>
         </ul>
       </div>
     </div>
   );
 }
+

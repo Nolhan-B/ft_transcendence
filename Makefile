@@ -15,11 +15,12 @@ install:
 build:
 	docker compose build --no-cache
 
-up:
+up: install
 	docker compose up -d --build
 
 down:
 	docker compose down
 
+# node --version 22.x needed
 lint:
 	npm run lint
