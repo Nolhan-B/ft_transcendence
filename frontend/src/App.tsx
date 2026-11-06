@@ -1,9 +1,7 @@
-
-
 export function App() {
-    return (
-        <div>
-            <p>Welcome to transcendence.</p>
-        </div>
-    );
+  return (
+    <div>
+      <p>Welcome to transcendence.</p>
+    </div>
+  );
 }

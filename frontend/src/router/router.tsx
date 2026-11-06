@@ -10,10 +10,10 @@ function Router() {
     <Routes>
       {/* Default layout */}
       <Route element={<MainLayout />} path="/">
-        <Route path='/home' element={<HomePage/>} />
+        <Route path="/home" element={<HomePage />} />
       </Route>
       <Route element={<AuthLayout />} path="/">
-        <Route path='/auth' element={<AuthPage/>} />
+        <Route path="/auth" element={<AuthPage />} />
       </Route>
     </Routes>
   );

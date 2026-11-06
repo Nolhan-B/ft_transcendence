@@ -20,3 +20,6 @@ up:
 
 down:
 	docker compose down
+
+lint:
+	npm run lint
