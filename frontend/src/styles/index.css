@@ -1,13 +1,16 @@
 @import "tailwindcss";
 
 @plugin "daisyui" {
-    themes: false;
+    themes: dracula --default, synthwave;
+    /* themes: synthwave;
+    themes: synthwave; */
+
     /* don't ship the 30 built-in themes */
 }
 
 @plugin "daisyui/theme" {
     name: "uno";
-    default: true;
+    /* default: true; */
     color-scheme: light;
 
     /* surfaces */

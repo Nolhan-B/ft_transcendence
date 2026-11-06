@@ -12,11 +12,11 @@ install:
 	chmod 644 gateway/ssl/transcendence.crt
 	docker compose build
 
-rebuild:
-	docker compose build --no-cache frontend
+build:
+	docker compose build --no-cache
 
 up:
-	docker compose up
+	docker compose up -d --build
 
 down:
 	docker compose down
