@@ -2,7 +2,8 @@
   "name": "chat-service",
   "version": "1.0.0",
   "scripts": {
-    "dev": "npx prisma generate && tsx watch src/server.ts"
+    "dev": "npx prisma generate && tsx watch src/server.ts",
+    "build": "tsc"
   },
   "dependencies": {
     "@fastify/cookie": "^11.0.2",

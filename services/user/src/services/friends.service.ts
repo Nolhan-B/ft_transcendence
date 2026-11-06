@@ -1,4 +1,4 @@
-import { PrismaClient } from "../generated/prisma/client.js";
+import { PrismaClient } from "shared";
 import type {
   Profile,
   Friendship,
@@ -78,7 +78,7 @@ export async function acceptFriendRequest(
     id: updatedFriendship.id,
     userId: updatedFriendship.userId,
     friendId: updatedFriendship.friendId,
-    status: updatedFriendship.status,
+    status: updatedFriendship.status as FriendshipStatus,
     createdAt: updatedFriendship.createdAt.toISOString(),
   };
 }

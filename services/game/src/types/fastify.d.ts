@@ -1,4 +1,4 @@
-import { PrismaClient } from "../../../../shared/src/generated/prisma/client.js";
+import { PrismaClient } from "shared";
 import { GameManager } from "../managers/game.manager.js";
 import "@fastify/jwt";
 import { RoomManager } from "../managers/room.manager.ts";
