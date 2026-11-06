@@ -1,3 +1,5 @@
+import { Link } from "react-router-dom";
+import { AUTH_PAGE_TITLE, GAME_PAGE_TITLE, HOME_PAGE_TITLE, LEGAL_PAGE_TITLE, PROFILE_PAGE_TITLE, TERMS_PAGE_TITLE } from "../../../constants";
 
 export function Drawer() {
   return (
@@ -12,9 +14,13 @@ export function Drawer() {
     <div className="drawer-side">
         <label htmlFor="my-drawer-1" aria-label="close sidebar" className="drawer-overlay"></label>
         <ul className="menu bg-base-200 min-h-full w-80 p-4">
-        {/* Sidebar content here */}
-        <li><a>WIP</a></li>
-        <li><a>WIP</a></li>
+            {/* Sidebar content here */}
+            <li><Link to='/home'>{HOME_PAGE_TITLE}</Link></li>
+            <li><Link to='/auth'>{AUTH_PAGE_TITLE}</Link></li>
+            <li><Link to='/game'>{GAME_PAGE_TITLE}</Link></li>
+            <li><Link to='/legal'>{LEGAL_PAGE_TITLE}</Link></li>
+            <li><Link to='/profile'>{PROFILE_PAGE_TITLE}</Link></li>
+            <li><Link to='/terms'>{TERMS_PAGE_TITLE}</Link></li>
         </ul>
     </div>
     </div>
