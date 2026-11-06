@@ -381,8 +381,11 @@ const tests = [
       );
 
       let updates = 0;
+      let errors = 0;
       const counter = (data: any) => {
-        if (JSON.parse(data.toString()).type === "game_updated") updates++;
+        const msg = JSON.parse(data.toString());
+        if (msg.type === "game_updated") updates++;
+        if (msg.type === "error") errors++;
       };
       ws.on("message", counter);
 
@@ -423,6 +426,10 @@ const tests = [
       ]);
 
       assert(updates > 0, "La partie doit avoir généré des game_updated");
+      assert(
+        errors === 0,
+        `L'humain ne doit recevoir aucune erreur, en a reçu ${errors}`,
+      );
       assert(
         turns < maxTurns,
         `La partie ne doit pas dépasser ${maxTurns} tours humains`,

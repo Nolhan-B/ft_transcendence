@@ -23,20 +23,27 @@ export function scheduleBotTurnIfNeeded(
   if (gameState.status === GameStatus.FINISHED) return;
 
   setTimeout(
-    () => {
+    async () => {
       const botPlayer = gameState.players.find(
         (p) => p.isCurrentTurn === true,
       )!;
 
-      // Copie du ctx pour le bot : le ctx de l'humain n'est jamais modif
-      const botCtx: GatewayContext = { ...ctx, userId: botPlayer.userId };
+      // Les erreurs du bot ne partent pas chez l'humain : on note juste l'échec
+      let failed = false;
+      const botCtx: GatewayContext = {
+        ...ctx,
+        userId: botPlayer.userId,
+        sendError: () => {
+          failed = true;
+        },
+      };
 
       if (gameState.lastWildDraw4) {
         if (shouldChallengeBluff(botPlayer.hand, gameState.currentColor)) {
-          handleChallengeBluff(botCtx, { gameId: gameId });
-          return;
+          await handleChallengeBluff(botCtx, { gameId });
+        } else {
+          handleAcceptWildDraw4(botCtx, { gameId });
         }
-        handleAcceptWildDraw4(botCtx, { gameId: gameId });
         return;
       }
 
@@ -48,38 +55,43 @@ export function scheduleBotTurnIfNeeded(
         gameState.settings.stacking,
       );
 
-      if (!cardToPlay) {
-        handleDrawCard(botCtx, { gameId: gameId });
-        return;
+      if (cardToPlay) {
+        switch (cardToPlay.value) {
+          case "7":
+            await handlePlayCard(botCtx, {
+              gameId,
+              cardId: cardToPlay.id,
+              targetUserId: chooseSwapTarget(
+                gameState.players.map((p) => ({
+                  userId: p.userId,
+                  handCount: p.hand.length,
+                })),
+                botPlayer.userId,
+              ),
+            });
+            break;
+          case "wild":
+          case "wild_draw4":
+            await handlePlayCard(botCtx, {
+              gameId,
+              cardId: cardToPlay.id,
+              chosenColor: chooseColor(botPlayer.hand),
+            });
+            break;
+          default:
+            await handlePlayCard(botCtx, { gameId, cardId: cardToPlay.id });
+            break;
+        }
+        if (!failed) return;
+        // Coup refusé : on pioche à la place
+        failed = false;
       }
 
-      switch (cardToPlay.value) {
-        case "7": {
-          handlePlayCard(botCtx, {
-            gameId: gameId,
-            cardId: cardToPlay.id,
-            targetUserId: chooseSwapTarget(
-              gameState.players.map((p) => {
-                return { userId: p.userId, handCount: p.hand.length };
-              }),
-              botPlayer.userId,
-            ),
-          });
-          break;
-        }
-        case "wild":
-        case "wild_draw4": {
-          handlePlayCard(botCtx, {
-            gameId: gameId,
-            cardId: cardToPlay.id,
-            chosenColor: chooseColor(botPlayer.hand),
-          });
-          break;
-        }
-        default: {
-          handlePlayCard(botCtx, { gameId: gameId, cardId: cardToPlay.id });
-          break;
-        }
+      await handleDrawCard(botCtx, { gameId });
+      if (failed) {
+        console.error(
+          `[bot-turn] ${botPlayer.userId} bloqué dans la partie ${gameId}`,
+        );
       }
     },
     500 + Math.random() * 1000,
