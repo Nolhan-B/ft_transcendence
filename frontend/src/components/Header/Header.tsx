@@ -1,5 +1,6 @@
 export type HeaderProps = {variant: "simple" | "default"}
 
+import { Drawer } from "./components/Drawer";
 import { SiteTitle } from "./components/SiteTitle";
 
 export function Header({ variant }: HeaderProps) {
@@ -13,9 +14,7 @@ export function Header({ variant }: HeaderProps) {
     return (
         <div className="navbar bg-base-200 shadow-sm">
             <div className="flex-none">
-                <button className="btn btn-square btn-ghost">
-                <svg aria-label="Menu" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" className="inline-block h-5 w-5 stroke-current"> <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"></path> </svg>
-                </button>
+                <Drawer />
             </div>
             <div className="flex-1">
                 <SiteTitle />
