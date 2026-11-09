@@ -24,7 +24,33 @@ ENV NODE_ENV=development
 COPY services/user ./services/user
 
 WORKDIR /app/services/user
+EXPOSE 3004
+CMD ["npm", "run", "dev"]
 
+# 3. Builder stage: compile TypeScript and prune dev dependencies
+FROM base AS builder
+COPY services/user ./services/user
+
+WORKDIR /app
+RUN npm run build --workspace=user-service
+RUN npm prune --omit=dev --workspace=user-service --workspace=shared
+
+# 4. Production stage: minimal runtime footprint
+FROM node:22-alpine AS prod
+WORKDIR /app/services/user
+ENV NODE_ENV=production
+
+RUN apk add --no-cache wget openssl
+
+# Copy hoisted dependencies and compiled artifacts
+COPY --chown=node:node package*.json /app/
+COPY --chown=node:node --from=builder /app/node_modules /app/node_modules
+COPY --chown=node:node --from=builder /app/shared/package*.json /app/shared/
+COPY --chown=node:node --from=builder /app/shared/dist /app/shared/dist
+COPY --chown=node:node --from=builder /app/services/user/package*.json ./
+COPY --chown=node:node --from=builder /app/services/user/dist ./dist
+
+USER node
 EXPOSE 3004
 
-CMD ["npm", "run", "dev"]
+CMD ["node", "dist/index.js"]

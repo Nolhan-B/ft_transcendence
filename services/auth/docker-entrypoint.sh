@@ -9,7 +9,6 @@ while ! nc -z postgres 5432; do
 done
 echo "[auth] PostgreSQL is ready!"
 
-# Synchronisation avec le chemin relatif
 echo "[auth] Pushing Prisma schema to PostgreSQL..."
 [ -f /run/secrets/db_password ] || { echo "[auth] ERROR: Missing secret"; exit 1; }
 npx prisma db push --config=./prisma7.config.ts --schema=/app/shared/prisma/schema.prisma --accept-data-loss

@@ -1,4 +1,4 @@
-import type { PrismaClient } from "../../../../shared/src/generated/prisma/client.js";
+import type { PrismaClient } from "shared";
 
 declare module "fastify" {
   interface FastifyInstance {
