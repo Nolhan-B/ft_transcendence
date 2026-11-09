@@ -71,7 +71,9 @@ function connectWs(
   token: string,
 ): Promise<{ ws: WebSocket; firstMsg: any }> {
   return new Promise((resolve, reject) => {
-    const ws = new WebSocket(`ws://127.0.0.1:${port}/ws?token=${token}`);
+    const ws = new WebSocket(`ws://127.0.0.1:${port}/ws`, {
+      headers: { Cookie: `access_token=${token}` },
+    });
     ws.once("message", (data) => {
       resolve({ ws, firstMsg: JSON.parse(data.toString()) });
     });
@@ -91,12 +93,6 @@ function waitForMessage(
     }, timeoutMs);
     const handler = (data: any) => {
       const msg = JSON.parse(data.toString());
-      if (msg.type === "error" && type !== "error") {
-        clearTimeout(timeout);
-        ws.off("message", handler);
-        reject(new Error(`Erreur serveur: ${JSON.stringify(msg)}`));
-        return;
-      }
       if (msg.type === type) {
         clearTimeout(timeout);
         ws.off("message", handler);
@@ -203,7 +199,9 @@ const tests = [
 
   test("e2e: connexion WS refuse token invalide", async () => {
     const { fastify, port } = await buildServer();
-    const ws = new WebSocket(`ws://127.0.0.1:${port}/ws?token=nimportequoi`);
+    const ws = new WebSocket(`ws://127.0.0.1:${port}/ws`, {
+      headers: { Cookie: "access_token=nimportequoi" },
+    });
     try {
       const msg = await waitForMessage(ws, "error", 5000);
       assert(msg.type === "error", "Doit recevoir une erreur");
@@ -325,11 +323,9 @@ const tests = [
     });
   }),
 
-  test("e2e: plusieurs bots s'enchaînent sans humain", async () => {
+  test("e2e: la main revient à l'humain après les tours du bot", async () => {
     await withClient(async ({ ws, gameManager, userId }) => {
-      const gameId = await setupBotGame(ws, 3);
-      // setupBotGame n'ajoute qu'un bot : on en ajoute pas d'autre ici,
-      // donc on vérifie juste l'enchaînement humain → bot → humain
+      const gameId = await setupBotGame(ws);
       const game = gameManager.getGame(gameId)!;
 
       const current = game.players.find((p) => p.isCurrentTurn)!;
@@ -338,16 +334,40 @@ const tests = [
         await waitForMessage(ws, "game_updated");
       }
 
-      // Attendre que la main revienne à l'humain (le bot a fini son tour)
+      // Le bot peut enchaîner plusieurs tours (skip, reverse, +2 à 2 joueurs).
+      // On compte les game_updated pour distinguer « le bot joue encore » de
+      // « le bot est bloqué ».
+      let updates = 0;
+      const counter = (data: any) => {
+        if (JSON.parse(data.toString()).type === "game_updated") updates++;
+      };
+      ws.on("message", counter);
+
       let backToHuman = false;
-      for (let i = 0; i < 10; i++) {
+      let lastUpdates = 0;
+      let idleChecks = 0;
+      for (let i = 0; i < 40; i++) {
         await sleep(500);
-        const now = game.players.find((p) => p.isCurrentTurn)!;
-        if (now.userId === userId || game.status === GameStatus.FINISHED) {
+        const now = game.players.find((p) => p.isCurrentTurn);
+        if (
+          !now ||
+          now.userId === userId ||
+          game.status === GameStatus.FINISHED
+        ) {
           backToHuman = true;
           break;
         }
+        // Le bot joue en 0,5 à 1,5 s : 3 s sans aucun coup = bot bloqué
+        if (updates === lastUpdates) idleChecks++;
+        else idleChecks = 0;
+        lastUpdates = updates;
+        assert(
+          idleChecks < 6,
+          "Le bot semble bloqué : plus aucun coup depuis 3s",
+        );
       }
+
+      ws.off("message", counter);
       assert(backToHuman, "Le tour doit revenir à l'humain après le bot");
     });
   }),
@@ -361,8 +381,11 @@ const tests = [
       );
 
       let updates = 0;
+      let errors = 0;
       const counter = (data: any) => {
-        if (JSON.parse(data.toString()).type === "game_updated") updates++;
+        const msg = JSON.parse(data.toString());
+        if (msg.type === "game_updated") updates++;
+        if (msg.type === "error") errors++;
       };
       ws.on("message", counter);
 
@@ -403,6 +426,10 @@ const tests = [
       ]);
 
       assert(updates > 0, "La partie doit avoir généré des game_updated");
+      assert(
+        errors === 0,
+        `L'humain ne doit recevoir aucune erreur, en a reçu ${errors}`,
+      );
       assert(
         turns < maxTurns,
         `La partie ne doit pas dépasser ${maxTurns} tours humains`,

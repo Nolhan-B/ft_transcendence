@@ -204,7 +204,7 @@ export default async function gameGateway(fastify: FastifyInstance) {
   }
 
   fastify.get("/ws", { websocket: true }, async (socket, request) => {
-    const token = (request.query as { token?: string }).token;
+    const token = request.cookies.access_token;
     if (!token) {
       sendError(socket, "Unauthorized");
       socket.close();

@@ -12,8 +12,15 @@ install:
 	chmod 644 gateway/ssl/transcendence.crt
 	docker compose build
 
-up:
-	docker compose up
+build:
+	docker compose build --no-cache
+
+up: install
+	docker compose up -d --build
 
 down:
 	docker compose down
+
+# node --version 22.x needed
+lint:
+	npm run lint
