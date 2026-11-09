@@ -47,7 +47,7 @@ export function RegisterForm() {
     }
     setFormError(null);
     const status = await submit({ email, username, password });
-    if (status) navigate("/");
+    if (status) navigate("/home");
   }
 
   return (
