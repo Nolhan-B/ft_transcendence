@@ -17,20 +17,20 @@
   --color-base-content: #cdd6f4;
 
   /* brand (Couleurs UNO vives) */
-  --color-primary: #ff5555;          /* Rouge UNO */
+  --color-primary: #ff5555; /* Rouge UNO */
   --color-primary-content: #ffffff;
-  --color-secondary: #5555ff;        /* Bleu UNO */
+  --color-secondary: #5555ff; /* Bleu UNO */
   --color-secondary-content: #ffffff;
-  --color-accent: #ffaa00;           /* Jaune UNO */
+  --color-accent: #ffaa00; /* Jaune UNO */
   --color-accent-content: #1e1e2e;
   --color-neutral: #313244;
   --color-neutral-content: #cdd6f4;
 
   /* feedback */
-  --color-info: #5555ff;             /* Bleu */
-  --color-success: #55aa55;          /* Vert UNO */
-  --color-warning: #ffaa00;          /* Jaune */
-  --color-error: #ff5555;            /* Rouge */
+  --color-info: #5555ff; /* Bleu */
+  --color-success: #55aa55; /* Vert UNO */
+  --color-warning: #ffaa00; /* Jaune */
+  --color-error: #ff5555; /* Rouge */
 
   /* shape (Bordures marquées style Neo-Brutalism) */
   --radius-selector: 0.75rem;
