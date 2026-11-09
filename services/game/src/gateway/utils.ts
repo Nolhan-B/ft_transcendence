@@ -44,6 +44,10 @@ export function filterStateForPlayer(
   };
 }
 
+export function filterStateForSpectator(game: InternalGameState): GameState {
+  return filterStateForPlayer(game, "");
+}
+
 export function toRoomInfo(room: Room): RoomInfo {
   return {
     code: room.code,
@@ -107,6 +111,12 @@ export function validateMessage(raw: unknown): ClientMessage | null {
     case "remove_bot":
       if (typeof msg.roomCode !== "string" || typeof msg.botId !== "string")
         return null;
+      break;
+    case "challenge_bluff":
+    case "accept_wild_draw4":
+    case "spectate_game":
+    case "leave_spectate":
+      if (typeof msg.gameId !== "string") return null;
       break;
     default:
       return null;

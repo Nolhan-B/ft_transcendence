@@ -5,3 +5,5 @@ export { handleCallUno } from "./call-uno.js";
 export { handleCatchUno } from "./catch-uno.js";
 export { handleChallengeBluff } from "./challenge-bluff.js";
 export { handleAcceptWildDraw4 } from "./accept-wild-draw4.js";
+export { handleSpectateGame } from "./spectate-game.js";
+export { handleLeaveSpectate } from "./leave-spectate.js";
