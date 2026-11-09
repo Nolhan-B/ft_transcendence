@@ -85,4 +85,4 @@ WORKDIR /app/services/game
 EXPOSE 3002
 
 ENTRYPOINT ["/usr/bin/dumb-init", "--", "/usr/local/bin/docker-entrypoint.sh"]
-CMD ["node", "dist/index.js"]
+CMD ["node", "dist/server.js"]

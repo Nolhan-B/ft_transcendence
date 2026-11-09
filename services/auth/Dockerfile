@@ -59,6 +59,7 @@ COPY --chown=node:node --from=builder /app/node_modules /app/node_modules
 COPY --chown=node:node --from=builder /app/shared/package*.json /app/shared/
 COPY --chown=node:node --from=builder /app/shared/dist /app/shared/dist
 COPY --chown=node:node --from=builder /app/services/auth/package*.json ./
+COPY --chown=node:node --from=builder /app/shared/prisma /app/shared/prisma
 COPY --chown=node:node --from=builder /app/services/auth/dist ./dist
 COPY --chown=node:node --from=builder /app/services/auth/prisma* ./
 
