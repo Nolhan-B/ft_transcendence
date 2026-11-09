@@ -8,6 +8,7 @@ import {
   validateMessage,
   filterStateForPlayer,
   toRoomInfo,
+  filterStateForSpectator,
 } from "./utils.js";
 import {
   handleJoinGame,
@@ -17,6 +18,8 @@ import {
   handleCatchUno,
   handleChallengeBluff,
   handleAcceptWildDraw4,
+  handleSpectateGame,
+  handleLeaveSpectate,
 } from "./handlers/game/index.js";
 import {
   handleCreateRoom,
@@ -65,6 +68,11 @@ const bluffTimers: Map<string, NodeJS.Timeout> = new Map();
 const turnTimers: Map<string, NodeJS.Timeout> = new Map();
 const afkCounts: Map<string, number> = new Map();
 
+const spectators: Map<
+  string,
+  Set<{ socket: WebSocket; userId: string }>
+> = new Map();
+
 const disconnectTimers: Map<string, NodeJS.Timeout> = new Map();
 const RECONNECT_GRACE_MS = Number(process.env.RECONNECT_GRACE_MS) || 30000;
 
@@ -77,12 +85,23 @@ export default async function gameGateway(fastify: FastifyInstance) {
     event: ServerEvent,
     excludeUserId?: string,
   ): void {
-    const room = rooms.get(gameId);
-    if (!room) return;
     const data = JSON.stringify(event);
-    for (const client of room) {
-      if (client.userId !== excludeUserId) {
-        client.socket.send(data);
+
+    const room = rooms.get(gameId);
+    if (room) {
+      for (const client of room) {
+        if (client.userId !== excludeUserId) {
+          client.socket.send(data);
+        }
+      }
+    }
+
+    const watchers = spectators.get(gameId);
+    if (watchers) {
+      for (const client of watchers) {
+        if (client.socket.readyState === WebSocket.OPEN) {
+          client.socket.send(data);
+        }
       }
     }
   }
@@ -92,12 +111,26 @@ export default async function gameGateway(fastify: FastifyInstance) {
     state: InternalGameState,
   ): void {
     const room = rooms.get(gameId);
-    if (!room) return;
-    for (const client of room) {
-      const playerGameState = filterStateForPlayer(state, client.userId);
-      client.socket.send(
-        JSON.stringify({ type: "game_updated", state: playerGameState }),
-      );
+    if (room) {
+      for (const client of room) {
+        const playerGameState = filterStateForPlayer(state, client.userId);
+        client.socket.send(
+          JSON.stringify({ type: "game_updated", state: playerGameState }),
+        );
+      }
+    }
+
+    const watchers = spectators.get(gameId);
+    if (watchers) {
+      const data = JSON.stringify({
+        type: "game_updated",
+        state: filterStateForSpectator(state),
+      });
+      for (const client of watchers) {
+        if (client.socket.readyState === WebSocket.OPEN) {
+          client.socket.send(data);
+        }
+      }
     }
   }
 
@@ -200,6 +233,7 @@ export default async function gameGateway(fastify: FastifyInstance) {
     chatLogs.delete(gameId);
     moveLogs.delete(gameId);
     rooms.delete(gameId);
+    spectators.delete(gameId);
     manager.removeGame(gameId);
   }
 
@@ -246,6 +280,7 @@ export default async function gameGateway(fastify: FastifyInstance) {
       turnTimers,
       afkCounts,
       disconnectTimers,
+      spectators,
       broadCastToRoom,
       broadCastStateToRoom,
       broadcastToRoomSockets,
@@ -316,10 +351,23 @@ export default async function gameGateway(fastify: FastifyInstance) {
         case "remove_bot":
           handleRemoveBot(ctx, message);
           break;
+        case "spectate_game":
+          handleSpectateGame(ctx, message);
+          break;
+        case "leave_spectate":
+          handleLeaveSpectate(ctx, message);
+          break;
       }
     });
 
     socket.on("close", async () => {
+      for (const [gameId, watchers] of spectators) {
+        for (const client of watchers) {
+          if (client.socket === socket) watchers.delete(client);
+        }
+        if (watchers.size === 0) spectators.delete(gameId);
+      }
+
       for (const [gameId, room] of rooms) {
         let found = false;
         for (const client of room) {
