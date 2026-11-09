@@ -1,1 +1,45 @@
 @import "tailwindcss";
+
+@plugin "daisyui" {
+  themes:
+    dracula --default,
+    synthwave;
+  /* themes: synthwave;
+    themes: synthwave; */
+
+  /* don't ship the 30 built-in themes */
+}
+
+@plugin "daisyui/theme" {
+  name: "uno";
+  /* default: true; */
+  color-scheme: light;
+
+  /* surfaces */
+  --color-base-100: #f3e7cc;
+  --color-base-200: #e9dcc0;
+  --color-base-300: #d9c9a6;
+  --color-base-content: #2b2118;
+
+  /* brand */
+  --color-primary: #c8372d;
+  --color-primary-content: #fff8ef;
+  --color-secondary: #1f6f5c;
+  --color-secondary-content: #fff8ef;
+  --color-accent: #d9a441;
+  --color-accent-content: #2b2118;
+  --color-neutral: #2b2118;
+  --color-neutral-content: #f3e7cc;
+
+  /* feedback */
+  --color-info: #2f6f9f;
+  --color-success: #3f8f4f;
+  --color-warning: #d9a441;
+  --color-error: #b02a22;
+
+  /* shape */
+  --radius-selector: 0.5rem;
+  --radius-field: 0.5rem;
+  --radius-box: 1rem;
+  --border: 2px;
+}
