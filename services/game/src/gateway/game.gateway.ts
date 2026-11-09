@@ -65,6 +65,11 @@ const bluffTimers: Map<string, NodeJS.Timeout> = new Map();
 const turnTimers: Map<string, NodeJS.Timeout> = new Map();
 const afkCounts: Map<string, number> = new Map();
 
+const spectators: Map<
+  string,
+  Set<{ socket: WebSocket; userId: string }>
+> = new Map();
+
 const disconnectTimers: Map<string, NodeJS.Timeout> = new Map();
 const RECONNECT_GRACE_MS = Number(process.env.RECONNECT_GRACE_MS) || 30000;
 
@@ -246,6 +251,7 @@ export default async function gameGateway(fastify: FastifyInstance) {
       turnTimers,
       afkCounts,
       disconnectTimers,
+      spectators,
       broadCastToRoom,
       broadCastStateToRoom,
       broadcastToRoomSockets,

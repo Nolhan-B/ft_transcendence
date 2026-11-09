@@ -34,6 +34,7 @@ export interface GatewayContext {
   turnTimers: Map<string, NodeJS.Timeout>;
   afkCounts: Map<string, number>;
   disconnectTimers: Map<string, NodeJS.Timeout>;
+  spectators: Map<string, Set<{ socket: WebSocket; userId: string }>>;
   broadCastToRoom: (
     gameId: string,
     event: ServerEvent,
