@@ -243,8 +243,14 @@ const tests = [
       const { gameId } = await setupHumanGame(server);
       const { started } = await spectate(server, gameId);
 
-      assert(started.state !== undefined, "spectate_started doit contenir un state");
-      assert(started.state.id === gameId, "Le state doit être celui de la partie");
+      assert(
+        started.state !== undefined,
+        "spectate_started doit contenir un state",
+      );
+      assert(
+        started.state.id === gameId,
+        "Le state doit être celui de la partie",
+      );
       assert(
         started.state.status === GameStatus.IN_PROGRESS,
         "La partie doit être en cours",
@@ -274,7 +280,10 @@ const tests = [
         const seen = started.state.players.find(
           (p: any) => p.userId === real.userId,
         );
-        assert(seen !== undefined, `Le joueur ${real.userId} doit être visible`);
+        assert(
+          seen !== undefined,
+          `Le joueur ${real.userId} doit être visible`,
+        );
         assert(
           seen.hand.length === real.hand.length,
           `Nombre de cartes faux pour ${real.userId} : ${seen.hand.length} au lieu de ${real.hand.length}`,
@@ -289,13 +298,18 @@ const tests = [
       const { started } = await spectate(server, gameId);
       const game = server.gameManager.getGame(gameId)!;
 
-      assert(started.state.topCard.id === game.topCard.id, "topCard doit être visible");
+      assert(
+        started.state.topCard.id === game.topCard.id,
+        "topCard doit être visible",
+      );
       assert(
         started.state.currentColor === game.currentColor,
         "currentColor doit être visible",
       );
       const current = game.players.find((p) => p.isCurrentTurn)!;
-      const seenCurrent = started.state.players.find((p: any) => p.isCurrentTurn);
+      const seenCurrent = started.state.players.find(
+        (p: any) => p.isCurrentTurn,
+      );
       assert(
         seenCurrent?.userId === current.userId,
         "Le joueur courant doit être visible",
@@ -311,7 +325,10 @@ const tests = [
       const s3 = await spectate(server, gameId);
 
       for (const s of [s1, s2, s3]) {
-        assert(s.started.state.id === gameId, "Chaque spectateur doit recevoir l'état");
+        assert(
+          s.started.state.id === gameId,
+          "Chaque spectateur doit recevoir l'état",
+        );
       }
     });
   }),
@@ -340,7 +357,10 @@ const tests = [
       const ws = await connectUser(server, uniqueUserId("watcher"));
       send(ws, { type: "spectate_game", gameId: "partie-qui-existe-pas" });
       const err = await waitForMessage(ws, "error");
-      assert(err.message === "Game not found", `Message inattendu : ${err.message}`);
+      assert(
+        err.message === "Game not found",
+        `Message inattendu : ${err.message}`,
+      );
     });
   }),
 
@@ -394,8 +414,14 @@ const tests = [
       send(ws, { type: "play_card", gameId, cardId: realCard.id });
       const err = await waitForMessage(ws, "error");
 
-      assert(err.message === "Invalid move", `Message inattendu : ${err.message}`);
-      assert(game.topCard.id === topBefore, "La carte du dessus ne doit pas changer");
+      assert(
+        err.message === "Invalid move",
+        `Message inattendu : ${err.message}`,
+      );
+      assert(
+        game.topCard.id === topBefore,
+        "La carte du dessus ne doit pas changer",
+      );
       assert(
         game.players[0].hand.some((c) => c.id === realCard.id),
         "La carte doit rester dans la main du joueur",
@@ -413,8 +439,14 @@ const tests = [
       send(ws, { type: "draw_card", gameId });
       const err = await waitForMessage(ws, "error");
 
-      assert(err.message === "Cannot draw card", `Message inattendu : ${err.message}`);
-      assert(game.drawPile.length === pileBefore, "La pioche ne doit pas changer");
+      assert(
+        err.message === "Cannot draw card",
+        `Message inattendu : ${err.message}`,
+      );
+      assert(
+        game.drawPile.length === pileBefore,
+        "La pioche ne doit pas changer",
+      );
     });
   }),
 
@@ -458,7 +490,10 @@ const tests = [
       send(wsA, { type: "draw_card", gameId });
       const msg = await update;
 
-      assert(msg.state.id === gameId, "La mise à jour doit concerner la partie");
+      assert(
+        msg.state.id === gameId,
+        "La mise à jour doit concerner la partie",
+      );
     });
   }),
 
@@ -530,7 +565,10 @@ const tests = [
 
       // Le bot joue en 0,5 à 1,5 s
       const botMove = await waitForMessage(ws, "game_updated", 3000);
-      assert(allHandsHidden(botMove.state), "La main du bot doit rester cachée");
+      assert(
+        allHandsHidden(botMove.state),
+        "La main du bot doit rester cachée",
+      );
     });
   }),
 
@@ -544,7 +582,9 @@ const tests = [
 
       const messages = collect(ws, 500);
       send(wsA, { type: "draw_card", gameId });
-      const received = (await messages).filter((m) => m.type === "game_updated");
+      const received = (await messages).filter(
+        (m) => m.type === "game_updated",
+      );
 
       assert(
         received.length === 1,
@@ -565,8 +605,14 @@ const tests = [
 
       const meA = mA.state.players.find((p: any) => p.userId === idA);
       const meB = mB.state.players.find((p: any) => p.userId === idB);
-      assert(meA.hand.every((c: any) => c.id !== ""), "A doit voir ses cartes");
-      assert(meB.hand.every((c: any) => c.id !== ""), "B doit voir ses cartes");
+      assert(
+        meA.hand.every((c: any) => c.id !== ""),
+        "A doit voir ses cartes",
+      );
+      assert(
+        meB.hand.every((c: any) => c.id !== ""),
+        "B doit voir ses cartes",
+      );
 
       const otherForA = mA.state.players.find((p: any) => p.userId === idB);
       assert(
@@ -587,6 +633,148 @@ const tests = [
       assert(
         !all.some((m) => m.type === "spectate_started"),
         "spectate_started ne doit être envoyé qu'au spectateur",
+      );
+    });
+  }),
+
+  // ---------------- Chat ----------------
+
+  test("chat: le spectateur lit les messages des joueurs", async () => {
+    await withServer(async (server) => {
+      const { wsA, idA, gameId } = await setupHumanGame(server);
+      const { ws } = await spectate(server, gameId);
+
+      const chat = waitForMessage(ws, "chat_message");
+      send(wsA, { type: "chat_message", gameId, content: "salut" });
+      const msg = await chat;
+
+      assert(msg.content === "salut", `Contenu inattendu : ${msg.content}`);
+      assert(msg.userId === idA, "Le message doit venir de A");
+      assert(
+        msg.username !== "",
+        "Le pseudo de l'expéditeur doit être présent",
+      );
+    });
+  }),
+
+  test("chat: le spectateur ne peut pas écrire", async () => {
+    await withServer(async (server) => {
+      const { wsA, wsB, gameId } = await setupHumanGame(server);
+      const { ws } = await spectate(server, gameId);
+
+      const msgsA = collect(wsA, 400);
+      const msgsB = collect(wsB, 400);
+      send(ws, { type: "chat_message", gameId, content: "je suis spectateur" });
+      const err = await waitForMessage(ws, "error");
+
+      assert(
+        err.message === "You are not part of this game",
+        `Message inattendu : ${err.message}`,
+      );
+      const all = [...(await msgsA), ...(await msgsB)];
+      assert(
+        !all.some((m) => m.type === "chat_message"),
+        "Les joueurs ne doivent pas recevoir le message du spectateur",
+      );
+    });
+  }),
+
+  test("chat: un utilisateur extérieur ne peut pas écrire", async () => {
+    await withServer(async (server) => {
+      const { wsA, gameId } = await setupHumanGame(server);
+      const outsider = await connectUser(server, uniqueUserId("outsider"));
+
+      const msgsA = collect(wsA, 400);
+      send(outsider, { type: "chat_message", gameId, content: "coucou" });
+      const err = await waitForMessage(outsider, "error");
+
+      assert(
+        err.message === "You are not part of this game",
+        `Message inattendu : ${err.message}`,
+      );
+      assert(
+        !(await msgsA).some((m) => m.type === "chat_message"),
+        "A ne doit pas recevoir le message d'un extérieur",
+      );
+    });
+  }),
+
+  test("chat: refuse un message vide", async () => {
+    await withServer(async (server) => {
+      const { wsA, gameId } = await setupHumanGame(server);
+      send(wsA, { type: "chat_message", gameId, content: "" });
+      const err = await waitForMessage(wsA, "error");
+      assert(
+        err.message === "Invalid message",
+        `Message inattendu : ${err.message}`,
+      );
+    });
+  }),
+
+  test("chat: refuse un message composé uniquement d'espaces", async () => {
+    await withServer(async (server) => {
+      const { wsA, gameId } = await setupHumanGame(server);
+      send(wsA, { type: "chat_message", gameId, content: "    \n\t  " });
+      const err = await waitForMessage(wsA, "error");
+      assert(
+        err.message === "Invalid message",
+        `Message inattendu : ${err.message}`,
+      );
+    });
+  }),
+
+  test("chat: refuse un message de plus de 500 caractères", async () => {
+    await withServer(async (server) => {
+      const { wsA, gameId } = await setupHumanGame(server);
+      send(wsA, { type: "chat_message", gameId, content: "a".repeat(501) });
+      const err = await waitForMessage(wsA, "error");
+      assert(
+        err.message === "Invalid message",
+        `Message inattendu : ${err.message}`,
+      );
+    });
+  }),
+
+  test("chat: accepte un message de exactement 500 caractères", async () => {
+    await withServer(async (server) => {
+      const { wsA, wsB, gameId } = await setupHumanGame(server);
+      const chat = waitForMessage(wsB, "chat_message");
+      send(wsA, { type: "chat_message", gameId, content: "a".repeat(500) });
+      const msg = await chat;
+      assert(
+        msg.content.length === 500,
+        "Le message de 500 caractères doit passer",
+      );
+    });
+  }),
+
+  test("chat: les espaces autour du message sont retirés", async () => {
+    await withServer(async (server) => {
+      const { wsA, wsB, gameId } = await setupHumanGame(server);
+      const { ws } = await spectate(server, gameId);
+
+      const chatB = waitForMessage(wsB, "chat_message");
+      const chatS = waitForMessage(ws, "chat_message");
+      send(wsA, { type: "chat_message", gameId, content: "   gg   " });
+      const [mB, mS] = await Promise.all([chatB, chatS]);
+
+      assert(mB.content === "gg", `B a reçu "${mB.content}"`);
+      assert(mS.content === "gg", `Le spectateur a reçu "${mS.content}"`);
+    });
+  }),
+
+  test("chat: refuse un message pour une partie inexistante", async () => {
+    await withServer(async (server) => {
+      const ws = await connectUser(server, uniqueUserId("player"));
+      send(ws, {
+        type: "chat_message",
+        gameId: "partie-qui-existe-pas",
+        content: "hey",
+      });
+      const err = await waitForMessage(ws, "error");
+      assert(
+        err.message === "Game not found",
+        `Message inattendu : ${err.message}`,
       );
     });
   }),
@@ -755,7 +943,10 @@ const tests = [
       const late = await connectUser(server, uniqueUserId("late"));
       send(late, { type: "spectate_game", gameId });
       const err = await waitForMessage(late, "error");
-      assert(err.message === "Game not found", `Message inattendu : ${err.message}`);
+      assert(
+        err.message === "Game not found",
+        `Message inattendu : ${err.message}`,
+      );
     });
   }),
 
