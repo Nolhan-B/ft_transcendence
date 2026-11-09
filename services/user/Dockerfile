@@ -53,4 +53,4 @@ COPY --chown=node:node --from=builder /app/services/user/dist ./dist
 USER node
 EXPOSE 3004
 
-CMD ["node", "dist/index.js"]
+CMD ["node", "dist/server.js"]
