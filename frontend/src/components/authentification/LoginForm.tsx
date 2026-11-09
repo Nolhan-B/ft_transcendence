@@ -55,7 +55,7 @@ export function LoginForm() {
           />
         </label>
       </div>
-      <div className="flex gap-3">
+      <div className="flex flex-col gap-3 @xs:flex-row">
         <button
           type="submit"
           disabled={loading}
