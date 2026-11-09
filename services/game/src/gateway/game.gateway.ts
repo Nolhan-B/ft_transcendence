@@ -351,9 +351,6 @@ export default async function gameGateway(fastify: FastifyInstance) {
         case "remove_bot":
           handleRemoveBot(ctx, message);
           break;
-        case "remove_bot":
-          handleRemoveBot(ctx, message);
-          break;
         case "spectate_game":
           handleSpectateGame(ctx, message);
           break;

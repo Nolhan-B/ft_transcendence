@@ -112,8 +112,6 @@ export function validateMessage(raw: unknown): ClientMessage | null {
       if (typeof msg.roomCode !== "string" || typeof msg.botId !== "string")
         return null;
       break;
-    case "challenge_bluff":
-    case "accept_wild_draw4":
     case "spectate_game":
     case "leave_spectate":
       if (typeof msg.gameId !== "string") return null;
