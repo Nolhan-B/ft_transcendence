@@ -1,0 +1,29 @@
+groups:
+  - name: transcendence_alerts
+    rules:
+      - alert: ServiceDown
+        expr: up == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Instance {{ $labels.instance }} down"
+          description: "Job {{ $labels.job }} (instance {{ $labels.instance }}) has been unreachable for more than 30 seconds."
+
+      - alert: HighHttpErrorRate
+        expr: sum(rate(http_requests_total{status=~"5.."}[1m])) by (job) > 0.05
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High 5xx error rate on {{ $labels.job }}"
+          description: "Service {{ $labels.job }} has an abnormal rate of 5xx HTTP errors over the last minute."
+
+      - alert: HighResponseLatency
+        expr: http_request_duration_seconds{quantile="0.9"} > 1
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High latency on {{ $labels.job }}"
+          description: "90% of requests on {{ $labels.job }} take longer than 1 second."

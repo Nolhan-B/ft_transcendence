@@ -22,7 +22,7 @@ services:
       interval: 5s
       timeout: 3s
       retries: 3
-      start_period: 10s
+      start_period: 20s
     depends_on:
       postgres:
         condition: service_healthy
@@ -85,7 +85,7 @@ services:
     build:
       context: .
       dockerfile: services/user/Dockerfile
-      target: dev
+      target: prod
     volumes:
       - ./services/user/src:/app/src
       - user_uploads:/app/uploads
@@ -201,6 +201,7 @@ services:
       - "9090:9090"
     volumes:
       - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
       - prometheus_data:/prometheus
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
