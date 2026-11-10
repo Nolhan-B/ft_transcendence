@@ -11,7 +11,7 @@ export function LoginForm() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault(); // Anti browser reloading
     const success = await submit({ email, password });
-    if (success) navigate("/");
+    if (success) navigate("/home");
   }
 
   return (

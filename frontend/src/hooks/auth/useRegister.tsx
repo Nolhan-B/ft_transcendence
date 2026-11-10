@@ -1,7 +1,9 @@
 import { useState } from "react";
 import type { SignupPayload } from "shared";
+import { useAuth } from "./useAuth";
 
 export function useRegister() {
+  const { register } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -9,24 +11,12 @@ export function useRegister() {
     setLoading(true);
     setError(null);
 
-    try {
-      const res = await fetch("/api/auth/signup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => null);
-        throw new Error(data?.error ?? "Sign-up failed."); // Default error if no error provided
-      }
-      return true;
-    } catch (e) {
-      setError((e as Error).message);
-      return false;
-    } finally {
-      setLoading(false);
-    }
+    const result = await register(payload);
+    setLoading(false);
+
+    if (result.status === "success") return true;
+    setError(result.status === "error" ? result.message : "Sign-up failed.");
+    return false;
   }
   return { submit, loading, error };
 }

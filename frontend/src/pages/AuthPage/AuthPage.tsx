@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { LoginForm } from "../../components/authentification/LoginForm";
+import { TwoFactorForm } from "../../components/authentification/TwoFactorForm";
+import { useAuth } from "../../hooks/auth/useAuth";
 import { Hand } from "../../components/cards/Hand";
 import type { HandCard } from "../../components/cards/Hand";
 
@@ -26,6 +28,7 @@ const MODES: { mode: Mode; label: string; activeClass: string }[] = [
 
 export function AuthPage() {
   const [selected, setSelected] = useState(FRONT);
+  const { twoFactorPending } = useAuth();
 
   // A starting UNO hand: 7 cards alternating sign-in / sign-up. Every card
   // is usable, the front one shows the form. Content only on the front card,
@@ -38,7 +41,11 @@ export function AuthPage() {
       label: mode === "login" ? "Switch to Sign-in" : "Switch to Sign-up",
       content:
         i !== selected ? undefined : mode === "login" ? (
-          <LoginForm />
+          twoFactorPending ? (
+            <TwoFactorForm />
+          ) : (
+            <LoginForm />
+          )
         ) : (
           <p className="text-center">Sign-up form coming soon</p>
         ),
