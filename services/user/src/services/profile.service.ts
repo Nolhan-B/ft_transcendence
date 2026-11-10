@@ -9,7 +9,13 @@ export async function getProfileById(
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, username: true, avatarUrl: true, createdAt: true },
+    select: {
+      id: true,
+      username: true,
+      avatarUrl: true,
+      createdAt: true,
+      elo: true,
+    },
   });
   if (!user) return null;
 
@@ -18,6 +24,7 @@ export async function getProfileById(
     username: user.username,
     avatarUrl: user.avatarUrl,
     createdAt: user.createdAt.toISOString(),
+    elo: user.elo,
   };
 }
 
@@ -41,6 +48,7 @@ export async function updateProfile(
     username: updatedUser.username,
     avatarUrl: updatedUser.avatarUrl,
     createdAt: updatedUser.createdAt.toISOString(),
+    elo: updatedUser.elo,
   };
 }
 
@@ -62,5 +70,6 @@ export async function updateAvatar(
     username: updatedUser.username,
     avatarUrl: updatedUser.avatarUrl,
     createdAt: updatedUser.createdAt.toISOString(),
+    elo: updatedUser.elo,
   };
 }

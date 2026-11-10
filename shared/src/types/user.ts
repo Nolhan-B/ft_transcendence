@@ -87,6 +87,7 @@ export type FriendshipWithFriend = {
     username: string;
     avatarUrl: string | null;
     createdAt: Date;
+    elo: number;
   };
 };
 
@@ -96,5 +97,6 @@ export type FriendshipWithUser = {
     username: string;
     avatarUrl: string | null;
     createdAt: Date;
+    elo: number;
   };
 };

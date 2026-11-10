@@ -116,7 +116,13 @@ async function getSent(
     where: { userId, status },
     include: {
       friend: {
-        select: { id: true, username: true, avatarUrl: true, createdAt: true },
+        select: {
+          id: true,
+          username: true,
+          avatarUrl: true,
+          createdAt: true,
+          elo: true,
+        },
       },
     },
   });
@@ -132,7 +138,13 @@ async function getReceived(
     where: { friendId: userId, status },
     include: {
       user: {
-        select: { id: true, username: true, avatarUrl: true, createdAt: true },
+        select: {
+          id: true,
+          username: true,
+          avatarUrl: true,
+          createdAt: true,
+          elo: true,
+        },
       },
     },
   });
@@ -144,11 +156,13 @@ function mapToProfile(user: {
   username: string;
   avatarUrl: string | null;
   createdAt: Date;
+  elo: number;
 }): Profile {
   return {
     id: user.id,
     username: user.username,
     avatarUrl: user.avatarUrl,
     createdAt: user.createdAt.toISOString(),
+    elo: user.elo,
   };
 }
