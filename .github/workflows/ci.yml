@@ -76,6 +76,7 @@ jobs:
           echo "dummy_password" > secrets/db_password.txt
           echo "postgresql://transcendence_user:dummy_password@postgres:5432/transcendence_db?schema=public" > secrets/db_url.txt
           echo "dummy_jwt_secret" > secrets/jwt_secret.txt
+          echo "grafana_admin_password" > secrets/grafana_admin_password.txt
           mkdir -p gateway/ssl
           openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
             -keyout gateway/ssl/transcendence.key \

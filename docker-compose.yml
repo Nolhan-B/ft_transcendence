@@ -12,17 +12,17 @@ services:
       context: .
       dockerfile: services/auth/Dockerfile
       target: prod
-    # volumes:
-    #   - ./services/auth/src:/app/src
+    restart: unless-stopped
     environment:
       <<: *db-env
+      NODE_ENV: production
     healthcheck:
       test:
         ["CMD-SHELL", "wget -q --spider http://127.0.0.1:3001/health || exit 1"]
       interval: 5s
       timeout: 3s
       retries: 3
-      start_period: 10s
+      start_period: 20s
     depends_on:
       postgres:
         condition: service_healthy
@@ -36,11 +36,10 @@ services:
       context: .
       dockerfile: services/game/Dockerfile
       target: prod
-    # volumes:
-    #   - ./services/game/src:/app/src
+    restart: unless-stopped
     environment:
       <<: *db-env
-      NODE_ENV: development
+      NODE_ENV: production
     depends_on:
       postgres:
         condition: service_healthy
@@ -61,11 +60,10 @@ services:
       context: .
       dockerfile: services/chat/Dockerfile
       target: prod
-    # volumes:
-    #   - ./services/chat/src:/app/src
+    restart: unless-stopped
     environment:
       <<: *db-env
-      NODE_ENV: development
+      NODE_ENV: production
     depends_on:
       postgres:
         condition: service_healthy
@@ -85,13 +83,13 @@ services:
     build:
       context: .
       dockerfile: services/user/Dockerfile
-      target: dev
+      target: prod
     volumes:
-      - ./services/user/src:/app/src
       - user_uploads:/app/uploads
+    restart: unless-stopped
     environment:
       <<: *db-env
-      NODE_ENV: development
+      NODE_ENV: production
     secrets:
       - db_password
       - db_url
@@ -109,18 +107,12 @@ services:
 
   frontend:
     build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      # target: dev
-    volumes:
-      - ./frontend/src:/app/src
-      - ./frontend/public:/app/public
-      - ./frontend/index.html:/app/index.html
-      - ./frontend/vite.config.ts:/app/vite.config.ts
-    environment:
-      - NODE_ENV=development
+      context: .
+      dockerfile: frontend/Dockerfile
+      target: prod
+    restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:5173/ || exit 1"]
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:80/ || exit 1"]
       interval: 10s
       timeout: 3s
       retries: 3
@@ -133,6 +125,7 @@ services:
     ports:
       - "${HTTP_PORT:-8080}:80"
       - "${HTTPS_PORT:-8443}:443"
+    restart: unless-stopped
     volumes:
       - ./gateway/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./gateway/ssl:/etc/nginx/ssl:ro
@@ -178,7 +171,7 @@ services:
       retries: 5
 
   adminer:
-    image: adminer:latest
+    image: adminer:4.17.1
     restart: always
     depends_on:
       - postgres
@@ -198,9 +191,10 @@ services:
     container_name: ft_transcendence-prometheus
     restart: unless-stopped
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"
     volumes:
       - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
       - prometheus_data:/prometheus
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
@@ -211,11 +205,13 @@ services:
     container_name: ft_transcendence-grafana
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     environment:
       - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_PASSWORD__FILE=/run/secrets/grafana_admin_password
       - GF_USERS_ALLOW_SIGN_UP=false
+    secrets:
+      - grafana_admin_password
     volumes:
       - grafana_data:/var/lib/grafana
       - ./monitoring/grafana/datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml:ro
@@ -235,3 +231,5 @@ secrets:
     file: ./secrets/db_url.txt
   jwt_secret:
     file: ./secrets/jwt_secret.txt
+  grafana_admin_password:
+    file: ./secrets/grafana_admin_password.txt

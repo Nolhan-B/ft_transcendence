@@ -1,0 +1,43 @@
+services:
+  auth:
+    build:
+      target: dev
+    volumes:
+      - ./services/auth/src:/app/services/auth/src
+    environment:
+      NODE_ENV: development
+
+  game:
+    build:
+      target: dev
+    volumes:
+      - ./services/game/src:/app/services/game/src
+    environment:
+      NODE_ENV: development
+
+  chat:
+    build:
+      target: dev
+    volumes:
+      - ./services/chat/src:/app/services/chat/src
+    environment:
+      NODE_ENV: development
+
+  user:
+    build:
+      target: dev
+    volumes:
+      - ./services/user/src:/app/services/user/src
+    environment:
+      NODE_ENV: development
+
+  frontend:
+    build:
+      target: dev
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+      - ./frontend/index.html:/app/index.html
+      - ./frontend/vite.config.ts:/app/vite.config.ts
+    environment:
+      NODE_ENV: development

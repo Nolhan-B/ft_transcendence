@@ -42,15 +42,19 @@ ENV NODE_ENV=production
 
 RUN apk add --no-cache wget openssl
 
-# Copy hoisted dependencies and compiled artifacts
+# Hoisted root modules + shared
 COPY --chown=node:node package*.json /app/
 COPY --chown=node:node --from=builder /app/node_modules /app/node_modules
 COPY --chown=node:node --from=builder /app/shared/package*.json /app/shared/
 COPY --chown=node:node --from=builder /app/shared/dist /app/shared/dist
+COPY --chown=node:node --from=builder /app/shared/prisma /app/shared/prisma
+
+# Service user artifacts & local modules
 COPY --chown=node:node --from=builder /app/services/user/package*.json ./
+COPY --chown=node:node --from=builder /app/services/user/node_modules ./node_modules
 COPY --chown=node:node --from=builder /app/services/user/dist ./dist
 
 USER node
 EXPOSE 3004
 
-CMD ["node", "dist/index.js"]
+CMD ["node", "dist/server.js"]
