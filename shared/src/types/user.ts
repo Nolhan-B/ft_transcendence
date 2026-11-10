@@ -8,6 +8,7 @@ export interface User {
   avatarUrl: string | null;
   twoFactorSecret: string | null;
   twoFactorSecretEnabled: boolean;
+  elo: number;
   createdAt: ISODateString;
 }
 
