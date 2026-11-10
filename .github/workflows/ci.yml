@@ -48,6 +48,9 @@ jobs:
       - name: Run reconnect integration tests
         run: npm run test-reconnect
 
+      - name: Run spectator integration tests
+        run: npm run test-spectator
+
   security:
     name: Check Secrets
     runs-on: ubuntu-latest

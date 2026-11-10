@@ -78,6 +78,14 @@ export interface CatchUnoPayload {
   targetUserId: string;
 }
 
+export interface SpectateGamePayload {
+  gameId: string;
+}
+
+export interface LeaveSpectatePayload {
+  gameId: string;
+}
+
 // ============================================================
 // ROOM - Server -> Client
 // ============================================================
@@ -153,6 +161,11 @@ export interface BluffResultEvent {
   penaltyCount: number;
 }
 
+export interface SpectateStartedEvent {
+  type: "spectate_started";
+  state: GameState;
+}
+
 // ============================================================
 // UNIONS
 // ============================================================
@@ -167,7 +180,9 @@ export type ServerEvent =
   | ChatMessageEvent
   | ErrorEvent
   | UnoCaughtEvent
-  | BluffResultEvent;
+  | BluffResultEvent
+  | BluffResultEvent
+  | SpectateStartedEvent;
 
 export type ClientMessage =
   | ({ type: "create_room" } & CreateRoomPayload)
@@ -184,4 +199,6 @@ export type ClientMessage =
   | ({ type: "challenge_bluff" } & ChallengeBluffPayload)
   | ({ type: "accept_wild_draw4" } & AcceptWildDraw4Payload)
   | ({ type: "add_bot" } & AddBotPayload)
-  | ({ type: "remove_bot" } & RemoveBotPayload);
+  | ({ type: "remove_bot" } & RemoveBotPayload)
+  | ({ type: "spectate_game" } & SpectateGamePayload)
+  | ({ type: "leave_spectate" } & LeaveSpectatePayload);

@@ -1,45 +1,40 @@
 @import "tailwindcss";
 
 @plugin "daisyui" {
-  themes:
-    dracula --default,
-    synthwave;
-  /* themes: synthwave;
-    themes: synthwave; */
-
-  /* don't ship the 30 built-in themes */
+  /* don't ship the 30 built-in themes: only the custom "uno" theme below */
+  themes: false;
 }
 
 @plugin "daisyui/theme" {
   name: "uno";
-  /* default: true; */
-  color-scheme: light;
+  default: true;
+  color-scheme: dark;
 
-  /* surfaces */
-  --color-base-100: #f3e7cc;
-  --color-base-200: #e9dcc0;
-  --color-base-300: #d9c9a6;
-  --color-base-content: #2b2118;
+  /* surfaces (Dark mode arcade chic) */
+  --color-base-100: #1e1e2e;
+  --color-base-200: #181825;
+  --color-base-300: #11111b;
+  --color-base-content: #cdd6f4;
 
-  /* brand */
-  --color-primary: #c8372d;
-  --color-primary-content: #fff8ef;
-  --color-secondary: #1f6f5c;
-  --color-secondary-content: #fff8ef;
-  --color-accent: #d9a441;
-  --color-accent-content: #2b2118;
-  --color-neutral: #2b2118;
-  --color-neutral-content: #f3e7cc;
+  /* brand (Couleurs UNO vives) */
+  --color-primary: #ff5555; /* Rouge UNO */
+  --color-primary-content: #ffffff;
+  --color-secondary: #5555ff; /* Bleu UNO */
+  --color-secondary-content: #ffffff;
+  --color-accent: #ffaa00; /* Jaune UNO */
+  --color-accent-content: #1e1e2e;
+  --color-neutral: #313244;
+  --color-neutral-content: #cdd6f4;
 
   /* feedback */
-  --color-info: #2f6f9f;
-  --color-success: #3f8f4f;
-  --color-warning: #d9a441;
-  --color-error: #b02a22;
+  --color-info: #5555ff; /* Bleu */
+  --color-success: #55aa55; /* Vert UNO */
+  --color-warning: #ffaa00; /* Jaune */
+  --color-error: #ff5555; /* Rouge */
 
-  /* shape */
-  --radius-selector: 0.5rem;
-  --radius-field: 0.5rem;
+  /* shape (Bordures marquées style Neo-Brutalism) */
+  --radius-selector: 0.75rem;
+  --radius-field: 0.75rem;
   --radius-box: 1rem;
-  --border: 2px;
+  --border: 3px;
 }
