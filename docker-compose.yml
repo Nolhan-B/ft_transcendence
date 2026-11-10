@@ -12,11 +12,10 @@ services:
       context: .
       dockerfile: services/auth/Dockerfile
       target: prod
-    # volumes:
-    #   - ./services/auth/src:/app/src
     restart: unless-stopped
     environment:
       <<: *db-env
+      NODE_ENV: production
     healthcheck:
       test:
         ["CMD-SHELL", "wget -q --spider http://127.0.0.1:3001/health || exit 1"]
@@ -37,8 +36,6 @@ services:
       context: .
       dockerfile: services/game/Dockerfile
       target: prod
-    # volumes:
-    #   - ./services/game/src:/app/src
     restart: unless-stopped
     environment:
       <<: *db-env
@@ -63,8 +60,6 @@ services:
       context: .
       dockerfile: services/chat/Dockerfile
       target: prod
-    # volumes:
-    #   - ./services/chat/src:/app/src
     restart: unless-stopped
     environment:
       <<: *db-env
@@ -90,7 +85,6 @@ services:
       dockerfile: services/user/Dockerfile
       target: prod
     volumes:
-      # - ./services/user/src:/app/src
       - user_uploads:/app/uploads
     restart: unless-stopped
     environment:
@@ -113,19 +107,12 @@ services:
 
   frontend:
     build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      # target: dev
-    volumes:
-      - ./frontend/src:/app/src
-      - ./frontend/public:/app/public
-      - ./frontend/index.html:/app/index.html
-      - ./frontend/vite.config.ts:/app/vite.config.ts
+      context: .
+      dockerfile: frontend/Dockerfile
+      target: prod
     restart: unless-stopped
-    environment:
-      - NODE_ENV=development
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:5173/ || exit 1"]
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:80/ || exit 1"]
       interval: 10s
       timeout: 3s
       retries: 3
