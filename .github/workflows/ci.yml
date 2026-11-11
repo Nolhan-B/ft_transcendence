@@ -57,6 +57,9 @@ jobs:
       - name: Run ranked elo unitary tests
         run: npm run test-elo
 
+      - name: Run ranked queue unitary tests
+        run: npm run test-elo
+
   security:
     name: Check Secrets
     runs-on: ubuntu-latest
