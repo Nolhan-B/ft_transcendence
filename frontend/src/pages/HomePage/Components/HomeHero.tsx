@@ -9,7 +9,7 @@ export function HomeHero() {
       <div className="relative grid grid-cols-1 items-center gap-10 overflow-hidden p-5 __bg-rays md:grid-cols-2 rounded-3xl __border-4 border-success-50">
         <div className="flex flex-col gap-3">
           <h1 className="text-6xl sm:text-8xl font-black uppercase tracking-tight text-accent">
-            Ready to use your +4 ?
+            Ready to use your +4 ? - WIP
           </h1>
           <p className="text-2xl text-base-content/70">
             Challenge your friends in real time, chain special cards and be
