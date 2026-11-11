@@ -1,7 +1,9 @@
+import { HomeHero } from "./Components/HomeHero";
+
 export function HomePage() {
   return (
-    <div>
-      <p>Home page</p>
+    <div className="flex flex-col gap-7">
+      <HomeHero />
     </div>
   );
 }

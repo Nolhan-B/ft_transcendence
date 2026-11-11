@@ -1,5 +1,15 @@
 @import "tailwindcss";
 
+/* Decorative "light rays" depth effect, shared by the auth page and the home
+   hero. Tune the pivot with --rays-origin (e.g. [--rays-origin:50%_80%]). */
+@utility bg-rays {
+  background-image: repeating-conic-gradient(
+    from var(--rays-angle, 0deg) at var(--rays-origin, 50% 50%),
+    color-mix(in oklab, var(--color-base-content) 6%, transparent) 0deg 6deg,
+    transparent 6deg 12deg
+  );
+}
+
 @plugin "daisyui" {
   /* don't ship the 30 built-in themes: only the custom "uno" theme below */
   themes: false;
@@ -29,6 +39,7 @@
   /* feedback */
   --color-info: #5555ff; /* Bleu */
   --color-success: #55aa55; /* Vert UNO */
+  --color-success-content: #081c15;
   --color-warning: #ffaa00; /* Jaune */
   --color-error: #ff5555; /* Rouge */
 
