@@ -6,6 +6,7 @@ import { WebSocket } from "ws";
 import { GameMode, GameStatus } from "shared";
 import { GameManager } from "../src/managers/game.manager.js";
 import { RoomManager } from "../src/managers/room.manager.js";
+import { QueueManager } from "../src/managers/queue.manager.js";
 
 // Délai de grâce court pour les tests : doit être défini AVANT de charger le gateway
 const GRACE_MS = 500;
@@ -44,6 +45,7 @@ async function buildServer() {
   const fastify = Fastify({ logger: false });
   const gameManager = new GameManager();
   const roomManager = new RoomManager();
+  const queueManager = new QueueManager();
 
   fastify.register(cookie);
   fastify.register(jwt, { secret: JWT_SECRET });
@@ -60,6 +62,7 @@ async function buildServer() {
 
   fastify.decorate("gameManager", gameManager);
   fastify.decorate("roomManager", roomManager);
+  fastify.decorate("queueManager", queueManager);
 
   fastify.register(websocket);
   fastify.register(gameGateway);
