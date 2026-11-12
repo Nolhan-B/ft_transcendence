@@ -38,10 +38,13 @@
 
   /* feedback */
   --color-info: #5555ff; /* Bleu */
+  --color-info-content: #ffffff;
   --color-success: #55aa55; /* Vert UNO */
   --color-success-content: #081c15;
   --color-warning: #ffaa00; /* Jaune */
+  --color-warning-content: #1e1e2e; /* Texte foncé : contraste sur le jaune vif */
   --color-error: #ff5555; /* Rouge */
+  --color-error-content: #ffffff;
 
   /* shape (Bordures marquées style Neo-Brutalism) */
   --radius-selector: 0.75rem;

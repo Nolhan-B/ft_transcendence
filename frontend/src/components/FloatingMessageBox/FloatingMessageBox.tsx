@@ -31,7 +31,6 @@ export function FloatingMessageBox() {
           aria-label="Game chat"
         />
         <div className="tab-content bg-base-100 border-base-300 p-6">
-          <p>Game chat</p>
           <GameChat />
         </div>
       </div>
