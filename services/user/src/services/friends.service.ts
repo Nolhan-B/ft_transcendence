@@ -1,4 +1,4 @@
-import { PrismaClient } from "shared";
+import { Prisma, PrismaClient } from "shared";
 import type {
   Profile,
   Friendship,
@@ -35,10 +35,71 @@ export async function sendFriendRequest(
   userId: string,
   friendId: string,
 ): Promise<Friendship | null> {
-  if (!userId || !friendId) return null;
+  // Prevent missing IDs or self-friend requests
+  if (!userId || !friendId || userId === friendId) return null;
 
-  const friendship = await prisma.friendship.create({
-    data: { userId, friendId },
+  // Use a serializable transaction to prevent bidirectional race conditions (A->B and B->A simultaneously)
+  return prisma.$transaction(
+    async (tx) => {
+      // Check if either user has blocked the other
+      const blocked = await tx.blockedFriendship.findFirst({
+        where: {
+          OR: [
+            { blockerId: userId, blockedId: friendId },
+            { blockerId: friendId, blockedId: userId },
+          ],
+        },
+      });
+      if (blocked) return null;
+
+      // Check if a friendship or pending request already exists in either direction
+      const existing = await tx.friendship.findFirst({
+        where: {
+          OR: [
+            { userId, friendId },
+            { userId: friendId, friendId: userId },
+          ],
+        },
+      });
+      if (existing) return null;
+
+      const friendship = await tx.friendship.create({
+        data: { userId, friendId },
+      });
+
+      return {
+        id: friendship.id,
+        userId: friendship.userId,
+        friendId: friendship.friendId,
+        status: friendship.status as FriendshipStatus,
+        createdAt: friendship.createdAt.toISOString(),
+      };
+    },
+    { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+  );
+}
+
+export async function acceptFriendRequest(
+  prisma: PrismaClient,
+  userId: string,
+  friendId: string,
+): Promise<Friendship | null> {
+  if (!userId || !friendId || userId === friendId) return null;
+
+  // Atomically transition from PENDING to ACCEPTED to prevent concurrent double-accepts
+  const updated = await prisma.friendship.updateMany({
+    where: {
+      userId: friendId,
+      friendId: userId,
+      status: FriendshipStatus.PENDING,
+    },
+    data: { status: FriendshipStatus.ACCEPTED },
+  });
+
+  if (updated.count === 0) return null;
+
+  const friendship = await prisma.friendship.findUnique({
+    where: { userId_friendId: { userId: friendId, friendId: userId } },
   });
 
   if (!friendship) return null;
@@ -52,37 +113,6 @@ export async function sendFriendRequest(
   };
 }
 
-export async function acceptFriendRequest(
-  prisma: PrismaClient,
-  userId: string,
-  friendId: string,
-): Promise<Friendship | null> {
-  if (!userId || !friendId) return null;
-
-  const friendship = await prisma.friendship.findUnique({
-    where: { userId_friendId: { userId: friendId, friendId: userId } },
-  });
-
-  if (!friendship) return null;
-
-  if (friendship.status === FriendshipStatus.ACCEPTED) return null;
-
-  const updatedFriendship = await prisma.friendship.update({
-    where: { id: friendship.id },
-    data: { status: FriendshipStatus.ACCEPTED },
-  });
-
-  if (!updatedFriendship) return null;
-
-  return {
-    id: updatedFriendship.id,
-    userId: updatedFriendship.userId,
-    friendId: updatedFriendship.friendId,
-    status: updatedFriendship.status as FriendshipStatus,
-    createdAt: updatedFriendship.createdAt.toISOString(),
-  };
-}
-
 export async function deleteFriendRequest(
   prisma: PrismaClient,
   userId: string,
@@ -90,22 +120,20 @@ export async function deleteFriendRequest(
 ): Promise<boolean> {
   if (!userId || !friendId) return false;
 
-  const friendship = await prisma.friendship.findFirst({
+  // Single atomic DELETE statement avoids SELECT-then-DELETE P2025 race conditions
+  const deleted = await prisma.friendship.deleteMany({
     where: {
       OR: [
-        { userId: userId, friendId: friendId },
+        { userId, friendId },
         { userId: friendId, friendId: userId },
       ],
     },
   });
-  if (!friendship) return false;
 
-  await prisma.friendship.delete({ where: { id: friendship.id } });
-
-  return true;
+  return deleted.count > 0;
 }
 
-////// fonction helpeuse
+////// Helper functions
 
 async function getSent(
   prisma: PrismaClient,

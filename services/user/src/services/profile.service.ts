@@ -1,6 +1,15 @@
 import { PrismaClient } from "shared";
 import type { Profile, UpdateProfilePayload } from "shared";
 
+// Shared projection to avoid loading sensitive fields (password, 2FA secret) into memory
+const PROFILE_SELECT = {
+  id: true,
+  username: true,
+  avatarUrl: true,
+  createdAt: true,
+  elo: true,
+} as const;
+
 export async function getProfileById(
   prisma: PrismaClient,
   userId: string,
@@ -9,13 +18,7 @@ export async function getProfileById(
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: {
-      id: true,
-      username: true,
-      avatarUrl: true,
-      createdAt: true,
-      elo: true,
-    },
+    select: PROFILE_SELECT,
   });
   if (!user) return null;
 
@@ -28,20 +31,27 @@ export async function getProfileById(
   };
 }
 
-// Route qui sera amener a evoluer (vocation: update plusieurs champs at once)
 export async function updateProfile(
   prisma: PrismaClient,
   id: string,
   data: UpdateProfilePayload,
 ): Promise<Profile | null> {
-  if (!data) return null;
+  if (!id || !data) return null;
 
-  const user = await prisma.user.findUnique({ where: { id } });
-  if (!user) return null;
+  // Explicitly whitelist allowed fields matching UpdateProfilePayload
+  const updateData: { username?: string } = {};
+  if (data.username !== undefined) updateData.username = data.username;
 
-  const updatedUser = await prisma.user.update({ where: { id }, data });
+  if (Object.keys(updateData).length === 0) {
+    return getProfileById(prisma, id);
+  }
 
-  if (!updatedUser) return null;
+  // Single atomic UPDATE query; P2002 and P2025 are handled by the route / global error handler
+  const updatedUser = await prisma.user.update({
+    where: { id },
+    data: updateData,
+    select: PROFILE_SELECT,
+  });
 
   return {
     id: updatedUser.id,
@@ -57,12 +67,13 @@ export async function updateAvatar(
   id: string,
   avatarUrl: string,
 ): Promise<Profile | null> {
-  const user = await prisma.user.findUnique({ where: { id } });
-  if (!user) return null;
+  if (!id || !avatarUrl) return null;
 
+  // Single atomic UPDATE query; P2025 is handled by the route / global error handler
   const updatedUser = await prisma.user.update({
     where: { id },
     data: { avatarUrl },
+    select: PROFILE_SELECT,
   });
 
   return {

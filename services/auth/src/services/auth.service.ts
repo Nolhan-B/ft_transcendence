@@ -31,7 +31,7 @@ export async function login(
   password: string,
 ): Promise<Omit<User, "twoFactorSecret"> | null> {
   const user = await prisma.user.findUnique({ where: { email } });
-  if (!user) return null;
+  if (!user || !user.password) return null;
 
   const valid = await bcrypt.compare(password, user.password);
   if (!valid) return null;
@@ -54,7 +54,7 @@ export async function deleteAccount(
   code?: string,
 ): Promise<boolean> {
   const user = await prisma.user.findUnique({ where: { id: userId } });
-  if (!user) return false;
+  if (!user || !user.password) return false;
 
   const validPassword = await bcrypt.compare(password, user.password);
   if (!validPassword) return false;
