@@ -40,7 +40,7 @@ COPY services/auth ./services/auth
 # Build TypeScript via workspace
 RUN npm run build --workspace=auth-service
 
-# Purge devDependencies au niveau du monorepo
+# Prune devDependencies across the monorepo
 RUN npm prune --omit=dev --workspace=auth-service --workspace=shared
 
 # 4. Production stage: minimal runtime footprint
@@ -50,7 +50,7 @@ ENV NODE_ENV=production
 
 RUN apk add --no-cache wget openssl netcat-openbsd
 
-# Entrypoint
+# Copy entrypoint script
 COPY services/auth/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 

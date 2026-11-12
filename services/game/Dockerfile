@@ -16,15 +16,20 @@ RUN --mount=type=cache,target=/root/.npm \
 COPY shared ./shared
 RUN cd shared && npm run build
 
-COPY services/game/prisma* ./services/game/
+# Copy service-specific Prisma directory if present and generate client in base layer
+COPY services/game/prisma* ./services/game/prisma/
+RUN if [ -f ./services/game/prisma/schema.prisma ]; then \
+      npx prisma generate --schema=./services/game/prisma/schema.prisma; \
+    fi
 
 # =========================================================
-# 2. Development stage (utilisé actuellement en local)
+# 2. Development stage
 # =========================================================
 FROM base AS dev
 ENV NODE_ENV=development
 RUN apk add --no-cache netcat-openbsd
 
+# Copy game source code last to preserve cache on shared and Prisma layers
 COPY services/game ./services/game
 
 WORKDIR /app/services/game
@@ -35,50 +40,46 @@ ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 CMD ["npm", "run", "dev"]
 
 # =========================================================
-# 3. Builder stage: compile le service game et purge les devDeps
+# 3. Builder stage: compile TypeScript and prune devDeps
 # =========================================================
 FROM base AS builder
 
-# Copie du code source complet de game
+# Copy full game source code (Prisma client is already cached in base)
 COPY services/game ./services/game
 
-# Si game possède son propre schéma Prisma, génération du client
-RUN if [ -f ./services/game/prisma/schema.prisma ]; then \
-      npx prisma generate --schema=./services/game/prisma/schema.prisma; \
-    fi
-
-# Compilation TypeScript du service game (génère services/game/dist)
+# Compile TypeScript for game service (outputs to services/game/dist)
 RUN npm run build --workspace=game-service
 
-# Suppression des devDependencies (TypeScript, @types, outils de build)
+# Remove devDependencies (TypeScript, @types, build tools)
 RUN npm prune --omit=dev --workspace=game-service --workspace=shared
 
 # =========================================================
-# 4. Production stage: image finale minimale et sécurisée
+# 4. Production stage: minimal and secure runtime image
 # =========================================================
 FROM node:22-alpine AS prod
 WORKDIR /app
 ENV NODE_ENV=production
 
-# Dépendances système minimales de runtime (openssl pour Prisma, wget pour le healthcheck)
+# Minimal runtime system dependencies (openssl for Prisma, wget for healthcheck)
 RUN apk add --no-cache wget openssl dumb-init
 
-# Copie de l'entrypoint si des migrations doivent tourner au démarrage
+# Copy entrypoint script for startup migrations if needed
 COPY services/game/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-# Copie sélective depuis le builder avec attribution à l'utilisateur non-root node
+# Selective copy from builder owned by non-root node user
 COPY --chown=node:node package*.json ./
 COPY --chown=node:node --from=builder /app/node_modules ./node_modules
 COPY --chown=node:node --from=builder /app/shared/package*.json ./shared/
 COPY --chown=node:node --from=builder /app/shared/dist ./shared/dist
+COPY --chown=node:node --from=builder /app/shared/prisma ./shared/prisma
 COPY --chown=node:node --from=builder /app/services/game/package*.json ./services/game/
 COPY --chown=node:node --from=builder /app/services/game/dist ./services/game/dist
 
-# Si Prisma a besoin du dossier prisma au runtime (migrations/schéma)
-COPY --chown=node:node --from=builder /app/services/game/prisma* ./services/game/
+# Copy service-specific Prisma files if present at runtime
+COPY --chown=node:node --from=builder /app/services/game/prisma* ./services/game/prisma/
 
-# Exécution sous utilisateur restreint
+# Run as restricted non-root user
 USER node
 
 WORKDIR /app/services/game
