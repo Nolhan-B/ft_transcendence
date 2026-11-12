@@ -63,6 +63,9 @@ jobs:
       - name: Run ranked queue unitary tests
         run: npm run test-elo
 
+      - name: Run game e2e actions tests 
+        run: npm run test-game-actions
+
   security:
     name: Check Secrets
     runs-on: ubuntu-latest
