@@ -10,6 +10,7 @@ import roomManager from "./plugins/room.manager.js";
 import { setupMetrics } from "shared";
 import fs from "node:fs";
 import process from "node:process";
+import queueManager from "./plugins/queue.manager.js";
 
 if (fs.existsSync("/run/secrets/db_url")) {
   process.env.DATABASE_URL = fs
@@ -84,6 +85,7 @@ fastify.register(prismaPlugin);
 fastify.register(websocket);
 fastify.register(gameManager);
 fastify.register(roomManager);
+fastify.register(queueManager);
 
 fastify.register(gameGateway);
 fastify.register(gameRoutes);

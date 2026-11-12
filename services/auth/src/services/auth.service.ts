@@ -21,6 +21,7 @@ export async function signup(
     username: user.username,
     avatarUrl: user.avatarUrl,
     createdAt: user.createdAt.toISOString(),
+    elo: user.elo,
   };
 }
 
@@ -42,6 +43,7 @@ export async function login(
     avatarUrl: user.avatarUrl,
     twoFactorSecretEnabled: user.twoFactorSecretEnabled,
     createdAt: user.createdAt.toISOString(),
+    elo: user.elo,
   };
 }
 
@@ -81,5 +83,6 @@ export async function getMe(
     avatarUrl: user.avatarUrl,
     twoFactorSecretEnabled: user.twoFactorSecretEnabled,
     createdAt: user.createdAt.toISOString(),
+    elo: user.elo,
   };
 }

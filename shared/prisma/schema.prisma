@@ -14,6 +14,7 @@ model User {
   password                String
   avatarUrl               String?
   twoFactorSecret         String?
+  elo                     Int       @default(1000)
   twoFactorSecretEnabled  Boolean   @default(false)
   createdAt               DateTime  @default(now())
 

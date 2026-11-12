@@ -47,6 +47,7 @@ export async function verifyTwoFactor(
       username: updatedUser.username,
       avatarUrl: updatedUser.avatarUrl,
       twoFactorSecretEnabled: updatedUser.twoFactorSecretEnabled,
+      elo: updatedUser.elo,
       createdAt: updatedUser.createdAt.toISOString(),
     };
   }
@@ -68,6 +69,7 @@ export async function validateTwoFactor(
       username: user.username,
       avatarUrl: user.avatarUrl,
       twoFactorSecretEnabled: user.twoFactorSecretEnabled,
+      elo: user.elo,
       createdAt: user.createdAt.toISOString(),
     };
   }
@@ -99,6 +101,7 @@ export async function disableTwoFactor(
       username: updatedUser.username,
       avatarUrl: updatedUser.avatarUrl,
       twoFactorSecretEnabled: updatedUser.twoFactorSecretEnabled,
+      elo: updatedUser.elo,
       createdAt: updatedUser.createdAt.toISOString(),
     };
   }
