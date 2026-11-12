@@ -51,19 +51,19 @@ jobs:
       - name: Run spectator integration tests
         run: npm run test-spectator
 
-      - name: Run ranked matchmaking unitary tests
+      - name: Run matchmaking unit tests
         run: npm run test-matchmaking
 
-      - name: Run ranked matchmaking e2e tests
+      - name: Run matchmaking integration tests
         run: npm run test-matchmaking-e2e
 
-      - name: Run ranked elo unitary tests
+      - name: Run ELO unit tests
         run: npm run test-elo
 
-      - name: Run ranked queue unitary tests
-        run: npm run test-elo
+      - name: Run queue unit tests
+        run: npm run test-queue
 
-      - name: Run game e2e actions tests 
+      - name: Run game actions integration tests
         run: npm run test-game-actions
 
   security:

@@ -9,17 +9,17 @@
     "test-ai": "npx tsx services/game/tests/ai.test.ts",
     "test-ai-e2e": "npx tsx services/game/tests/e2e-bot.test.ts",
     "test-reconnect": "npx tsx services/game/tests/e2e-reconnect.test.ts",
+    "test-spectator": "npx tsx services/game/tests/e2e-spectator.test.ts",
+    "test-game-actions": "npx tsx services/game/tests/e2e-game-actions.test.ts",
     "test-matchmaking": "npx tsx services/game/tests/matchmaking.test.ts",
-    "test-matchmaking-e2e": "npx tsx services/game/tests/matchmaking.test.ts",
+    "test-matchmaking-e2e": "npx tsx services/game/tests/matchmaking-e2e.test.ts",
     "test-elo": "npx tsx services/game/tests/elo.test.ts",
     "test-queue": "npx tsx services/game/tests/queue.test.ts",
-    "test-game-all": "npm run test-game && npm run test-game-integration && npm run test-rooms && npm run test-ai && npm run test-ai-e2e && npm run test-reconnect && npm run test-spectator && npm run test-matchmaking && npm run test-matchmaking-e2e && npm run test-elo && npm run test-queue",
+    "test-game-all": "npm run test-game && npm run test-game-integration && npm run test-rooms && npm run test-ai && npm run test-ai-e2e && npm run test-reconnect && npm run test-spectator && npm run test-game-actions && npm run test-matchmaking && npm run test-matchmaking-e2e && npm run test-elo && npm run test-queue",
     "test-api": "bash ./.github/scripts/api_test.sh",
     "test-e2e": "bash ./.github/scripts/e2e_test.sh",
     "test-chat": "node ./.github/scripts/chat_test.js",
-    "test-spectator": "npx tsx services/game/tests/e2e-spectator.test.ts",
-    "test-game-actions": "npx tsx services/game/tests/e2e-game-actions.test.ts",
-    "test-all": "npm run lint && npm run test-game-all && npm run test-chat && npm run test-api && npm run test-e2e && npm run test-game-actions"
+    "test-all": "npm run lint && npm run test-game-all && npm run test-chat && npm run test-api && npm run test-e2e"
   },
   "workspaces": [
     "services/*",
