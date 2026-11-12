@@ -34,6 +34,8 @@ import { handleChatMessage } from "./handlers/chat/index.js";
 import type { GatewayContext } from "./types.js";
 import { advanceToNextPlayer } from "../engine/game-state.js";
 import { scheduleBotTurnIfNeeded } from "./handlers/game/bot-turn.js";
+import { handleJoinQueue } from "./handlers/matchmaking/join-queue.js";
+import { handleLeaveQueue } from "./handlers/matchmaking/leqve-queue.js";
 
 const TURN_TIMEOUT_MS = 20000;
 const MAX_AFK_COUNT = 2;
@@ -79,6 +81,7 @@ const RECONNECT_GRACE_MS = Number(process.env.RECONNECT_GRACE_MS) || 30000;
 export default async function gameGateway(fastify: FastifyInstance) {
   const manager = fastify.gameManager;
   const roomManager = fastify.roomManager;
+  const queueManager = fastify.queueManager;
 
   function broadCastToRoom(
     gameId: string,
@@ -271,6 +274,7 @@ export default async function gameGateway(fastify: FastifyInstance) {
       userId,
       manager,
       roomManager,
+      queueManager,
       rooms,
       roomSockets,
       chatLogs,
@@ -356,6 +360,12 @@ export default async function gameGateway(fastify: FastifyInstance) {
           break;
         case "leave_spectate":
           handleLeaveSpectate(ctx, message);
+          break;
+        case "join_queue":
+          await handleJoinQueue(ctx);
+          break;
+        case "leave_queue":
+          handleLeaveQueue(ctx);
           break;
       }
     });
