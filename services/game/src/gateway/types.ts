@@ -4,6 +4,7 @@ import { GameManager } from "../managers/game.manager.js";
 import { Room, RoomManager } from "../managers/room.manager.js";
 import { InternalGameState } from "../engine/game-state.js";
 import { RoomInfo, ServerEvent } from "shared";
+import { QueueManager } from "../managers/queue.manager.js";
 
 export interface GatewayContext {
   fastify: FastifyInstance;
@@ -11,6 +12,7 @@ export interface GatewayContext {
   userId: string;
   manager: GameManager;
   roomManager: RoomManager;
+  queueManager: QueueManager;
   rooms: Map<string, Set<{ socket: WebSocket; userId: string }>>;
   roomSockets: Map<string, Set<{ socket: WebSocket; userId: string }>>;
   chatLogs: Map<

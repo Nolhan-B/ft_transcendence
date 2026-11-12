@@ -51,6 +51,18 @@ jobs:
       - name: Run spectator integration tests
         run: npm run test-spectator
 
+      - name: Run ranked matchmaking unitary tests
+        run: npm run test-matchmaking
+
+      - name: Run ranked matchmaking e2e tests
+        run: npm run test-matchmaking-e2e
+
+      - name: Run ranked elo unitary tests
+        run: npm run test-elo
+
+      - name: Run ranked queue unitary tests
+        run: npm run test-elo
+
   security:
     name: Check Secrets
     runs-on: ubuntu-latest

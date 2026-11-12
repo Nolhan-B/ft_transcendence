@@ -1,4 +1,9 @@
-import type { GameMode, GameParticipant, GameSettings } from "shared";
+import {
+  GameStatus,
+  type GameMode,
+  type GameParticipant,
+  type GameSettings,
+} from "shared";
 import type { InternalGameState } from "../engine/game-state.js";
 import * as engine from "../engine/game-state.js";
 
@@ -52,5 +57,14 @@ export class GameManager {
 
   removeGame(gameId: string): void {
     this.games.delete(gameId);
+  }
+
+  isPlayerInGame(userId: string): boolean {
+    for (const game of this.games.values()) {
+      if (game.status !== GameStatus.IN_PROGRESS) continue;
+      const player = game.players.find((p) => p.userId === userId);
+      if (player && !player.disconnected) return true;
+    }
+    return false;
   }
 }

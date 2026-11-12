@@ -7,6 +7,7 @@ import { GameMode, GameStatus } from "shared";
 import gameGateway from "../src/gateway/game.gateway.js";
 import { GameManager } from "../src/managers/game.manager.js";
 import { RoomManager } from "../src/managers/room.manager.js";
+import { QueueManager } from "../src/managers/queue.manager.js";
 
 let passed = 0;
 let failed = 0;
@@ -35,6 +36,7 @@ async function buildServer() {
   const fastify = Fastify({ logger: false });
   const gameManager = new GameManager();
   const roomManager = new RoomManager();
+  const queueManager = new QueueManager();
 
   fastify.register(cookie);
   fastify.register(jwt, { secret: JWT_SECRET });
@@ -54,6 +56,7 @@ async function buildServer() {
 
   fastify.decorate("gameManager", gameManager);
   fastify.decorate("roomManager", roomManager);
+  fastify.decorate("queueManager", queueManager);
 
   fastify.register(websocket);
   fastify.register(gameGateway);
