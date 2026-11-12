@@ -4,7 +4,7 @@ import pg from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "shared";
 
-// Fonction pour récupérer l'URL de connexion sécurisée
+// Build database connection string from Docker secret or environment fallback
 function getDatabaseUrl(): string {
   const secretPath = "/run/secrets/db_password";
 
@@ -18,17 +18,28 @@ function getDatabaseUrl(): string {
     return `postgresql://${user}:${encodeURIComponent(password)}@${host}:${port}/${dbName}`;
   }
 
-  // Fallback si jamais on lance hors conteneur
+  // Fallback when running outside Docker with DATABASE_URL set
   if (process.env.DATABASE_URL) {
     return process.env.DATABASE_URL;
   }
 
   throw new Error(
-    "Impossible de se connecter : aucun secret ni variable DATABASE_URL trouvée.",
+    "Database connection failed: neither /run/secrets/db_password nor DATABASE_URL is defined.",
   );
 }
 
-const pool = new pg.Pool({ connectionString: getDatabaseUrl() });
+const pool = new pg.Pool({
+  connectionString: getDatabaseUrl(),
+  max: 10,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 5000,
+});
+
+// Prevent unhandled 'error' events on idle pool clients from crashing the Node.js process
+pool.on("error", (err) => {
+  console.error("Unexpected PostgreSQL pool error on idle client:", err);
+});
+
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
