@@ -304,6 +304,135 @@ test("elo: un joueur à 0 qui gagne remonte", () => {
 });
 
 // ============================================================
+// ABANDONS
+// ============================================================
+
+// Variations avec une liste de joueurs qui ont abandonné (leurs userId : p1, p2…)
+function deltasWithAbandon(elos: number[], abandoned: string[]): number[] {
+  return computeEloChanges(ranking(...elos), abandoned).map(
+    (c) => c.newElo - c.oldElo,
+  );
+}
+
+// 4 joueurs à 1000, p2, p3 et p4 sont partis : chaque partant ne perd que
+// son duel contre p1, qui vaut K / 3 / 2. Les duels entre partants ne comptent pas.
+const ABANDON_STAYER = rounded(1000, (K / 3 / 2) * 3);
+const ABANDON_LEAVER = rounded(1000, -(K / 3 / 2));
+
+test("abandon: sans liste d'abandons, le résultat ne change pas", () => {
+  const elos = [1100, 1000, 950, 1200];
+  const without = deltas(...elos).join();
+  const withEmpty = deltasWithAbandon(elos, []).join();
+  assert(
+    without === withEmpty,
+    `Sans abandon : ${without}, avec [] : ${withEmpty}`,
+  );
+});
+
+test(`abandon: 1 qui reste et 3 qui partent → ${fmt(ABANDON_STAYER)} / ${fmt(ABANDON_LEAVER)} chacun`, () => {
+  const d = deltasWithAbandon([1000, 1000, 1000, 1000], ["p2", "p3", "p4"]);
+  assert(
+    d[0] === ABANDON_STAYER,
+    `Celui qui reste doit faire ${fmt(ABANDON_STAYER)}, fait ${fmt(d[0])}`,
+  );
+  for (let i = 1; i < 4; i++) {
+    assert(
+      d[i] === ABANDON_LEAVER,
+      `Le partant p${i + 1} doit faire ${fmt(ABANDON_LEAVER)}, fait ${fmt(d[i])}`,
+    );
+  }
+});
+
+test("abandon: un partant ne gagne jamais de points contre un autre partant", () => {
+  // Sans la règle, p2 « battrait » p3 et p4 et gagnerait des points
+  const d = deltasWithAbandon([1000, 1000, 1000, 1000], ["p2", "p3", "p4"]);
+  assert(
+    d[1] < 0,
+    `Le partant classé 2e doit perdre des points, fait ${fmt(d[1])}`,
+  );
+});
+
+test("abandon: à ELO égal, tous les partants perdent autant", () => {
+  const d = deltasWithAbandon([1000, 1000, 1000, 1000], ["p2", "p3", "p4"]);
+  assert(
+    d[1] === d[2] && d[2] === d[3],
+    `Les partants doivent perdre pareil : ${d.slice(1).join()}`,
+  );
+});
+
+test("abandon: deux joueurs restent, deux partent", () => {
+  const d = deltasWithAbandon([1000, 1000, 1000, 1000], ["p3", "p4"]);
+  assert(d[0] > d[1], "Le 1er doit gagner plus que le 2e");
+  assert(
+    d[1] > 0,
+    `Le 2e est resté et bat les deux partants : il doit gagner, fait ${fmt(d[1])}`,
+  );
+  assert(d[2] < 0 && d[3] < 0, "Les deux partants doivent perdre");
+  assert(d[2] === d[3], "Les deux partants doivent perdre autant");
+});
+
+test("abandon: un seul partant → même résultat que s'il était juste dernier", () => {
+  // Il n'y a aucun duel entre partants à ignorer
+  const elos = [1000, 1050, 980, 1020];
+  const normal = deltas(...elos).join();
+  const withAbandon = deltasWithAbandon(elos, ["p4"]).join();
+  assert(
+    normal === withAbandon,
+    `Dernier : ${normal}, partant : ${withAbandon}`,
+  );
+});
+
+test("abandon: tout le monde est parti → personne ne bouge", () => {
+  const d = deltasWithAbandon([1000, 1200, 900], ["p1", "p2", "p3"]);
+  assert(
+    d.every((x) => x === 0),
+    `Aucun ELO ne doit bouger : ${d.join()}`,
+  );
+});
+
+test("abandon: un id inconnu dans la liste est ignoré", () => {
+  const elos = [1000, 1000, 1000];
+  const normal = deltas(...elos).join();
+  const withUnknown = deltasWithAbandon(elos, ["quelquun-d-autre"]).join();
+  assert(
+    normal === withUnknown,
+    `Sans : ${normal}, avec un id inconnu : ${withUnknown}`,
+  );
+});
+
+test("abandon: propriétés sur 1000 parties aléatoires avec abandons", () => {
+  for (let run = 0; run < 1000; run++) {
+    const n = 2 + Math.floor(Math.random() * 3); // 2 à 4 joueurs
+    const stayers = 1 + Math.floor(Math.random() * (n - 1)); // au moins 1 qui reste
+    const elos = Array.from(
+      { length: n },
+      () => 600 + Math.floor(Math.random() * 1400),
+    );
+    // Comme dans updateElo : ceux qui restent d'abord, les partants à la fin
+    const abandoned = Array.from(
+      { length: n - stayers },
+      (_, i) => `p${stayers + i + 1}`,
+    );
+    const d = deltasWithAbandon(elos, abandoned);
+
+    for (let i = stayers; i < n; i++) {
+      assert(
+        d[i] <= 0,
+        `Run ${run} : le partant p${i + 1} gagne ${d[i]} (${elos.join(",")}, partants ${abandoned.join(",")})`,
+      );
+    }
+    assert(
+      d[0] >= 0,
+      `Run ${run} : le 1er perd des points (${elos.join(",")})`,
+    );
+    assert(
+      d.every((x) => Math.abs(x) <= K),
+      `Run ${run} : une variation dépasse K`,
+    );
+  }
+});
+
+// ============================================================
 // PROPRIÉTÉS SUR DES CLASSEMENTS ALÉATOIRES
 // ============================================================
 
