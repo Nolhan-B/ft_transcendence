@@ -47,15 +47,15 @@ export default async function gameRoutes(fastify: FastifyInstance) {
           .code(400)
           .send({ error: "Duplicate participants are not allowed" });
       }
-    if (mode === GameMode.RANKED) {
-      return reply
-        .code(400)
-        .send({ error: "Ranked games are only available through matchmaking" });
-    }
+      if (mode === GameMode.RANKED) {
+        return reply.code(400).send({
+          error: "Ranked games are only available through matchmaking",
+        });
+      }
 
-    const isCreatorInGame = participants.some((p) => p.id === id);
-    if (!isCreatorInGame)
-      return reply.code(400).send({ error: "Creator must be a participant" });
+      const isCreatorInGame = participants.some((p) => p.id === id);
+      if (!isCreatorInGame)
+        return reply.code(400).send({ error: "Creator must be a participant" });
 
       if (!uniqueIds.has(id)) {
         return reply.code(400).send({ error: "Creator must be a participant" });
@@ -102,17 +102,17 @@ export default async function gameRoutes(fastify: FastifyInstance) {
       if (name.trim().length === 0) {
         return reply.code(400).send({ error: "Room name cannot be empty" });
       }
-    if (mode === GameMode.RANKED) {
-      return reply
-        .code(400)
-        .send({ error: "Ranked games are only available through matchmaking" });
-    }
+      if (mode === GameMode.RANKED) {
+        return reply.code(400).send({
+          error: "Ranked games are only available through matchmaking",
+        });
+      }
 
-    if (maxPlayers < 2 || maxPlayers > 4) {
-      return reply
-        .code(400)
-        .send({ error: "Max players must be between 2 and 4" });
-    }
+      if (maxPlayers < 2 || maxPlayers > 4) {
+        return reply
+          .code(400)
+          .send({ error: "Max players must be between 2 and 4" });
+      }
 
       const roomCode = fastify.roomManager.createRoom(
         id,
