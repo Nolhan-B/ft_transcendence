@@ -1,5 +1,10 @@
 import { FastifyInstance } from "fastify";
-import { CreateGamePayload, CreateRoomPayload, JwtPayload } from "shared";
+import {
+  CreateGamePayload,
+  CreateRoomPayload,
+  GameMode,
+  JwtPayload,
+} from "shared";
 
 export default async function gameRoutes(fastify: FastifyInstance) {
   fastify.post("/games/create", async (request, reply) => {
@@ -7,6 +12,12 @@ export default async function gameRoutes(fastify: FastifyInstance) {
     const { id } = request.user as JwtPayload;
 
     const { participants, mode, settings } = request.body as CreateGamePayload;
+
+    if (mode === GameMode.RANKED) {
+      return reply
+        .code(400)
+        .send({ error: "Ranked games are only available through matchmaking" });
+    }
 
     const isCreatorInGame = participants.some((p) => p.id === id);
     if (!isCreatorInGame)
@@ -32,6 +43,12 @@ export default async function gameRoutes(fastify: FastifyInstance) {
 
     const { name, mode, maxPlayers, password } =
       request.body as CreateRoomPayload;
+
+    if (mode === GameMode.RANKED) {
+      return reply
+        .code(400)
+        .send({ error: "Ranked games are only available through matchmaking" });
+    }
 
     if (maxPlayers < 2 || maxPlayers > 4) {
       return reply

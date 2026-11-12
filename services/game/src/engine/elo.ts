@@ -2,6 +2,7 @@ export const ELO_K = 16;
 
 export function computeEloChanges(
   ranking: { userId: string; elo: number }[],
+  abandoned: string[] = [],
 ): { userId: string; oldElo: number; newElo: number }[] {
   const n = ranking.length;
   if (n < 2) {
@@ -17,6 +18,12 @@ export function computeEloChanges(
 
   for (let i = 0; i < n; i++) {
     for (let j = i + 1; j < n; j++) {
+      if (
+        abandoned.includes(ranking[i].userId) &&
+        abandoned.includes(ranking[j].userId)
+      ) {
+        continue;
+      }
       const prob = probabilityToDefeat(ranking[i].elo, ranking[j].elo);
 
       deltas[i] += k * (1 - prob);
