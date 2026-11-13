@@ -8,6 +8,7 @@ export interface User {
   avatarUrl: string | null;
   twoFactorSecret: string | null;
   twoFactorSecretEnabled: boolean;
+  elo: number;
   createdAt: ISODateString;
 }
 
@@ -86,6 +87,7 @@ export type FriendshipWithFriend = {
     username: string;
     avatarUrl: string | null;
     createdAt: Date;
+    elo: number;
   };
 };
 
@@ -95,5 +97,6 @@ export type FriendshipWithUser = {
     username: string;
     avatarUrl: string | null;
     createdAt: Date;
+    elo: number;
   };
 };

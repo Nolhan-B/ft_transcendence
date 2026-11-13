@@ -1,6 +1,6 @@
 import { FastifyInstance } from "fastify";
 import { WebSocket } from "ws";
-import { GameStatus, type ServerEvent } from "shared";
+import { GameMode, GameStatus, type ServerEvent } from "shared";
 import { RawData } from "ws";
 import { InternalGameState } from "../engine/game-state.js";
 import {
@@ -34,6 +34,10 @@ import { handleChatMessage } from "./handlers/chat/index.js";
 import type { GatewayContext } from "./types.js";
 import { advanceToNextPlayer } from "../engine/game-state.js";
 import { scheduleBotTurnIfNeeded } from "./handlers/game/bot-turn.js";
+import { handleJoinQueue } from "./handlers/matchmaking/join-queue.js";
+import { handleLeaveQueue } from "./handlers/matchmaking/leave-queue.js";
+import { findMatch } from "../engine/matchmaking.js";
+import { computeEloChanges } from "../engine/elo.js";
 
 const TURN_TIMEOUT_MS = 20000;
 const MAX_AFK_COUNT = 2;
@@ -76,9 +80,14 @@ const spectators: Map<
 const disconnectTimers: Map<string, NodeJS.Timeout> = new Map();
 const RECONNECT_GRACE_MS = Number(process.env.RECONNECT_GRACE_MS) || 30000;
 
+const MATCHMAKING_TICK_MS = Number(process.env.MATCHMAKING_TICK_MS) || 2000;
+const MATCH_JOIN_TIMEOUT_MS =
+  Number(process.env.MATCH_JOIN_TIMEOUT_MS) || 15000;
+
 export default async function gameGateway(fastify: FastifyInstance) {
   const manager = fastify.gameManager;
   const roomManager = fastify.roomManager;
+  const queueManager = fastify.queueManager;
 
   function broadCastToRoom(
     gameId: string,
@@ -192,6 +201,44 @@ export default async function gameGateway(fastify: FastifyInstance) {
     turnTimers.set(gameId, timer);
   }
 
+  async function updateElo(game: InternalGameState): Promise<void> {
+    const ranked = [...game.ranking];
+    for (const p of game.players) {
+      if (!ranked.includes(p.userId) && !p.disconnected) ranked.push(p.userId);
+    }
+    for (const p of game.players) {
+      if (!ranked.includes(p.userId)) ranked.push(p.userId);
+    }
+
+    const users = await fastify.prisma.user.findMany({
+      where: { id: { in: ranked } },
+      select: { id: true, elo: true },
+    });
+    const eloById = new Map(users.map((u) => [u.id, u.elo]));
+
+    const abandoned = game.players
+      .filter((p) => p.disconnected && !game.ranking.includes(p.userId))
+      .map((p) => p.userId);
+
+    const changes = computeEloChanges(
+      ranked
+        .filter((id) => eloById.has(id))
+        .map((id) => ({ userId: id, elo: eloById.get(id)! })),
+      abandoned,
+    );
+
+    await fastify.prisma.$transaction(
+      changes.map((c) =>
+        fastify.prisma.user.update({
+          where: { id: c.userId },
+          data: { elo: c.newElo },
+        }),
+      ),
+    );
+
+    broadCastToRoom(game.id, { type: "elo_updated", changes });
+  }
+
   async function endGame(
     gameId: string,
     game: InternalGameState,
@@ -214,12 +261,18 @@ export default async function gameGateway(fastify: FastifyInstance) {
       clearTimeout(bluffTimers.get(gameId));
       bluffTimers.delete(gameId);
     }
-    const activePlayers = game.players.filter((p) => !p.disconnected);
-    game.winnerId = activePlayers.length === 1 ? activePlayers[0].userId : null;
+    if (!game.winnerId) {
+      const activePlayers = game.players.filter((p) => !p.disconnected);
+      game.winnerId =
+        activePlayers.length === 1 ? activePlayers[0].userId : null;
+    }
     broadCastToRoom(gameId, {
       type: "game_ended",
       winnerId: game.winnerId ?? "",
     });
+    if (game.mode === GameMode.RANKED) {
+      await updateElo(game);
+    }
     await fastify.prisma.match.create({
       data: {
         mode: game.mode,
@@ -236,6 +289,48 @@ export default async function gameGateway(fastify: FastifyInstance) {
     spectators.delete(gameId);
     manager.removeGame(gameId);
   }
+
+  function runMatchmaking(): void {
+    const now = Date.now();
+    let group = findMatch(queueManager.list(), now);
+
+    while (group) {
+      queueManager.removeMany(group.map((e) => e.userId));
+
+      const gameId = manager.createGame(
+        group.map((e) => ({ id: e.userId, username: e.username })),
+        GameMode.RANKED,
+      );
+
+      if (gameId) {
+        const event = JSON.stringify({
+          type: "match_found",
+          gameId,
+          players: group.map((e) => ({
+            id: e.userId,
+            username: e.username,
+            elo: e.elo,
+          })),
+        });
+        for (const e of group) {
+          const socket = connectedUser.get(e.userId);
+          if (socket?.readyState === WebSocket.OPEN) socket.send(event);
+        }
+
+        // Si personne ne rejoint la partie, on l'annule sans toucher à l'ELO
+        setTimeout(() => {
+          const game = manager.getGame(gameId);
+          const room = rooms.get(gameId);
+          if (game && (!room || room.size === 0)) manager.removeGame(gameId);
+        }, MATCH_JOIN_TIMEOUT_MS);
+      }
+
+      group = findMatch(queueManager.list(), now);
+    }
+  }
+
+  const matchmakingInterval = setInterval(runMatchmaking, MATCHMAKING_TICK_MS);
+  fastify.addHook("onClose", async () => clearInterval(matchmakingInterval));
 
   fastify.get("/ws", { websocket: true }, async (socket, request) => {
     const token = request.cookies.access_token;
@@ -271,6 +366,7 @@ export default async function gameGateway(fastify: FastifyInstance) {
       userId,
       manager,
       roomManager,
+      queueManager,
       rooms,
       roomSockets,
       chatLogs,
@@ -357,10 +453,17 @@ export default async function gameGateway(fastify: FastifyInstance) {
         case "leave_spectate":
           handleLeaveSpectate(ctx, message);
           break;
+        case "join_queue":
+          await handleJoinQueue(ctx);
+          break;
+        case "leave_queue":
+          handleLeaveQueue(ctx);
+          break;
       }
     });
 
     socket.on("close", async () => {
+      queueManager.leave(userId);
       for (const [gameId, watchers] of spectators) {
         for (const client of watchers) {
           if (client.socket === socket) watchers.delete(client);

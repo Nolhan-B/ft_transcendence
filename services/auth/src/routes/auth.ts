@@ -123,24 +123,53 @@ export default async function authRoutes(fastify: FastifyInstance) {
     return { user };
   });
 
-  fastify.delete("/account", async (request, reply) => {
-    await request.jwtVerify();
-    const { id } = request.user as JwtPayload;
-    const { password, code } = request.body as {
-      password: string;
-      code?: string;
-    };
+  fastify.delete(
+    "/account",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["password"],
+          properties: {
+            password: { type: "string", minLength: 1 },
+            code: { type: "string", minLength: 6, maxLength: 6 },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      await request.jwtVerify();
+      const { id } = request.user as JwtPayload;
+      const { password, code } = request.body as {
+        password: string;
+        code?: string;
+      };
 
-    const deleted = await authService.deleteAccount(
-      fastify.prisma,
-      id,
-      password,
-      code,
-    );
-    if (!deleted)
-      return reply.code(401).send({ error: "Invalid password or 2FA code" });
+      try {
+        const deleted = await authService.deleteAccount(
+          fastify.prisma,
+          id,
+          password,
+          code,
+        );
+        if (!deleted) {
+          return reply
+            .code(401)
+            .send({ error: "Invalid password or 2FA code" });
+        }
 
-    reply.clearCookie("access_token", { path: "/" });
-    return reply.send({ message: "Account deleted" });
-  });
+        reply.clearCookie("access_token", { path: "/" });
+        return reply.send({ message: "Account deleted" });
+      } catch (err: unknown) {
+        const prismaError = err as { code?: string };
+        // Handle concurrent delete race condition gracefully
+        if (prismaError.code === "P2025") {
+          reply.clearCookie("access_token", { path: "/" });
+          return reply.code(404).send({ error: "Account already deleted" });
+        }
+        request.log.error(err);
+        return reply.code(500).send({ error: "Internal server error" });
+      }
+    },
+  );
 }

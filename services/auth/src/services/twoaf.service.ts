@@ -34,22 +34,20 @@ export async function verifyTwoFactor(
   code: string,
 ): Promise<Omit<User, "twoFactorSecret"> | null> {
   const user = await prisma.user.findUnique({ where: { id: userId } });
-  if (!user) return null;
-
-  if (!user.twoFactorSecret) return null;
+  if (!user || !user.twoFactorSecret) return null;
 
   if (authenticator.verify({ token: code, secret: user.twoFactorSecret })) {
     const updatedUser = await prisma.user.update({
       where: { id: userId },
       data: { twoFactorSecretEnabled: true },
     });
-    if (!updatedUser) return null;
     return {
       id: updatedUser.id,
       email: updatedUser.email,
       username: updatedUser.username,
       avatarUrl: updatedUser.avatarUrl,
       twoFactorSecretEnabled: updatedUser.twoFactorSecretEnabled,
+      elo: updatedUser.elo,
       createdAt: updatedUser.createdAt.toISOString(),
     };
   }
@@ -62,9 +60,7 @@ export async function validateTwoFactor(
   code: string,
 ): Promise<Omit<User, "twoFactorSecret"> | null> {
   const user = await prisma.user.findUnique({ where: { id: userId } });
-  if (!user) return null;
-
-  if (!user.twoFactorSecret) return null;
+  if (!user || !user.twoFactorSecret) return null;
 
   if (authenticator.verify({ token: code, secret: user.twoFactorSecret })) {
     return {
@@ -73,6 +69,7 @@ export async function validateTwoFactor(
       username: user.username,
       avatarUrl: user.avatarUrl,
       twoFactorSecretEnabled: user.twoFactorSecretEnabled,
+      elo: user.elo,
       createdAt: user.createdAt.toISOString(),
     };
   }
@@ -86,7 +83,7 @@ export async function disableTwoFactor(
   code: string,
 ): Promise<Omit<User, "twoFactorSecret"> | null> {
   const user = await prisma.user.findUnique({ where: { id: userId } });
-  if (!user) return null;
+  if (!user || !user.password) return null;
 
   const valid = await bcrypt.compare(password, user.password);
   if (!valid) return null;
@@ -98,13 +95,13 @@ export async function disableTwoFactor(
       where: { id: userId },
       data: { twoFactorSecret: null, twoFactorSecretEnabled: false },
     });
-    if (!updatedUser) return null;
     return {
       id: updatedUser.id,
       email: updatedUser.email,
       username: updatedUser.username,
       avatarUrl: updatedUser.avatarUrl,
       twoFactorSecretEnabled: updatedUser.twoFactorSecretEnabled,
+      elo: updatedUser.elo,
       createdAt: updatedUser.createdAt.toISOString(),
     };
   }

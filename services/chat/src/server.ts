@@ -1,4 +1,4 @@
-import Fastify from "fastify";
+import Fastify, { FastifyError } from "fastify";
 import fs from "node:fs";
 import process from "node:process";
 import cookie from "@fastify/cookie";
@@ -22,9 +22,43 @@ if (fs.existsSync("/run/secrets/jwt_secret")) {
     .trim();
 }
 
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const MAX_MESSAGE_LENGTH = 2000;
+const MAX_ROOM_ID_LENGTH = 100;
+
 const fastify = Fastify({
   logger: true,
 });
+
+// Global HTTP error handler to map Prisma/Fastify errors cleanly and prevent stack trace leaks
+fastify.setErrorHandler(
+  (error: FastifyError & { code?: string }, request, reply) => {
+    if (error.code === "P2002") {
+      return reply.code(409).send({ error: "Resource already exists" });
+    }
+    if (error.code === "P2025") {
+      return reply.code(404).send({ error: "Resource not found" });
+    }
+    if (error.code === "P2003") {
+      return reply
+        .code(409)
+        .send({ error: "Cannot complete operation due to related records" });
+    }
+
+    if (error.statusCode && error.statusCode >= 400 && error.statusCode < 500) {
+      return reply.code(error.statusCode).send({
+        statusCode: error.statusCode,
+        code: error.code,
+        error: error.name,
+        message: error.message,
+      });
+    }
+
+    request.log.error(error);
+    return reply.code(500).send({ error: "Internal server error" });
+  },
+);
 
 setupMetrics(fastify, "chat-services");
 
@@ -74,9 +108,15 @@ fastify.register(async function (fastify) {
       return;
     }
 
+    // Prevent unhandled 'error' events on abrupt client disconnects from crashing Node
+    socket.on("error", (err) => {
+      fastify.log.warn({ err, userId }, "WebSocket client error");
+    });
+
     fastify.log.info(`User authenticated on WS: ${userId}`);
     connectedClients.set(userId, socket);
 
+    // Deliver offline queued messages upon connection
     (async () => {
       try {
         const pendingMessages = await fastify.prisma.directMessage.findMany({
@@ -133,10 +173,23 @@ fastify.register(async function (fastify) {
       if (
         type !== "direct_message" ||
         typeof receiverId !== "string" ||
+        !UUID_REGEX.test(receiverId) ||
         typeof content !== "string" ||
-        content.trim() === ""
+        content.trim() === "" ||
+        content.length > MAX_MESSAGE_LENGTH
       ) {
         socket.send(JSON.stringify({ error: "Invalid message payload" }));
+        return;
+      }
+
+      // Validate gameRoomId as a bounded string without enforcing UUID format
+      if (
+        gameRoomId !== undefined &&
+        gameRoomId !== null &&
+        (typeof gameRoomId !== "string" ||
+          gameRoomId.length > MAX_ROOM_ID_LENGTH)
+      ) {
+        socket.send(JSON.stringify({ error: "Invalid gameRoomId format" }));
         return;
       }
 
@@ -145,7 +198,10 @@ fastify.register(async function (fastify) {
         receiverId,
         content,
         messageType: messageType === "game_invite" ? "game_invite" : "text",
-        gameRoomId: typeof gameRoomId === "string" ? gameRoomId : undefined,
+        gameRoomId:
+          typeof gameRoomId === "string" && gameRoomId.trim() !== ""
+            ? gameRoomId.trim()
+            : undefined,
       };
 
       if (payload.receiverId === userId) {
@@ -155,32 +211,32 @@ fastify.register(async function (fastify) {
         return;
       }
 
-      const blockRelation = await fastify.prisma.blockedFriendship.findFirst({
-        where: {
-          OR: [
-            { blockerId: userId, blockedId: payload.receiverId },
-            { blockerId: payload.receiverId, blockedId: userId },
-          ],
-        },
-      });
-
-      if (blockRelation) {
-        socket.send(
-          JSON.stringify({
-            type: "error",
-            message: "Cannot send message: user is blocked",
-          }),
-        );
-        return;
-      }
-
-      const recipientSocket = connectedClients.get(payload.receiverId);
-      const isRecipientOnline =
-        recipientSocket !== undefined && recipientSocket.readyState === 1;
-
-      let savedMessage;
+      // Wrap all database calls inside try/catch to prevent unhandled promise rejections
       try {
-        savedMessage = await fastify.prisma.directMessage.create({
+        const blockRelation = await fastify.prisma.blockedFriendship.findFirst({
+          where: {
+            OR: [
+              { blockerId: userId, blockedId: payload.receiverId },
+              { blockerId: payload.receiverId, blockedId: userId },
+            ],
+          },
+        });
+
+        if (blockRelation) {
+          socket.send(
+            JSON.stringify({
+              type: "error",
+              message: "Cannot send message: user is blocked",
+            }),
+          );
+          return;
+        }
+
+        const recipientSocket = connectedClients.get(payload.receiverId);
+        const isRecipientOnline =
+          recipientSocket !== undefined && recipientSocket.readyState === 1;
+
+        const savedMessage = await fastify.prisma.directMessage.create({
           data: {
             senderId: userId,
             receiverId: payload.receiverId,
@@ -199,29 +255,34 @@ fastify.register(async function (fastify) {
             createdAt: true,
           },
         });
-      } catch (err) {
-        fastify.log.error({ err }, "Failed to persist direct message");
+
+        const outboundString = JSON.stringify({
+          type: "direct_message",
+          id: savedMessage.id,
+          senderId: savedMessage.senderId,
+          receiverId: savedMessage.receiverId,
+          content: savedMessage.content,
+          messageType: savedMessage.messageType,
+          gameRoomId: savedMessage.gameRoomId,
+          createdAt: savedMessage.createdAt.toISOString(),
+        });
+
+        if (isRecipientOnline && recipientSocket) {
+          recipientSocket.send(outboundString);
+        }
+
+        if (socket.readyState === 1) {
+          socket.send(outboundString);
+        }
+      } catch (err: unknown) {
+        const prismaError = err as { code?: string };
+        // Handle foreign key violation when sender or recipient no longer exists
+        if (prismaError.code === "P2003") {
+          socket.send(JSON.stringify({ error: "Recipient not found" }));
+          return;
+        }
+        fastify.log.error({ err }, "Failed to process direct message");
         socket.send(JSON.stringify({ error: "Failed to send message" }));
-        return;
-      }
-
-      const outboundString = JSON.stringify({
-        type: "direct_message",
-        id: savedMessage.id,
-        senderId: savedMessage.senderId,
-        receiverId: savedMessage.receiverId,
-        content: savedMessage.content,
-        messageType: savedMessage.messageType,
-        gameRoomId: savedMessage.gameRoomId,
-        createdAt: savedMessage.createdAt.toISOString(),
-      });
-
-      if (isRecipientOnline && recipientSocket) {
-        recipientSocket.send(outboundString);
-      }
-
-      if (socket.readyState === 1) {
-        socket.send(outboundString);
       }
     });
 
@@ -236,7 +297,8 @@ fastify.register(async function (fastify) {
 
 const start = async () => {
   try {
-    await fastify.listen({ port: 3003, host: "0.0.0.0" });
+    const port = Number(process.env.CHAT_PORT ?? 3003);
+    await fastify.listen({ port, host: "0.0.0.0" });
   } catch (err) {
     fastify.log.error(err);
     process.exit(1);

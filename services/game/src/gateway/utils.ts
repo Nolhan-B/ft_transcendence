@@ -116,6 +116,9 @@ export function validateMessage(raw: unknown): ClientMessage | null {
     case "leave_spectate":
       if (typeof msg.gameId !== "string") return null;
       break;
+    case "join_queue":
+    case "leave_queue":
+      break;
     default:
       return null;
   }

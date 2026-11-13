@@ -167,6 +167,30 @@ export interface SpectateStartedEvent {
 }
 
 // ============================================================
+// MATCHMAKING - Server -> Client
+// ============================================================
+
+export interface QueueJoinedEvent {
+  type: "queue_joined";
+  elo: number;
+}
+
+export interface QueueLeftEvent {
+  type: "queue_left";
+}
+
+export interface MatchFoundEvent {
+  type: "match_found";
+  gameId: string;
+  players: { id: string; username: string; elo: number }[];
+}
+
+export interface EloUpdatedEvent {
+  type: "elo_updated";
+  changes: { userId: string; oldElo: number; newElo: number }[];
+}
+
+// ============================================================
 // UNIONS
 // ============================================================
 
@@ -182,7 +206,11 @@ export type ServerEvent =
   | UnoCaughtEvent
   | BluffResultEvent
   | BluffResultEvent
-  | SpectateStartedEvent;
+  | SpectateStartedEvent
+  | QueueJoinedEvent
+  | QueueLeftEvent
+  | MatchFoundEvent
+  | EloUpdatedEvent;
 
 export type ClientMessage =
   | ({ type: "create_room" } & CreateRoomPayload)
@@ -201,4 +229,6 @@ export type ClientMessage =
   | ({ type: "add_bot" } & AddBotPayload)
   | ({ type: "remove_bot" } & RemoveBotPayload)
   | ({ type: "spectate_game" } & SpectateGamePayload)
-  | ({ type: "leave_spectate" } & LeaveSpectatePayload);
+  | ({ type: "leave_spectate" } & LeaveSpectatePayload)
+  | { type: "join_queue" }
+  | { type: "leave_queue" };

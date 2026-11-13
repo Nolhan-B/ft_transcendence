@@ -6,6 +6,13 @@ export async function handleCreateRoom(
   ctx: GatewayContext,
   msg: { mode: GameMode; maxPlayers: number; name: string; password?: string },
 ): Promise<void> {
+  if (msg.mode === GameMode.RANKED) {
+    ctx.sendError(
+      ctx.socket,
+      "Ranked games are only available through matchmaking",
+    );
+    return;
+  }
   const user = await ctx.fastify.prisma.user.findUnique({
     where: { id: ctx.userId },
     select: { username: true },
