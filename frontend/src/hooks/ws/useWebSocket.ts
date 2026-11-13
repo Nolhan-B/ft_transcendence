@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-type Status = "connecting" | "open" | "closed";
+export type Status = "connecting" | "open" | "closed";
 
 interface Options {
   path: string;
