@@ -1,6 +1,17 @@
-import sendIcon from "../../../assets/icons/send.svg";
+import React, { useState } from "react";
 
 export function GameChat() {
+  const [messageContent, setMessageContent] = useState("");
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault(); // Anti browser reloading
+
+    if (messageContent == "")
+      return ;
+
+    console.log("WIP for sending message " + messageContent);
+  }
+
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-col">
@@ -35,15 +46,14 @@ export function GameChat() {
           <div className="chat-bubble">I hate you!</div>
         </div>
       </div>
-      <form className="flex gap-2 items-center">
-        <input type="text" placeholder="Your message" className="flex flex-1 input input-sm" />
+      <form className="flex gap-2 items-center" onSubmit={handleSubmit}>
+        <input
+          type="text"
+          placeholder="Your message"
+          className="flex flex-1 input input-sm"
+          onChange={(e) => setMessageContent(e.target.value)}
+        />
         <button className="btn border-0 bg-secondary text-secondary-content">
-          <img
-            src={sendIcon}
-            alt=""
-            aria-hidden="true"
-            className="size-[1.2em]"
-          />
           Send
         </button>
       </form>

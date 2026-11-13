@@ -1,4 +1,5 @@
 import messageIcon from "../../assets/icons/message.svg";
+import { FriendChat } from "./components/FriendChat";
 import { GameChat } from "./components/GameChat";
 
 export function FloatingMessageBox() {
@@ -21,9 +22,8 @@ export function FloatingMessageBox() {
           defaultChecked
         />
         <div className="tab-content bg-base-100 border-base-300 p-6">
-          <p>Friends chat</p>
+          <FriendChat />
         </div>
-
         <input
           type="radio"
           name="my_tabs_6"
