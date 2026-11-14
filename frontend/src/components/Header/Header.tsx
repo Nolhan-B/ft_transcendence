@@ -2,6 +2,7 @@ export type HeaderProps = { variant: "simple" | "logged-out" | "default" };
 
 import { Drawer } from "./components/Drawer";
 import { SiteTitle } from "./components/SiteTitle";
+import { UserProfileIcon } from "./components/UserProfileIcon";
 
 export function Header({ variant }: HeaderProps) {
   if (variant == "simple") {
@@ -51,6 +52,7 @@ export function Header({ variant }: HeaderProps) {
     <div className="navbar bg-base-200 shadow-sm">
       <div className="flex-1">
         <SiteTitle />
+        <UserProfileIcon />
       </div>
     </div>
   );
