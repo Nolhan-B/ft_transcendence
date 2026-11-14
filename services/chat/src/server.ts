@@ -165,7 +165,9 @@ fastify.register(async function (fastify) {
       try {
         parsed = JSON.parse(rawMessage.toString());
       } catch {
-        socket.send(JSON.stringify({ error: "Invalid JSON format" }));
+        socket.send(
+          JSON.stringify({ type: "error", message: "Invalid JSON format" }),
+        );
         return;
       }
 
@@ -178,7 +180,9 @@ fastify.register(async function (fastify) {
         content.trim() === "" ||
         content.length > MAX_MESSAGE_LENGTH
       ) {
-        socket.send(JSON.stringify({ error: "Invalid message payload" }));
+        socket.send(
+          JSON.stringify({ type: "error", message: "Invalid message payload" }),
+        );
         return;
       }
 
@@ -189,7 +193,12 @@ fastify.register(async function (fastify) {
         (typeof gameRoomId !== "string" ||
           gameRoomId.length > MAX_ROOM_ID_LENGTH)
       ) {
-        socket.send(JSON.stringify({ error: "Invalid gameRoomId format" }));
+        socket.send(
+          JSON.stringify({
+            type: "error",
+            message: "Invalid gameRoomId format",
+          }),
+        );
         return;
       }
 
@@ -206,7 +215,10 @@ fastify.register(async function (fastify) {
 
       if (payload.receiverId === userId) {
         socket.send(
-          JSON.stringify({ error: "Cannot send message to yourself" }),
+          JSON.stringify({
+            type: "error",
+            message: "Cannot send message to yourself",
+          }),
         );
         return;
       }
@@ -278,11 +290,15 @@ fastify.register(async function (fastify) {
         const prismaError = err as { code?: string };
         // Handle foreign key violation when sender or recipient no longer exists
         if (prismaError.code === "P2003") {
-          socket.send(JSON.stringify({ error: "Recipient not found" }));
+          socket.send(
+            JSON.stringify({ type: "error", message: "Recipient not found" }),
+          );
           return;
         }
         fastify.log.error({ err }, "Failed to process direct message");
-        socket.send(JSON.stringify({ error: "Failed to send message" }));
+        socket.send(
+          JSON.stringify({ type: "error", message: "Failed to send message" }),
+        );
       }
     });
 
