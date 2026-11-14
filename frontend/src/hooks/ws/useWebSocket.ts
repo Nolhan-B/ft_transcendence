@@ -37,7 +37,7 @@ export function useWebSocket({ path, onMessage }: Options) {
         try {
           onMessageRef.current?.(JSON.parse(event.data));
         } catch {
-          console.log("WS message ignoré (JSON invalide)", event.data);
+          console.log("WS message ignored (invalid JSON)", event.data);
         }
       });
 

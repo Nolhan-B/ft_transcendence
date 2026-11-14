@@ -5,13 +5,13 @@ import { HomePage } from "../pages/HomePage/HomePage";
 import { AuthLayout } from "../layouts/AuthLayout";
 import { AuthPage } from "../pages/AuthPage/AuthPage";
 import { RedirectIfAuth } from "./AuthGuards";
-import { GameSession } from "./GameSession";
+import { RealtimeSession } from "./RealtimeSession";
 
 function Router() {
   return (
     <Routes>
-      {/* One game WebSocket for all the pages while connected */}
-      <Route element={<GameSession />}>
+      {/* Game and chat WebSockets for all the pages while connected */}
+      <Route element={<RealtimeSession />}>
         {/* Default layout */}
         <Route element={<MainLayout />} path="/">
           <Route path="/home" element={<HomePage />} />
