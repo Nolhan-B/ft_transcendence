@@ -27,7 +27,7 @@ SSL_KEY  = $(SSL_DIR)/transcendence.key
 SSL_CRT  = $(SSL_DIR)/transcendence.crt
 
 # Docker secrets, copied one by one from secrets.example/ when missing
-SECRETS  = secrets/db_password.txt secrets/db_url.txt secrets/jwt_secret.txt
+SECRETS  = secrets/db_password.txt secrets/db_url.txt secrets/jwt_secret.txt secrets/grafana_admin_password.txt
 
 # node --version 22.x needed
 NODE_MAJOR = 22
