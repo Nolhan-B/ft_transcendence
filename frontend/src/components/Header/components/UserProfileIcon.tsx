@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import defaultProfilePicture from "../../../assets/images/default-profile-picture.png";
 
 export function UserProfileIcon() {
   return (
@@ -8,7 +9,7 @@ export function UserProfileIcon() {
       className="btn btn-ghost btn-circle avatar avatar-online"
     >
       <div className="w-10 rounded-full">
-        <img src="https://img.daisyui.com/images/profile/demo/gordon@192.webp" alt="" />
+        <img src={defaultProfilePicture} alt="" className="object-cover" />
       </div>
     </Link>
   );

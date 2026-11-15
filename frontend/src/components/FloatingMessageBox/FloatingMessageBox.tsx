@@ -13,7 +13,7 @@ export function FloatingMessageBox() {
       >
         <img src={messageIcon} alt="" aria-hidden="true" className="size-6" />
       </div>
-      <div className="tabs tabs-box">
+      <div className="tabs tabs-box w-80 max-w-[calc(100vw-2rem)] whitespace-normal">
         <input
           type="radio"
           name="my_tabs_6"
@@ -21,8 +21,10 @@ export function FloatingMessageBox() {
           aria-label="Friends messages"
           defaultChecked
         />
-        <div className="tab-content bg-base-100 border-base-300 p-6">
-          <FriendChat />
+        <div className="tab-content h-[26rem] max-h-[calc(100vh-8rem)] bg-base-100 border-base-300 p-6">
+          <div className="flex h-full flex-col">
+            <FriendChat />
+          </div>
         </div>
         <input
           type="radio"
@@ -30,8 +32,10 @@ export function FloatingMessageBox() {
           className="tab"
           aria-label="Game chat"
         />
-        <div className="tab-content bg-base-100 border-base-300 p-6">
-          <GameChat />
+        <div className="tab-content h-[26rem] max-h-[calc(100vh-8rem)] bg-base-100 border-base-300 p-6">
+          <div className="flex h-full flex-col">
+            <GameChat />
+          </div>
         </div>
       </div>
     </div>

@@ -1,5 +1,10 @@
 import React, { useState } from "react";
 
+// Scrolls a chat to its latest message whenever the element is (re)mounted
+const scrollToBottom = (element: HTMLDivElement | null) => {
+  if (element) element.scrollTop = element.scrollHeight;
+};
+
 export function GameChat() {
   const [messageContent, setMessageContent] = useState("");
 
@@ -13,8 +18,8 @@ export function GameChat() {
   }
 
   return (
-    <div className="flex flex-col gap-5">
-      <div className="flex flex-col">
+    <div className="flex min-h-0 flex-1 flex-col gap-5">
+      <div ref={scrollToBottom} className="flex min-h-0 flex-1 flex-col overflow-y-auto">
         <div className="chat chat-start">
           <div className="chat-image avatar">
             <div className="w-10 rounded-full">
