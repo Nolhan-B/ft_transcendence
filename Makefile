@@ -39,7 +39,7 @@ SERVICE ?=
 #                                   .PHONY                                     #
 # **************************************************************************** #
 
-.PHONY: all install build up down logs log ps clean fclean re lint lint-fix test help
+.PHONY: all install build up down logs log ps clean fclean re lint lint-fix test seed help
 
 .DEFAULT_GOAL := all
 
@@ -62,6 +62,7 @@ help:
 	$(ECHO) "  $(CYAN)make lint$(RESET)           ESLint and Prettier check (Node $(NODE_MAJOR).x needed)"
 	$(ECHO) "  $(CYAN)make lint-fix$(RESET)       ESLint --fix and Prettier --write on the whole project"
 	$(ECHO) "  $(CYAN)make test$(RESET)           start the project, then run all the tests"
+	$(ECHO) "  $(CYAN)make seed PASSWORD=<value>$(RESET)  insert three debug users (alice, bob, charlie)"
 	$(ECHO) "  $(CYAN)make clean$(RESET)          stop the project (same as down)"
 	$(ECHO) "  $(CYAN)make fclean$(RESET)         stop the project, delete its volumes (database included) and the certificate"
 	$(ECHO) "  $(CYAN)make re$(RESET)             fclean, then all"
@@ -154,6 +155,15 @@ lint-fix:
 # Needs the running project (API, WebSocket and end-to-end tests)
 test: up
 	npm run test-all
+
+# Insert three debug users through the real /signup route, so the password is
+# hashed by the service itself: no SQL and no hash to keep in sync.
+# 409 means the user already exists, so the rule can be run again safely.
+# The password is not stored in this file: make seed PASSWORD=<value>
+seed:
+	@test -n "$(PASSWORD)" || { $(ECHO) "$(RED)✗ Mot de passe manquant : make seed PASSWORD=<valeur>$(RESET)"; exit 1; }
+	$(COMPOSE) exec -T -e SEED_PASSWORD='$(PASSWORD)' auth node --input-type=module -e 'for (const name of ["alice", "bob", "charlie"]) { const res = await fetch("http://127.0.0.1:3001/signup", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: name + "@example.com", username: name, password: process.env.SEED_PASSWORD }) }); if (res.status !== 201 && res.status !== 409) { console.error(name, res.status, await res.text()); process.exit(1); } console.log(name, res.status === 201 ? "created" : "already exists"); }'
+	$(ECHO) "$(GREEN)✓ Utilisateurs de debug prêts : alice, bob, charlie$(RESET)"
 
 clean: down
 
