@@ -12,10 +12,13 @@ export function FriendListItem({
   avatarUrl,
   ...rest
 }: FriendListItemProps) {
+  // h-auto: .btn has a fixed height (2.5rem), which is exactly the avatar size,
+  // so p-2 would make the image overflow the button. Let the padding drive the
+  // height instead.
   return (
     <button
       {...rest}
-      className="btn justify-start border-0 flex flex-1 bg-neutral p-2 rounded-xl flex gap-5 text-base"
+      className="btn h-auto w-full justify-start border-0 flex bg-neutral p-1 rounded-xl gap-5 text-base"
     >
       <img
         alt="Friend profile picture"
