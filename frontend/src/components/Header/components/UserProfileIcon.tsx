@@ -1,10 +1,15 @@
+import { Link } from "react-router-dom";
 
 export function UserProfileIcon() {
   return (
-    <div className="avatar avatar-online">
-        <div className="w-24 rounded-full">
-            <img alt="Tailwind-CSS-Avatar-component" src="https://img.daisyui.com/images/profile/demo/gordon@192.webp" />
-        </div>
-    </div>
+    <Link
+      to="/profile"
+      aria-label="Profile"
+      className="btn btn-ghost btn-circle avatar avatar-online"
+    >
+      <div className="w-10 rounded-full">
+        <img src="https://img.daisyui.com/images/profile/demo/gordon@192.webp" alt="" />
+      </div>
+    </Link>
   );
 }
