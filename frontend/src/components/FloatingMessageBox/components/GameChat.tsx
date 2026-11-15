@@ -11,15 +11,17 @@ export function GameChat() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault(); // Anti browser reloading
 
-    if (messageContent == "")
-      return ;
+    if (messageContent == "") return;
 
     console.log("WIP for sending message " + messageContent);
   }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-5">
-      <div ref={scrollToBottom} className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+      <div
+        ref={scrollToBottom}
+        className="flex min-h-0 flex-1 flex-col overflow-y-auto"
+      >
         <div className="chat chat-start">
           <div className="chat-image avatar">
             <div className="w-10 rounded-full">

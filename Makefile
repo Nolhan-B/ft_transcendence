@@ -106,8 +106,7 @@ build: install
 # Build and start the whole project in the background
 up: install
 	$(COMPOSE) up -d --build
-	port=$$(sed -n 's/^HTTPS_PORT=//p' .env | tail -n 1)
-	$(ECHO) "$(GREEN)✓ Application : https://localhost:$${port:-8443}$(RESET)"
+	$(ECHO) "$(GREEN)✓ Application : https://localhost:$$(sed -n 's/^HTTPS_PORT=//p' .env | tail -n 1 | grep . || echo 8443)$(RESET)"
 
 down:
 	$(COMPOSE) down
@@ -117,28 +116,17 @@ logs:
 
 # Logs of one service, named by the SERVICE argument
 log:
-	if [ -z "$(SERVICE)" ]; then
-		$(ECHO) "$(RED)✗ Service manquant : make log SERVICE=<nom>$(RESET)"
-		$(ECHO) "Services : $$($(COMPOSE) config --services | tr '\n' ' ')"
-		exit 1
-	fi
+	@test -n "$(SERVICE)" || { $(ECHO) "$(RED)✗ Service manquant : make log SERVICE=<nom>$(RESET)"; $(ECHO) "Services : $$($(COMPOSE) config --services | tr '\n' ' ')"; exit 1; }
 	$(COMPOSE) logs -f --tail=100 $(SERVICE)
 
 ps:
 	$(COMPOSE) ps
 
-# Shell code that stops when node is missing or is not the expected version
-define NODE_CHECK
-if ! command -v node >/dev/null 2>&1; then
-	$(ECHO) "$(RED)✗ node est requis (version $(NODE_MAJOR).x)$(RESET)"
-	exit 1
-fi
-major=$$(node -p 'process.versions.node.split(".")[0]')
-if [ "$$major" != "$(NODE_MAJOR)" ]; then
-	$(ECHO) "$(RED)✗ Node $(NODE_MAJOR).x requis, version trouvée : $$(node --version)$(RESET)"
-	exit 1
-fi
-endef
+# Shell code that stops when node is missing or is not the expected version.
+# Written on ONE line on purpose: macOS ships GNU Make 3.81, which ignores
+# .ONESHELL, so every recipe line is run in its own shell. A multi-line if/fi
+# would be split across shells and fail with "unexpected end of file".
+NODE_CHECK = command -v node >/dev/null 2>&1 || { $(ECHO) "$(RED)✗ node est requis (version $(NODE_MAJOR).x)$(RESET)"; exit 1; }; major=$$(node -p 'process.versions.node.split(".")[0]'); [ "$$major" = "$(NODE_MAJOR)" ] || { $(ECHO) "$(RED)✗ Node $(NODE_MAJOR).x requis, version trouvée : $$(node --version)$(RESET)"; exit 1; }
 
 # Static checks (ESLint, Prettier)
 lint:
