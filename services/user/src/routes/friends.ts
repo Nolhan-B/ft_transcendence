@@ -1,7 +1,6 @@
 import { FastifyInstance } from "fastify";
 import * as friendsService from "../services/friends.service.js";
 import type { JwtPayload } from "shared";
-
 // Reusable JSON schema to validate UUID route parameters before hitting Prisma
 const uuidParamSchema = {
   params: {
