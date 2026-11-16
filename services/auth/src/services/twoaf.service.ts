@@ -11,6 +11,12 @@ export async function enableTwoFactor(
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) return null;
 
+  if (user.twoFactorSecretEnabled) {
+    throw Object.assign(new Error("2FA already enabled"), {
+      code: "2FA_ALREADY_ENABLED",
+    });
+  }
+
   const secret = authenticator.generateSecret();
 
   await prisma.user.update({
