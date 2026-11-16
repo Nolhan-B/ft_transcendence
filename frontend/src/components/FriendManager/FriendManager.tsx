@@ -8,7 +8,12 @@ import { FriendRequestItem } from "./components/FriendRequestItem";
 export function FriendManager() {
   const [friends, setFriends] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [friendListError, setFriendListError] = useState<string | null>(null);
+
+  const [friendRequests, setFriendRequests] = useState<Profile[]>([]);
+  const [friendRequestsError, setFriendRequestsError] = useState<string | null>(
+    null,
+  );
 
   // Friends list, served by the user service behind the gateway:
   useEffect(() => {
@@ -22,7 +27,9 @@ export function FriendManager() {
         const data = (await res.json()) as { friends: Profile[] };
         setFriends(data.friends);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Unknown error");
+        setFriendListError(
+          err instanceof Error ? err.message : "Unknown error",
+        );
       } finally {
         setLoading(false);
       }
@@ -31,8 +38,61 @@ export function FriendManager() {
     fetchFriends();
   }, []);
 
+  useEffect(() => {
+    async function fetchFriendRequests() {
+      try {
+        const res = await fetch("/api/user/friends/requests/received", {
+          credentials: "include", // the session lives in an httpOnly cookie
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        const data = (await res.json()) as { receivedRequests: Profile[] };
+        setFriendRequests(data.receivedRequests);
+      } catch (err) {
+        setFriendRequestsError(
+          err instanceof Error ? err.message : "Unknown error",
+        );
+      }
+    }
+
+    fetchFriendRequests();
+  }, []);
+
   function handleAddFriend(username: string) {
     console.log("WIP, add friend: " + username);
+  }
+
+  async function handleAcceptFriendRequest(userId: string) {
+    try {
+      const res = await fetch(`/api/user/friends/accept/${userId}`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      // Remove friend from pending list
+      setFriendRequests((all) => all.filter((r) => r.id !== userId));
+    } catch (err) {
+      setFriendRequestsError(
+        err instanceof Error ? err.message : "Unknown error",
+      );
+    }
+  }
+
+  async function handleDeclineFriendRequest(userId: string) {
+    try {
+      const res = await fetch(`/api/user/friends/${userId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      // Remove friend from pending list
+      setFriendRequests((all) => all.filter((r) => r.id !== userId));
+    } catch (err) {
+      setFriendRequestsError(
+        err instanceof Error ? err.message : "Unknown error",
+      );
+    }
   }
 
   return (
@@ -44,17 +104,31 @@ export function FriendManager() {
 
       <div className="flex flex-col gap-1">
         Pending Friend requests
-        <FriendRequestItem
-          onAccept={() => {
-            console.log("test");
-          }}
-        />
+        {friendRequestsError ? (
+          <p className="text-error text-sm">
+            Could not load requests: {friendRequestsError}
+          </p>
+        ) : friendRequests.length === 0 ? (
+          <p className="text-sm opacity-60">No pending requests</p>
+        ) : (
+          friendRequests.map((request) => (
+            <FriendRequestItem
+              key={request.id}
+              name={request.username}
+              avatarUrl={request.avatarUrl}
+              onAccept={() => handleAcceptFriendRequest(request.id)}
+              onDecline={() => handleDeclineFriendRequest(request.id)}
+            />
+          ))
+        )}
       </div>
 
       <div className="flex flex-col gap-1">
         Friends
-        {error ? (
-          <p className="text-error text-sm">Could not load friends: {error}</p>
+        {friendListError ? (
+          <p className="text-error text-sm">
+            Could not load friends: {friendListError}
+          </p>
         ) : loading ? (
           <p className="text-sm opacity-60">Loading friends…</p>
         ) : friends.length === 0 ? (
@@ -65,13 +139,10 @@ export function FriendManager() {
               key={friend.id}
               name={friend.username}
               avatarUrl={friend.avatarUrl}
+              onRemove={() => handleDeclineFriendRequest(friend.id)}
             />
           ))
         )}
-        <FriendListItem />
-        <FriendListItem />
-        <FriendListItem />
-        {/* <OpenedFriendChat /> */}
       </div>
     </div>
   );
