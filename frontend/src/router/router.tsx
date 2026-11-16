@@ -7,7 +7,6 @@ import { RulesPage } from "../pages/RulesPage/RulesPage";
 import { TermsPage } from "../pages/TermsPage/TermsPage";
 import { PrivacyPage } from "../pages/PrivacyPage/PrivacyPage";
 import { LeaderboardPage } from "../pages/LeaderboardPage/LeaderboardPage";
-import { UserProfilePage } from "../pages/UserProfilePage/UserProfilePage";
 import { PlayPage } from "../pages/PlayPage/PlayPage";
 import { RoomPage } from "../pages/RoomPage/RoomPage";
 import { GamePage } from "../pages/GamePage/GamePage";
@@ -34,7 +33,7 @@ function Router() {
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/leaderboard" element={<LeaderboardPage />} />
-          <Route path="/users/:id" element={<UserProfilePage />} />
+          <Route path="/users/:id" element={<ProfilePage />} />
 
           {/* Connected users only */}
           <Route element={<RequireAuth />}>
