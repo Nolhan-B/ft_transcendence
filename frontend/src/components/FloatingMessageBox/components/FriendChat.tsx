@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { Profile } from "shared";
 import { AddFriendField } from "./AddFriendField";
 import { FriendListItem } from "./FriendListItem";
+import { FriendRequestItem } from "./FriendRequestItem";
 // import { OpenedFriendChat } from "./OpenedFriendChat";
 
 export function FriendChat() {
@@ -30,8 +31,6 @@ export function FriendChat() {
     fetchFriends();
   }, []);
 
-  // The friend request API works with user ids, not usernames, and no route
-  // resolves a username yet: fill this in once /api/user has that lookup.
   function handleAddFriend(username: string) {
     console.log("WIP, add friend: " + username);
   }
@@ -39,6 +38,7 @@ export function FriendChat() {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2 pt-1">
       <AddFriendField onAdd={handleAddFriend} />
+      <FriendRequestItem onAccept={() => {console.log("test")}}/>
 
       {error ? (
         <p className="text-error text-sm">Could not load friends: {error}</p>
