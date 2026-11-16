@@ -85,7 +85,7 @@ services:
       dockerfile: services/user/Dockerfile
       target: prod
     volumes:
-      - user_uploads:/app/uploads
+      - user_uploads:/app/services/user/uploads
     restart: unless-stopped
     environment:
       <<: *db-env
