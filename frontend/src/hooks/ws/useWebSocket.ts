@@ -42,8 +42,8 @@ export function useWebSocket({ path, onMessage, isFatal }: Options) {
       socket.addEventListener("message", (event) => {
         try {
           const message = JSON.parse(event.data);
-          if (isFatalRef.current?.(message)) fatal = true;
           onMessageRef.current?.(message);
+          if (isFatalRef.current?.(message)) fatal = true;
         } catch {
           console.log("WS message ignored (invalid JSON)", event.data);
         }

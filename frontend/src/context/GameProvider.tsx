@@ -1,26 +1,41 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import type { CreateRoomPayload, RoomInfo, ServerEvent } from "shared";
 import { useWebSocket } from "../hooks/ws/useWebSocket";
 import { GameContext } from "./GameContext";
 import type { GameContextValue } from "./GameContext";
 
-// Refusals of the game server after which it closes the socket
-const FATAL_ERRORS = ["Already connected", "Unauthorized", "Invalid token"];
+// The server closes the socket after these refusals. "Already connected" is
+// often only a race (page reload, hot reload: the old socket is not closed yet
+// on the server), so it is retried a few times before giving up.
+const ALWAYS_FATAL = ["Unauthorized", "Invalid token"];
+const MAX_REFUSALS = 3;
 
 export function GameProvider({ children }: { children: ReactNode }) {
   const [room, setRoom] = useState<RoomInfo | null>(null);
   const [gameId, setGameId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Consecutive "Already connected" answers (reset once the server accepts us)
+  const refusals = useRef(0);
+
   const { status, send } = useWebSocket({
     path: "/api/game/ws",
-    // The server closes right after these errors: no reconnection loop
     isFatal: (message) => {
       const event = message as ServerEvent;
-      return event.type === "error" && FATAL_ERRORS.includes(event.message);
+      return (
+        event.type === "error" &&
+        (ALWAYS_FATAL.includes(event.message) ||
+          (event.message === "Already connected" &&
+            refusals.current >= MAX_REFUSALS))
+      );
     },
     onMessage: (message) => {
+      // Not part of ServerEvent: sent by the server once it accepts the socket
+      if ((message as { type?: string }).type === "connected") {
+        refusals.current = 0;
+        return;
+      }
       const event = message as ServerEvent;
       switch (event.type) {
         case "room_updated":
@@ -30,11 +45,16 @@ export function GameProvider({ children }: { children: ReactNode }) {
           setGameId(event.gameId);
           break;
         case "error":
-          setError(
-            event.message === "Already connected"
-              ? "The game is already open in another tab or window. Close it, then reload this page."
-              : event.message,
-          );
+          if (event.message === "Already connected") {
+            refusals.current++;
+            // Still retrying: stay silent
+            if (refusals.current < MAX_REFUSALS) break;
+            setError(
+              "The game is already open in another tab or window. Close it, then reload this page.",
+            );
+            break;
+          }
+          setError(event.message);
           break;
       }
     },
