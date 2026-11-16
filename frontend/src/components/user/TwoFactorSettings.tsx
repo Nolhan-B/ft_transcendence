@@ -9,7 +9,8 @@ async function post(url: string, body?: unknown): Promise<Response> {
   const response = await fetch(url, {
     method: "POST",
     credentials: "include",
-    headers: { "Content-Type": "application/json" },
+    // The server refuses a JSON content type with an empty body
+    headers: body === undefined ? {} : { "Content-Type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   if (!response.ok) {
@@ -49,7 +50,7 @@ export function TwoFactorSettings() {
     setNotice(null);
     setBusy(true);
     try {
-      const response = await post("/api/auth/2fa/enable", user);
+      const response = await post("/api/auth/2fa/enable");
       const data: { qrCode: string } = await response.json();
       setQrCode(data.qrCode);
       enableDialog.current?.showModal();
