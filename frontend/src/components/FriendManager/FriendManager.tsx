@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import type { Profile } from "shared";
-import { AddFriendField } from "./AddFriendField";
-import { FriendListItem } from "./FriendListItem";
-import { FriendRequestItem } from "./FriendRequestItem";
-// import { OpenedFriendChat } from "./OpenedFriendChat";
+import { AddFriendField } from "./components/AddFriendField";
+import { FriendListItem } from "./components/FriendListItem";
+import { FriendRequestItem } from "./components/FriendRequestItem";
+// import { OpenedFriendChat } from "./components/OpenedFriendChat";
 
-export function FriendChat() {
+export function FriendManager() {
   const [friends, setFriends] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -38,8 +38,8 @@ export function FriendChat() {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-6 pt-1">
       <div className="flex flex-col gap-1">
-      Send a friend request
-      <AddFriendField onAdd={handleAddFriend} />
+        Send a friend request
+        <AddFriendField onAdd={handleAddFriend} />
       </div>
 
       <div className="flex flex-col gap-1">

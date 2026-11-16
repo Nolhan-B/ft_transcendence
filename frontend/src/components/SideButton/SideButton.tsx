@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
-import { FriendRequestItem } from "../FloatingMessageBox/components/FriendRequestItem";
-import { FriendChat } from "../FloatingMessageBox/components/FriendChat";
+import { FriendManager } from "../FriendManager/FriendManager";
 
 // Vertical button glued to the right edge of the window, vertically centered.
 // Opens a drawer sliding in from the right.
@@ -49,7 +48,7 @@ export function SideButton() {
         >
           <div className="flex flex-col gap-3">
             <p className="text-sm opacity-60">Friends</p>
-            <FriendChat />
+            <FriendManager />
           </div>
         </aside>
       </div>
