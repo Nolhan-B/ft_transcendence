@@ -31,6 +31,10 @@ export default async function twofaRoutes(fastify: FastifyInstance) {
       if (prismaError.code === "P2025") {
         return reply.code(404).send({ error: "User not found" });
       }
+
+      if (prismaError.code === "2FA_ALREADY_ENABLED") {
+        return reply.code(409).send({ error: "2FA is already enabled" });
+      }
       request.log.error(err);
       return reply.code(500).send({ error: "Internal server error" });
     }

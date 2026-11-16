@@ -7,9 +7,14 @@ WORKDIR=$(mktemp -d)
 cleanup() {
   rm -rf "$WORKDIR"
   docker compose exec -T postgres psql -U transcendence_user -d transcendence_db \
-    -c "DELETE FROM \"User\" WHERE email LIKE 'alice\_%@test.com' OR email LIKE 'bob\_%@test.com';" >/dev/null 2>&1 || true
+    -c "DELETE FROM \"User\" WHERE email LIKE 'alice\_%@test.com' OR email LIKE 'bob\_%@test.com' OR email LIKE 'carol\_%@test.com';" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
+
+# Exécute une requête SQL et renvoie le résultat brut (sans en-tête)
+db() {
+  docker compose exec -T postgres psql -U transcendence_user -d transcendence_db -tAc "$1"
+}
 
 echo "=== 1. Health checks ==="
 for svc in auth user game chat; do
@@ -134,7 +139,113 @@ fi
 echo "Casse différente : 404"
 
 echo ""
-echo "=== 4. Workflow d'amitié ==="
+echo "=== 4. Activation de la 2FA ==="
+CAROL_EMAIL="carol_${SUFFIX}@test.com"
+
+CAROL_RES=$(curl -k -s -X POST "$BASE_URL/api/auth/signup" \
+  -H "Content-Type: application/json" \
+  -d "{\"email\":\"$CAROL_EMAIL\",\"username\":\"carol_${SUFFIX}\",\"password\":\"test1234\"}")
+
+CAROL_TOKEN=$(node -e "console.log(JSON.parse(process.argv[1]).token || '')" "$CAROL_RES")
+CAROL_ID=$(node -e "console.log(JSON.parse(process.argv[1]).user?.id || '')" "$CAROL_RES")
+
+if [ -z "$CAROL_TOKEN" ] || [ -z "$CAROL_ID" ]; then
+  echo "Échec de l'inscription pour Carol: $CAROL_RES"
+  exit 1
+fi
+echo "Carol créée (ID: $CAROL_ID)"
+
+carol_secret() {
+  db "SELECT \"twoFactorSecret\" FROM \"User\" WHERE id = '$CAROL_ID';"
+}
+
+enable_2fa() {
+  curl -k -s -o "$WORKDIR/enable.json" -w "%{http_code}" -X POST \
+    "$BASE_URL/api/auth/2fa/enable" \
+    -H "Authorization: Bearer $CAROL_TOKEN"
+}
+
+# Première activation : un secret en attente est créé, la 2FA n'est pas encore active
+echo "Carol demande l'activation de la 2FA..."
+STATUS=$(enable_2fa)
+if [ "$STATUS" -ne 200 ]; then
+  echo "Échec de l'activation (code HTTP $STATUS)"
+  cat "$WORKDIR/enable.json"
+  exit 1
+fi
+if ! node -e "process.exit(JSON.parse(require('fs').readFileSync(process.argv[1])).qrCode ? 0 : 1)" "$WORKDIR/enable.json"; then
+  echo "La réponse doit contenir un qrCode"
+  exit 1
+fi
+SECRET_1=$(carol_secret)
+ENABLED=$(db "SELECT \"twoFactorSecretEnabled\" FROM \"User\" WHERE id = '$CAROL_ID';")
+if [ -z "$SECRET_1" ]; then
+  echo "Un secret doit être enregistré"
+  exit 1
+fi
+if [ "$ENABLED" != "f" ]; then
+  echo "La 2FA ne doit pas être active avant confirmation (twoFactorSecretEnabled = $ENABLED)"
+  exit 1
+fi
+echo "Secret en attente créé, 2FA pas encore active"
+
+# Tant que la 2FA n'est pas confirmée, redemander un QR code est autorisé
+echo "Carol redemande un QR code avant de confirmer..."
+STATUS=$(enable_2fa)
+if [ "$STATUS" -ne 200 ]; then
+  echo "Redemander un QR code avant confirmation doit être autorisé (code HTTP $STATUS)"
+  exit 1
+fi
+SECRET_2=$(carol_secret)
+if [ "$SECRET_2" = "$SECRET_1" ]; then
+  echo "Un nouveau secret doit être généré tant que la 2FA n'est pas confirmée"
+  exit 1
+fi
+echo "Nouveau secret généré (2FA pas encore confirmée)"
+
+# On simule une 2FA confirmée
+db "UPDATE \"User\" SET \"twoFactorSecretEnabled\" = true WHERE id = '$CAROL_ID';" >/dev/null
+
+# Une fois la 2FA active, une nouvelle activation est refusée et le secret ne bouge pas
+echo "Carol (2FA active) redemande l'activation..."
+STATUS=$(enable_2fa)
+if [ "$STATUS" -ne 409 ]; then
+  echo "Réactiver une 2FA déjà active doit renvoyer 409 (code HTTP $STATUS)"
+  cat "$WORKDIR/enable.json"
+  exit 1
+fi
+SECRET_3=$(carol_secret)
+if [ "$SECRET_3" != "$SECRET_2" ]; then
+  echo "Le secret d'une 2FA active ne doit jamais être remplacé"
+  exit 1
+fi
+echo "Réactivation refusée (409), secret inchangé"
+
+# Plusieurs appels d'affilée ne changent rien non plus
+echo "Appels répétés sur une 2FA active..."
+for i in 1 2 3; do
+  STATUS=$(enable_2fa)
+  if [ "$STATUS" -ne 409 ]; then
+    echo "Appel $i : doit renvoyer 409 (code HTTP $STATUS)"
+    exit 1
+  fi
+done
+if [ "$(carol_secret)" != "$SECRET_2" ]; then
+  echo "Le secret a changé après des appels répétés"
+  exit 1
+fi
+echo "Appels répétés : toujours 409, secret inchangé"
+
+# Sans authentification, la route est refusée
+STATUS=$(curl -k -s -o /dev/null -w "%{http_code}" -X POST "$BASE_URL/api/auth/2fa/enable")
+if [ "$STATUS" -ne 401 ]; then
+  echo "Sans authentification, la route doit renvoyer 401 (code HTTP $STATUS)"
+  exit 1
+fi
+echo "Sans authentification : 401"
+
+echo ""
+echo "=== 5. Workflow d'amitié ==="
 
 # Alice envoie une demande à Bob, avec l'id trouvé par la recherche
 echo "Alice envoie une demande à Bob (id trouvé par son pseudo)..."
@@ -190,7 +301,7 @@ if echo "$ALICE_FRIENDS_AFTER" | grep -q "$BOB_ID"; then
 fi
 
 echo ""
-echo "=== 5. Match History ==="
+echo "=== 6. Match History ==="
 
 # Re-add friendship for game creation
 curl -k -fsSL -X POST "$BASE_URL/api/user/friends/request/$BOB_ID" \
