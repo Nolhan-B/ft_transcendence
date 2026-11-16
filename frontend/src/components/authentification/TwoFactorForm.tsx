@@ -32,12 +32,14 @@ export function TwoFactorForm() {
         autoFocus
         maxLength={6}
         pattern="[0-9]{6}"
+        required
         placeholder="000000"
         aria-label="Two-factor code"
-        className="input input-md w-full text-center tracking-[0.5em]"
+        className="input input-md validator w-full text-center tracking-[0.5em]"
         value={code}
         onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
       />
+      <p className="validator-hint -mt-2 text-center">Enter the 6 digits</p>
 
       <div className="flex flex-col gap-3">
         <button

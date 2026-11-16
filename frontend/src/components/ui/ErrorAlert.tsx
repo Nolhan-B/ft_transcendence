@@ -1,9 +1,11 @@
 interface Props {
   message: string;
+  // Shows a close button when given (toasts)
+  onClose?: () => void;
 }
 
 // The red alert used by every form
-export function ErrorAlert({ message }: Props) {
+export function ErrorAlert({ message, onClose }: Props) {
   return (
     <div role="alert" className="alert alert-error">
       <svg
@@ -21,6 +23,16 @@ export function ErrorAlert({ message }: Props) {
         />
       </svg>
       <span>{message}</span>
+      {onClose && (
+        <button
+          type="button"
+          className="btn btn-ghost btn-circle btn-xs"
+          aria-label="Dismiss"
+          onClick={onClose}
+        >
+          ✕
+        </button>
+      )}
     </div>
   );
 }

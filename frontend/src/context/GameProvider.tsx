@@ -5,6 +5,9 @@ import { useWebSocket } from "../hooks/ws/useWebSocket";
 import { GameContext } from "./GameContext";
 import type { GameContextValue } from "./GameContext";
 
+// Refusals of the game server after which it closes the socket
+const FATAL_ERRORS = ["Already connected", "Unauthorized", "Invalid token"];
+
 export function GameProvider({ children }: { children: ReactNode }) {
   const [room, setRoom] = useState<RoomInfo | null>(null);
   const [gameId, setGameId] = useState<string | null>(null);
@@ -12,6 +15,11 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
   const { status, send } = useWebSocket({
     path: "/api/game/ws",
+    // The server closes right after these errors: no reconnection loop
+    isFatal: (message) => {
+      const event = message as ServerEvent;
+      return event.type === "error" && FATAL_ERRORS.includes(event.message);
+    },
     onMessage: (message) => {
       const event = message as ServerEvent;
       switch (event.type) {
@@ -22,7 +30,11 @@ export function GameProvider({ children }: { children: ReactNode }) {
           setGameId(event.gameId);
           break;
         case "error":
-          setError(event.message);
+          setError(
+            event.message === "Already connected"
+              ? "The game is already open in another tab or window. Close it, then reload this page."
+              : event.message,
+          );
           break;
       }
     },
@@ -55,18 +67,31 @@ export function GameProvider({ children }: { children: ReactNode }) {
     send({ type: "start_game", roomCode: room.code });
   }, [send, room]);
 
+  const clearError = useCallback(() => setError(null), []);
+
   const value = useMemo<GameContextValue>(
     () => ({
       status,
       room,
       gameId,
       error,
+      clearError,
       createRoom,
       joinRoom,
       leaveRoom,
       startGame,
     }),
-    [status, room, gameId, error, createRoom, joinRoom, leaveRoom, startGame],
+    [
+      status,
+      room,
+      gameId,
+      error,
+      clearError,
+      createRoom,
+      joinRoom,
+      leaveRoom,
+      startGame,
+    ],
   );
 
   return <GameContext.Provider value={value}>{children}</GameContext.Provider>;

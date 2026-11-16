@@ -5,23 +5,29 @@ export type Status = "connecting" | "open" | "closed";
 interface Options {
   path: string;
   onMessage?: (message: unknown) => void;
+  // A message after which the server will never accept us (no reconnection)
+  isFatal?: (message: unknown) => boolean;
 }
 
-export function useWebSocket({ path, onMessage }: Options) {
+export function useWebSocket({ path, onMessage, isFatal }: Options) {
   const [status, setStatus] = useState<Status>("connecting");
 
   const wsRef = useRef<WebSocket | null>(null);
 
   const onMessageRef = useRef(onMessage);
 
+  const isFatalRef = useRef(isFatal);
+
   useEffect(() => {
     onMessageRef.current = onMessage;
+    isFatalRef.current = isFatal;
   });
 
   useEffect(() => {
     let active = true;
     let ws: WebSocket | null = null;
     let attempt = 0;
+    let fatal = false;
     let timer: ReturnType<typeof setTimeout>;
 
     function connect() {
@@ -35,7 +41,9 @@ export function useWebSocket({ path, onMessage }: Options) {
       });
       socket.addEventListener("message", (event) => {
         try {
-          onMessageRef.current?.(JSON.parse(event.data));
+          const message = JSON.parse(event.data);
+          if (isFatalRef.current?.(message)) fatal = true;
+          onMessageRef.current?.(message);
         } catch {
           console.log("WS message ignored (invalid JSON)", event.data);
         }
@@ -44,6 +52,7 @@ export function useWebSocket({ path, onMessage }: Options) {
       socket.addEventListener("close", () => {
         if (!active) return;
         setStatus("closed");
+        if (fatal) return; // refused by the server: retrying would only repeat it
         attempt++;
         const delay = Math.min(1000 * 2 ** (attempt - 1), 10000);
         timer = setTimeout(() => {

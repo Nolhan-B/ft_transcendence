@@ -25,18 +25,22 @@ export function LoginForm() {
           <input
             type="email"
             placeholder="Email"
-            className="input input-md flex-1"
+            required
+            className="input input-md validator flex-1"
             onChange={(e) => setEmail(e.target.value)}
           />
+          <p className="validator-hint">Enter a valid email address</p>
         </label>
         <label className="floating-label">
           <span>Password</span>
           <input
             type="password"
             placeholder="Password"
-            className="input input-md flex-1"
+            required
+            className="input input-md validator flex-1"
             onChange={(e) => setPassword(e.target.value)}
           />
+          <p className="validator-hint">Enter your password</p>
         </label>
       </div>
       <div className="flex flex-col gap-3 @xs:flex-row">

@@ -85,14 +85,14 @@ export function EditProfile({ profile, onSaved }: Props) {
               <legend className="fieldset-legend">Username</legend>
               <input
                 type="text"
-                className="input w-full"
+                className="input validator w-full"
                 value={username}
                 minLength={3}
                 maxLength={20}
                 required
                 onChange={(event) => setUsername(event.target.value)}
               />
-              <p className="label">3 to 20 characters</p>
+              <p className="validator-hint">3 to 20 characters</p>
             </fieldset>
 
             <fieldset className="fieldset">
