@@ -1,7 +1,7 @@
-export type HeaderProps = { variant: "simple" | "logged-out" | "default" };
-
+import { useAuth } from "../../hooks/auth/useAuth";
 import { Drawer } from "./components/Drawer";
 import { SiteTitle } from "./components/SiteTitle";
+import { UserProfileIcon } from "./components/UserProfileIcon";
 
 // "logged-out" has no "More" button, the other variants are identical
 export function Header({ variant }: HeaderProps) {

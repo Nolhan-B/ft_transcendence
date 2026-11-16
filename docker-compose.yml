@@ -169,6 +169,7 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
+      start_period: 20s
 
   adminer:
     image: adminer:4.17.1
