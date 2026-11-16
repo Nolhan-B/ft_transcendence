@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { ErrorAlert } from "../ui/ErrorAlert";
 import { useNavigate } from "react-router-dom";
 import { useTwoFactor } from "../../hooks/auth/useTwoFactor";
 
@@ -22,11 +23,7 @@ export function TwoFactorForm() {
         Enter the 6-digit code shown by your authenticator app.
       </p>
 
-      {error && (
-        <div role="alert" className="alert alert-error">
-          <span>{error}</span>
-        </div>
-      )}
+      {error && <ErrorAlert message={error} />}
 
       <input
         type="text"

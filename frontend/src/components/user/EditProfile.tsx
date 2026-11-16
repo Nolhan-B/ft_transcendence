@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { ErrorAlert } from "../ui/ErrorAlert";
 import type { FormEvent } from "react";
 import type { Profile } from "shared";
 import { useAuth } from "../../hooks/auth/useAuth";
@@ -105,11 +106,7 @@ export function EditProfile({ profile, onSaved }: Props) {
               <p className="label">PNG, JPG or WebP</p>
             </fieldset>
 
-            {error && (
-              <div role="alert" className="alert alert-error">
-                <span>{error}</span>
-              </div>
-            )}
+            {error && <ErrorAlert message={error} />}
 
             <div className="modal-action">
               <button
