@@ -42,12 +42,12 @@ export function SideButton() {
           }`}
         />
         <aside
-          className={`absolute right-0 top-0 h-full w-80 max-w-[calc(100vw-2rem)] bg-base-200 p-4 shadow-xl transition-transform duration-200 ${
+          className={`absolute right-0 top-0 flex h-full w-80 max-w-[calc(100vw-2rem)] flex-col overflow-hidden bg-base-200 p-4 shadow-xl transition-transform duration-200 ${
             open ? "translate-x-0" : "translate-x-full"
           }`}
         >
-          <div className="flex flex-col gap-3">
-            <p className="text-sm opacity-60">Friends</p>
+          <p className="mb-3 shrink-0 text-sm opacity-60">Friends</p>
+          <div className="flex min-h-0 flex-1 flex-col">
             <FriendManager />
           </div>
         </aside>

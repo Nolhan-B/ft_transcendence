@@ -21,6 +21,10 @@ ECHO    := echo -e
 
 COMPOSE  = docker compose
 
+# Database identifiers used by `make seed`; keep in sync with .env
+DB_USER ?= transcendence_user
+DB_NAME ?= transcendence_db
+
 # TLS certificate of the gateway (self-signed, generated once)
 SSL_DIR  = gateway/ssl
 SSL_KEY  = $(SSL_DIR)/transcendence.key
@@ -151,7 +155,9 @@ test: up
 seed:
 	@test -n "$(PASSWORD)" || { $(ECHO) "$(RED)✗ Mot de passe manquant : make seed PASSWORD=<valeur>$(RESET)"; exit 1; }
 	$(COMPOSE) exec -T -e SEED_PASSWORD='$(PASSWORD)' auth node --input-type=module -e 'for (const name of ["alice", "bob", "charlie"]) { const res = await fetch("http://127.0.0.1:3001/signup", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: name + "@example.com", username: name, password: process.env.SEED_PASSWORD }) }); if (res.status !== 201 && res.status !== 409) { console.error(name, res.status, await res.text()); process.exit(1); } console.log(name, res.status === 201 ? "created" : "already exists"); }'
+	$(COMPOSE) exec -T -e PGPASSWORD="$$(cat secrets/db_password.txt)" postgres psql -U $(DB_USER) -d $(DB_NAME) -v ON_ERROR_STOP=1 -q -c "DELETE FROM \"DirectMessage\" WHERE (\"senderId\", \"receiverId\") IN (SELECT a.id, b.id FROM \"User\" a, \"User\" b WHERE a.username = 'alice' AND b.username = 'bob') OR (\"senderId\", \"receiverId\") IN (SELECT b.id, a.id FROM \"User\" a, \"User\" b WHERE a.username = 'alice' AND b.username = 'bob'); INSERT INTO \"DirectMessage\" (id, \"senderId\", \"receiverId\", content, \"messageType\", delivered, \"createdAt\") SELECT v.id::uuid, sender.id, receiver.id, v.content, 'text', true, now() - v.ago FROM (VALUES ('11111111-1111-4111-8111-111111111101', 'alice', 'bob', 'Hey Bob! Ready for a game?', interval '20 minutes'), ('11111111-1111-4111-8111-111111111102', 'bob', 'alice', 'Always. Give me 2 minutes', interval '18 minutes'), ('11111111-1111-4111-8111-111111111103', 'alice', 'bob', 'I will destroy you with a +4', interval '16 minutes'), ('11111111-1111-4111-8111-111111111104', 'bob', 'alice', 'Bold words for someone with 3 cards left', interval '14 minutes'), ('11111111-1111-4111-8111-111111111105', 'alice', 'bob', 'UNO!', interval '12 minutes'), ('11111111-1111-4111-8111-111111111106', 'bob', 'alice', 'Not so fast, I still have a skip', interval '10 minutes'), ('11111111-1111-4111-8111-111111111107', 'alice', 'bob', 'You are bluffing, I can feel it', interval '8 minutes'), ('11111111-1111-4111-8111-111111111108', 'bob', 'alice', 'Maybe. Draw four and find out', interval '6 minutes'), ('11111111-1111-4111-8111-111111111109', 'alice', 'bob', 'Okay okay, rematch after this one', interval '4 minutes'), ('11111111-1111-4111-8111-111111111110', 'bob', 'alice', 'Deal. Loser buys the coffee', interval '2 minutes')) AS v(id, sender, receiver, content, ago) JOIN \"User\" sender ON sender.username = v.sender JOIN \"User\" receiver ON receiver.username = v.receiver;"
 	$(ECHO) "$(GREEN)✓ Utilisateurs de debug prêts : alice, bob, charlie$(RESET)"
+	$(ECHO) "$(GREEN)✓ Conversation de debug alice <-> bob insérée (10 messages)$(RESET)"
 
 clean: down
 
