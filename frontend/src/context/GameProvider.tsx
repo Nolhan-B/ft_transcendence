@@ -1,8 +1,10 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import type {
+  CardColor,
   CreateRoomPayload,
   GameSettings,
+  GameState,
   RoomInfo,
   ServerEvent,
 } from "shared";
@@ -19,6 +21,8 @@ const MAX_REFUSALS = 3;
 export function GameProvider({ children }: { children: ReactNode }) {
   const [room, setRoom] = useState<RoomInfo | null>(null);
   const [gameId, setGameId] = useState<string | null>(null);
+  const [gameState, setGameState] = useState<GameState | null>(null);
+  const [winnerId, setWinnerId] = useState<string | null>(null);
   const [inQueue, setInQueue] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -49,8 +53,17 @@ export function GameProvider({ children }: { children: ReactNode }) {
           break;
         case "game_started":
           setGameId(event.gameId);
+          // New game: forget the previous one
+          setGameState(null);
+          setWinnerId(null);
           // The server removes the room when the game starts
           setRoom(null);
+          break;
+        case "game_updated":
+          setGameState(event.state);
+          break;
+        case "game_ended":
+          setWinnerId(event.winnerId);
           break;
         case "queue_joined":
           setInQueue(true);
@@ -61,6 +74,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
         case "match_found":
           setInQueue(false);
           setGameId(event.gameId);
+          setGameState(null);
+          setWinnerId(null);
           break;
         case "error":
           if (event.message === "Already connected") {
@@ -135,6 +150,50 @@ export function GameProvider({ children }: { children: ReactNode }) {
     send({ type: "leave_queue" });
   }, [send]);
 
+  const joinGame = useCallback(
+    (id: string) => {
+      send({ type: "join_game", gameId: id });
+    },
+    [send],
+  );
+
+  const playCard = useCallback(
+    (
+      cardId: string,
+      options?: { chosenColor?: CardColor; targetUserId?: string },
+    ) => {
+      if (!gameId) return;
+      setError(null);
+      send({ type: "play_card", gameId, cardId, ...options });
+    },
+    [send, gameId],
+  );
+
+  const drawCard = useCallback(() => {
+    if (!gameId) return;
+    setError(null);
+    send({ type: "draw_card", gameId });
+  }, [send, gameId]);
+
+  const callUno = useCallback(() => {
+    if (!gameId) return;
+    send({ type: "call_uno", gameId });
+  }, [send, gameId]);
+
+  const catchUno = useCallback(
+    (targetUserId: string) => {
+      if (!gameId) return;
+      send({ type: "catch_uno", gameId, targetUserId });
+    },
+    [send, gameId],
+  );
+
+  const clearGame = useCallback(() => {
+    setGameId(null);
+    setGameState(null);
+    setWinnerId(null);
+  }, []);
+
   const clearError = useCallback(() => setError(null), []);
 
   const value = useMemo<GameContextValue>(
@@ -142,6 +201,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
       status,
       room,
       gameId,
+      gameState,
+      winnerId,
       inQueue,
       error,
       clearError,
@@ -154,11 +215,19 @@ export function GameProvider({ children }: { children: ReactNode }) {
       removeBot,
       joinQueue,
       leaveQueue,
+      joinGame,
+      playCard,
+      drawCard,
+      callUno,
+      catchUno,
+      clearGame,
     }),
     [
       status,
       room,
       gameId,
+      gameState,
+      winnerId,
       inQueue,
       error,
       clearError,
@@ -171,6 +240,12 @@ export function GameProvider({ children }: { children: ReactNode }) {
       removeBot,
       joinQueue,
       leaveQueue,
+      joinGame,
+      playCard,
+      drawCard,
+      callUno,
+      catchUno,
+      clearGame,
     ],
   );
 
