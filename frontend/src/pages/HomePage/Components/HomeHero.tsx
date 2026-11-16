@@ -5,11 +5,41 @@ import { WEBSITE_DESCRIPTION, WEBSITE_NAME } from "../../../constants";
 // Decorative cards drifting behind the hero. Purely visual: hidden from
 // assistive tech, and their motion is disabled by prefers-reduced-motion.
 const FLOATING_CARDS = [
-  { color: "bg-primary", label: "7", className: "left-[6%] top-[18%] -rotate-12", delay: "0s", duration: "8s" },
-  { color: "bg-secondary", label: "3", className: "left-[16%] bottom-[16%] rotate-6", delay: "1.2s", duration: "9s" },
-  { color: "bg-accent", label: "0", className: "right-[8%] top-[14%] rotate-12", delay: "0.6s", duration: "7.5s" },
-  { color: "bg-success", label: "9", className: "right-[18%] bottom-[20%] -rotate-6", delay: "1.8s", duration: "10s" },
-  { color: "bg-primary", label: "+4", className: "left-[42%] top-[8%] rotate-3", delay: "2.4s", duration: "11s" },
+  {
+    color: "bg-primary",
+    label: "7",
+    className: "left-[6%] top-[18%] -rotate-12",
+    delay: "0s",
+    duration: "8s",
+  },
+  {
+    color: "bg-secondary",
+    label: "3",
+    className: "left-[16%] bottom-[16%] rotate-6",
+    delay: "1.2s",
+    duration: "9s",
+  },
+  {
+    color: "bg-accent",
+    label: "0",
+    className: "right-[8%] top-[14%] rotate-12",
+    delay: "0.6s",
+    duration: "7.5s",
+  },
+  {
+    color: "bg-success",
+    label: "9",
+    className: "right-[18%] bottom-[20%] -rotate-6",
+    delay: "1.8s",
+    duration: "10s",
+  },
+  {
+    color: "bg-primary",
+    label: "+4",
+    className: "left-[42%] top-[8%] rotate-3",
+    delay: "2.4s",
+    duration: "11s",
+  },
 ];
 
 export function HomeHero() {

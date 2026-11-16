@@ -324,9 +324,7 @@ function EventsSection({
   return (
     <SectionPanel>
       <div className="flex items-center gap-2">
-        <span className="opacity-60">
-          websocket frames (last {MAX_EVENTS})
-        </span>
+        <span className="opacity-60">websocket frames (last {MAX_EVENTS})</span>
         <button type="button" className="btn btn-xs" onClick={clearEvents}>
           clear
         </button>
@@ -363,7 +361,9 @@ function FriendsSection() {
     try {
       const res = await action();
       setMessage(
-        res.ok ? `${label}: ok (${res.status})` : `${label}: HTTP ${res.status}`,
+        res.ok
+          ? `${label}: ok (${res.status})`
+          : `${label}: HTTP ${res.status}`,
       );
     } catch (err) {
       setMessage(`${label}: ${errorMessage(err)}`);
@@ -521,18 +521,10 @@ function ActionsSection({
   return (
     <SectionPanel>
       <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          className="btn btn-xs"
-          onClick={simulateWsError}
-        >
+        <button type="button" className="btn btn-xs" onClick={simulateWsError}>
           simulate ws error
         </button>
-        <button
-          type="button"
-          className="btn btn-xs"
-          onClick={reconnectSockets}
-        >
+        <button type="button" className="btn btn-xs" onClick={reconnectSockets}>
           reconnect sockets
         </button>
         <button

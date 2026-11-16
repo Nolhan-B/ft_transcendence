@@ -10,7 +10,8 @@
     transform: translate3d(0, 0, 0) rotate(var(--card-rotate, 0deg));
   }
   50% {
-    transform: translate3d(0, -18px, 0) rotate(calc(var(--card-rotate, 0deg) + 4deg));
+    transform: translate3d(0, -18px, 0)
+      rotate(calc(var(--card-rotate, 0deg) + 4deg));
   }
 }
 
