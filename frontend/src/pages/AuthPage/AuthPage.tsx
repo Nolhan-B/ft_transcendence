@@ -5,6 +5,7 @@ import { TwoFactorForm } from "../../components/authentification/TwoFactorForm";
 import { useAuth } from "../../hooks/auth/useAuth";
 import { Hand } from "../../components/cards/Hand";
 import type { HandCard } from "../../components/cards/Hand";
+import { RegisterForm } from "../../components/authentification/RegisterForm";
 
 type Mode = "login" | "register";
 
@@ -47,7 +48,8 @@ export function AuthPage() {
             <LoginForm />
           )
         ) : (
-          <p className="text-center">Sign-up form coming soon</p>
+          // <p className="text-center">Sign-up form coming soon</p>
+          <RegisterForm />
         ),
     };
   });

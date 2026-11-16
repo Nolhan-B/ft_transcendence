@@ -27,7 +27,7 @@ SSL_KEY  = $(SSL_DIR)/transcendence.key
 SSL_CRT  = $(SSL_DIR)/transcendence.crt
 
 # Docker secrets, copied one by one from secrets.example/ when missing
-SECRETS  = secrets/db_password.txt secrets/db_url.txt secrets/jwt_secret.txt
+SECRETS  = secrets/db_password.txt secrets/db_url.txt secrets/jwt_secret.txt secrets/grafana_admin_password.txt
 
 # node --version 22.x needed
 NODE_MAJOR = 22
@@ -39,7 +39,7 @@ SERVICE ?=
 #                                   .PHONY                                     #
 # **************************************************************************** #
 
-.PHONY: all install build up down logs log ps clean fclean re lint lint-fix test help
+.PHONY: all install build up down logs log ps clean fclean re lint lint-fix test seed help
 
 .DEFAULT_GOAL := all
 
@@ -62,6 +62,7 @@ help:
 	$(ECHO) "  $(CYAN)make lint$(RESET)           ESLint and Prettier check (Node $(NODE_MAJOR).x needed)"
 	$(ECHO) "  $(CYAN)make lint-fix$(RESET)       ESLint --fix and Prettier --write on the whole project"
 	$(ECHO) "  $(CYAN)make test$(RESET)           start the project, then run all the tests"
+	$(ECHO) "  $(CYAN)make seed PASSWORD=<value>$(RESET)  insert three debug users (alice, bob, charlie)"
 	$(ECHO) "  $(CYAN)make clean$(RESET)          stop the project (same as down)"
 	$(ECHO) "  $(CYAN)make fclean$(RESET)         stop the project, delete its volumes (database included) and the certificate"
 	$(ECHO) "  $(CYAN)make re$(RESET)             fclean, then all"
@@ -105,8 +106,7 @@ build: install
 # Build and start the whole project in the background
 up: install
 	$(COMPOSE) up -d --build
-	port=$$(sed -n 's/^HTTPS_PORT=//p' .env | tail -n 1)
-	$(ECHO) "$(GREEN)✓ Application : https://localhost:$${port:-8443}$(RESET)"
+	$(ECHO) "$(GREEN)✓ Application : https://localhost:$$(sed -n 's/^HTTPS_PORT=//p' .env | tail -n 1 | grep . || echo 8443)$(RESET)"
 
 down:
 	$(COMPOSE) down
@@ -116,28 +116,17 @@ logs:
 
 # Logs of one service, named by the SERVICE argument
 log:
-	if [ -z "$(SERVICE)" ]; then
-		$(ECHO) "$(RED)✗ Service manquant : make log SERVICE=<nom>$(RESET)"
-		$(ECHO) "Services : $$($(COMPOSE) config --services | tr '\n' ' ')"
-		exit 1
-	fi
+	@test -n "$(SERVICE)" || { $(ECHO) "$(RED)✗ Service manquant : make log SERVICE=<nom>$(RESET)"; $(ECHO) "Services : $$($(COMPOSE) config --services | tr '\n' ' ')"; exit 1; }
 	$(COMPOSE) logs -f --tail=100 $(SERVICE)
 
 ps:
 	$(COMPOSE) ps
 
-# Shell code that stops when node is missing or is not the expected version
-define NODE_CHECK
-if ! command -v node >/dev/null 2>&1; then
-	$(ECHO) "$(RED)✗ node est requis (version $(NODE_MAJOR).x)$(RESET)"
-	exit 1
-fi
-major=$$(node -p 'process.versions.node.split(".")[0]')
-if [ "$$major" != "$(NODE_MAJOR)" ]; then
-	$(ECHO) "$(RED)✗ Node $(NODE_MAJOR).x requis, version trouvée : $$(node --version)$(RESET)"
-	exit 1
-fi
-endef
+# Shell code that stops when node is missing or is not the expected version.
+# Written on ONE line on purpose: macOS ships GNU Make 3.81, which ignores
+# .ONESHELL, so every recipe line is run in its own shell. A multi-line if/fi
+# would be split across shells and fail with "unexpected end of file".
+NODE_CHECK = command -v node >/dev/null 2>&1 || { $(ECHO) "$(RED)✗ node est requis (version $(NODE_MAJOR).x)$(RESET)"; exit 1; }; major=$$(node -p 'process.versions.node.split(".")[0]'); [ "$$major" = "$(NODE_MAJOR)" ] || { $(ECHO) "$(RED)✗ Node $(NODE_MAJOR).x requis, version trouvée : $$(node --version)$(RESET)"; exit 1; }
 
 # Static checks (ESLint, Prettier)
 lint:
@@ -154,6 +143,15 @@ lint-fix:
 # Needs the running project (API, WebSocket and end-to-end tests)
 test: up
 	npm run test-all
+
+# Insert three debug users through the real /signup route, so the password is
+# hashed by the service itself: no SQL and no hash to keep in sync.
+# 409 means the user already exists, so the rule can be run again safely.
+# The password is not stored in this file: make seed PASSWORD=<value>
+seed:
+	@test -n "$(PASSWORD)" || { $(ECHO) "$(RED)✗ Mot de passe manquant : make seed PASSWORD=<valeur>$(RESET)"; exit 1; }
+	$(COMPOSE) exec -T -e SEED_PASSWORD='$(PASSWORD)' auth node --input-type=module -e 'for (const name of ["alice", "bob", "charlie"]) { const res = await fetch("http://127.0.0.1:3001/signup", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: name + "@example.com", username: name, password: process.env.SEED_PASSWORD }) }); if (res.status !== 201 && res.status !== 409) { console.error(name, res.status, await res.text()); process.exit(1); } console.log(name, res.status === 201 ? "created" : "already exists"); }'
+	$(ECHO) "$(GREEN)✓ Utilisateurs de debug prêts : alice, bob, charlie$(RESET)"
 
 clean: down
 

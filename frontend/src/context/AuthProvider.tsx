@@ -7,7 +7,11 @@ import type { AuthContextValue, AuthResult, AuthUser } from "./AuthContext";
 function postJson(url: string, body?: unknown) {
   return fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    // Only declare a JSON body when there is one: Fastify answers 400
+    // (FST_ERR_CTP_EMPTY_JSON_BODY) to a JSON content type with an empty body,
+    // which silently broke POST /logout.
+    headers:
+      body === undefined ? undefined : { "Content-Type": "application/json" },
     credentials: "include", // the session lives in an httpOnly cookie
     body: body === undefined ? undefined : JSON.stringify(body),
   });
