@@ -161,4 +161,17 @@ export default async function profileRoutes(fastify: FastifyInstance) {
       return reply.code(500).send({ error: "Internal server error" });
     }
   });
+
+  fastify.get("/users/by-username/:username", async (request, reply) => {
+    await request.jwtVerify();
+    const { username } = request.params as { username: string };
+
+    const profile = await profileService.getProfileByUsername(
+      fastify.prisma,
+      username,
+    );
+    if (!profile) return reply.code(404).send({ error: "User not found" });
+
+    return reply.send(profile);
+  });
 }

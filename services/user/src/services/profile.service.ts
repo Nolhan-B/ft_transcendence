@@ -84,3 +84,28 @@ export async function updateAvatar(
     elo: updatedUser.elo,
   };
 }
+
+export async function getProfileByUsername(
+  prisma: PrismaClient,
+  username: string,
+): Promise<Profile | null> {
+  const user = await prisma.user.findUnique({
+    where: { username },
+    select: {
+      id: true,
+      username: true,
+      avatarUrl: true,
+      createdAt: true,
+      elo: true,
+    },
+  });
+  if (!user) return null;
+
+  return {
+    id: user.id,
+    username: user.username,
+    avatarUrl: user.avatarUrl,
+    createdAt: user.createdAt.toISOString(),
+    elo: user.elo,
+  };
+}
