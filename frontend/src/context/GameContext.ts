@@ -7,6 +7,7 @@ export interface GameContextValue {
   room: RoomInfo | null;
   gameId: string | null;
   error: string | null;
+  clearError: () => void;
   createRoom: (payload: CreateRoomPayload) => void;
   joinRoom: (roomCode: string, password?: string) => void;
   leaveRoom: () => void;

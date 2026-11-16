@@ -1,4 +1,5 @@
 import { Outlet } from "react-router-dom";
+import { RealtimeErrors } from "../components/layout/RealtimeErrors";
 import { ChatProvider } from "../context/ChatProvider";
 import { GameProvider } from "../context/GameProvider";
 import { useAuth } from "../hooks/auth/useAuth";
@@ -13,6 +14,7 @@ export function RealtimeSession() {
     <GameProvider>
       <ChatProvider>
         <Outlet />
+        <RealtimeErrors />
       </ChatProvider>
     </GameProvider>
   ) : (
