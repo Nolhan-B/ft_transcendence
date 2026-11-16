@@ -1,23 +1,21 @@
-import { Drawer } from "./components/Drawer";
+import { NavLinks } from "./components/NavLinks";
 import { SiteTitle } from "./components/SiteTitle";
+import { UserMenu } from "./components/UserMenu";
 
-// "logged-out" has no "More" button, the other variants are identical
-export function Header({ variant }: HeaderProps) {
-  const showMore = variant !== "logged-out";
+// A dropdown stays open while it has the focus: drop it after a choice
+function closeDropdown() {
+  (document.activeElement as HTMLElement | null)?.blur();
+}
 
+export function Header() {
   return (
     <div className="navbar bg-base-200 shadow-sm">
-      <div className="flex-none">
-        <Drawer />
-      </div>
-      <div className="flex-1">
-        <SiteTitle />
-      </div>
-      {showMore && (
-        <div className="flex-none">
-          <button className="btn btn-square btn-ghost">
+      <div className="navbar-start">
+        {/* Small screens: the links are in a dropdown */}
+        <div className="dropdown lg:hidden">
+          <div tabIndex={0} role="button" className="btn btn-ghost btn-square">
             <svg
-              aria-label="More"
+              aria-label="Menu"
               xmlns="http://www.w3.org/2000/svg"
               fill="none"
               viewBox="0 0 24 24"
@@ -27,12 +25,30 @@ export function Header({ variant }: HeaderProps) {
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 strokeWidth="2"
-                d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z"
+                d="M4 6h16M4 12h16M4 18h16"
               />
             </svg>
-          </button>
+          </div>
+          <ul
+            tabIndex={0}
+            className="menu dropdown-content z-50 mt-3 w-52 rounded-box bg-base-200 p-2 shadow-xl"
+          >
+            <NavLinks onNavigate={closeDropdown} />
+          </ul>
         </div>
-      )}
+        <SiteTitle />
+      </div>
+
+      {/* Large screens: the links are in the middle of the navbar */}
+      <div className="navbar-center hidden lg:flex">
+        <ul className="menu menu-horizontal menu-lg gap-2">
+          <NavLinks />
+        </ul>
+      </div>
+
+      <div className="navbar-end">
+        <UserMenu />
+      </div>
     </div>
   );
 }

@@ -1,17 +1,45 @@
 import { createContext } from "react";
-import type { CreateRoomPayload, RoomInfo } from "shared";
+import type {
+  CardColor,
+  CreateRoomPayload,
+  GameSettings,
+  GameState,
+  RoomInfo,
+} from "shared";
 import type { Status } from "../hooks/ws/useWebSocket";
 
 export interface GameContextValue {
   status: Status;
   room: RoomInfo | null;
   gameId: string | null;
+  // Last state of the game sent by the server (the other hands are hidden)
+  gameState: GameState | null;
+  // Set when the server announces the end of the game
+  winnerId: string | null;
+  // true while waiting for a ranked opponent
+  inQueue: boolean;
   error: string | null;
   clearError: () => void;
   createRoom: (payload: CreateRoomPayload) => void;
   joinRoom: (roomCode: string, password?: string) => void;
   leaveRoom: () => void;
   startGame: () => void;
+  // Leader only (the server ignores the others)
+  updateSettings: (settings: GameSettings) => void;
+  addBot: () => void;
+  removeBot: (botId: string) => void;
+  joinQueue: () => void;
+  leaveQueue: () => void;
+  joinGame: (gameId: string) => void;
+  playCard: (
+    cardId: string,
+    options?: { chosenColor?: CardColor; targetUserId?: string },
+  ) => void;
+  drawCard: () => void;
+  callUno: () => void;
+  catchUno: (targetUserId: string) => void;
+  // Forget the finished game (back to the lobby)
+  clearGame: () => void;
 }
 
 export const GameContext = createContext<GameContextValue | null>(null);

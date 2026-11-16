@@ -9,7 +9,8 @@ async function post(url: string, body?: unknown): Promise<Response> {
   const response = await fetch(url, {
     method: "POST",
     credentials: "include",
-    headers: { "Content-Type": "application/json" },
+    // The server refuses a JSON content type with an empty body
+    headers: body === undefined ? {} : { "Content-Type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   if (!response.ok) {
