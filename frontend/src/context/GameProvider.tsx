@@ -1,6 +1,11 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import type { CreateRoomPayload, RoomInfo, ServerEvent } from "shared";
+import type {
+  CreateRoomPayload,
+  GameSettings,
+  RoomInfo,
+  ServerEvent,
+} from "shared";
 import { useWebSocket } from "../hooks/ws/useWebSocket";
 import { GameContext } from "./GameContext";
 import type { GameContextValue } from "./GameContext";
@@ -14,6 +19,7 @@ const MAX_REFUSALS = 3;
 export function GameProvider({ children }: { children: ReactNode }) {
   const [room, setRoom] = useState<RoomInfo | null>(null);
   const [gameId, setGameId] = useState<string | null>(null);
+  const [inQueue, setInQueue] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Consecutive "Already connected" answers (reset once the server accepts us)
@@ -42,6 +48,18 @@ export function GameProvider({ children }: { children: ReactNode }) {
           setRoom(event.room);
           break;
         case "game_started":
+          setGameId(event.gameId);
+          // The server removes the room when the game starts
+          setRoom(null);
+          break;
+        case "queue_joined":
+          setInQueue(true);
+          break;
+        case "queue_left":
+          setInQueue(false);
+          break;
+        case "match_found":
+          setInQueue(false);
           setGameId(event.gameId);
           break;
         case "error":
@@ -87,6 +105,36 @@ export function GameProvider({ children }: { children: ReactNode }) {
     send({ type: "start_game", roomCode: room.code });
   }, [send, room]);
 
+  const updateSettings = useCallback(
+    (settings: GameSettings) => {
+      if (!room) return;
+      send({ type: "update_room", roomCode: room.code, settings });
+    },
+    [send, room],
+  );
+
+  const addBot = useCallback(() => {
+    if (!room) return;
+    send({ type: "add_bot", roomCode: room.code });
+  }, [send, room]);
+
+  const removeBot = useCallback(
+    (botId: string) => {
+      if (!room) return;
+      send({ type: "remove_bot", roomCode: room.code, botId });
+    },
+    [send, room],
+  );
+
+  const joinQueue = useCallback(() => {
+    setError(null);
+    send({ type: "join_queue" });
+  }, [send]);
+
+  const leaveQueue = useCallback(() => {
+    send({ type: "leave_queue" });
+  }, [send]);
+
   const clearError = useCallback(() => setError(null), []);
 
   const value = useMemo<GameContextValue>(
@@ -94,23 +142,35 @@ export function GameProvider({ children }: { children: ReactNode }) {
       status,
       room,
       gameId,
+      inQueue,
       error,
       clearError,
       createRoom,
       joinRoom,
       leaveRoom,
       startGame,
+      updateSettings,
+      addBot,
+      removeBot,
+      joinQueue,
+      leaveQueue,
     }),
     [
       status,
       room,
       gameId,
+      inQueue,
       error,
       clearError,
       createRoom,
       joinRoom,
       leaveRoom,
       startGame,
+      updateSettings,
+      addBot,
+      removeBot,
+      joinQueue,
+      leaveQueue,
     ],
   );
 
