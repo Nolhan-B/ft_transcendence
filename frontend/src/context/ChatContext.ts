@@ -6,6 +6,7 @@ export interface ChatContextValue {
   status: Status;
   conversations: Record<string, DirectMessage[]>;
   error: string | null;
+  clearError: () => void;
   sendMessage: (receiverId: string, content: string) => void;
   loadHistory: (otherUserId: string) => Promise<void>;
 }

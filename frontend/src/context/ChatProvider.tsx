@@ -73,9 +73,18 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     },
     [addMessages],
   );
+  const clearError = useCallback(() => setError(null), []);
+
   const value = useMemo<ChatContextValue>(
-    () => ({ status, conversations, error, sendMessage, loadHistory }),
-    [status, conversations, error, sendMessage, loadHistory],
+    () => ({
+      status,
+      conversations,
+      error,
+      clearError,
+      sendMessage,
+      loadHistory,
+    }),
+    [status, conversations, error, clearError, sendMessage, loadHistory],
   );
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
