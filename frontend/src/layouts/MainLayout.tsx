@@ -3,6 +3,7 @@ import { Header } from "../components/Header/Header";
 import { Footer } from "../components/Footer/Footer";
 import { FloatingMessageBox } from "../components/FloatingMessageBox/FloatingMessageBox";
 import { DebugHeader } from "../components/DebugHeader/DebugHeader";
+import { SideButton } from "../components/SideButton/SideButton";
 
 export function MainLayout() {
   return (
@@ -18,6 +19,7 @@ export function MainLayout() {
       </main>
       <Footer />
       <FloatingMessageBox />
+      <SideButton />
     </div>
   );
 }
