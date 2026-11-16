@@ -49,7 +49,7 @@ export function TwoFactorSettings() {
     setNotice(null);
     setBusy(true);
     try {
-      const response = await post("/api/auth/2fa/enable");
+      const response = await post("/api/auth/2fa/enable", user);
       const data: { qrCode: string } = await response.json();
       setQrCode(data.qrCode);
       enableDialog.current?.showModal();
