@@ -38,7 +38,11 @@ export function FriendChat() {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2 pt-1">
       <AddFriendField onAdd={handleAddFriend} />
-      <FriendRequestItem onAccept={() => {console.log("test")}}/>
+      <FriendRequestItem
+        onAccept={() => {
+          console.log("test");
+        }}
+      />
 
       {error ? (
         <p className="text-error text-sm">Could not load friends: {error}</p>
