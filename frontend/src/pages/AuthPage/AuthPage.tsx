@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { LoginForm } from "../../components/authentification/LoginForm";
 import { TwoFactorForm } from "../../components/authentification/TwoFactorForm";
 import { useAuth } from "../../hooks/auth/useAuth";
@@ -28,7 +28,11 @@ const MODES: { mode: Mode; label: string; activeClass: string }[] = [
 ];
 
 export function AuthPage() {
-  const [selected, setSelected] = useState(FRONT);
+  // /auth?mode=register opens on the sign-up card (navbar "Sign up" button)
+  const [searchParams] = useSearchParams();
+  const [selected, setSelected] = useState(
+    searchParams.get("mode") === "register" ? cardOf("register") : FRONT,
+  );
   const { twoFactorPending } = useAuth();
 
   // A starting UNO hand: 7 cards alternating sign-in / sign-up. Every card
