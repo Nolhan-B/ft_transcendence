@@ -24,6 +24,10 @@ ENV NODE_ENV=development
 COPY services/user ./services/user
 
 WORKDIR /app/services/user
+
+# Ensure uploads directory exists with node ownership for named volume initialization
+RUN mkdir -p /app/services/user/uploads/avatars && chown -R node:node /app/services/user/uploads
+
 EXPOSE 3004
 CMD ["npm", "run", "dev"]
 
@@ -53,6 +57,9 @@ COPY --chown=node:node --from=builder /app/shared/prisma /app/shared/prisma
 COPY --chown=node:node --from=builder /app/services/user/package*.json ./
 COPY --chown=node:node --from=builder /app/services/user/node_modules ./node_modules
 COPY --chown=node:node --from=builder /app/services/user/dist ./dist
+
+# Ensure uploads directory exists with node ownership for named volume initialization
+RUN mkdir -p /app/services/user/uploads/avatars && chown -R node:node /app/services/user/uploads
 
 USER node
 EXPOSE 3004
