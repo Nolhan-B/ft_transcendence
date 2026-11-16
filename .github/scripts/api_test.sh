@@ -27,6 +27,7 @@ echo "=== 2. Création des comptes (Alice & Bob) ==="
 SUFFIX="$(date +%s)$((RANDOM % 100))"
 ALICE_EMAIL="alice_${SUFFIX}@test.com"
 BOB_EMAIL="bob_${SUFFIX}@test.com"
+BOB_USERNAME="bob_${SUFFIX}"
 
 # Signup Alice
 ALICE_RES=$(curl -k -s -X POST "$BASE_URL/api/auth/signup" \
@@ -45,7 +46,7 @@ echo "Alice créée (ID: $ALICE_ID)"
 # Signup Bob
 BOB_RES=$(curl -k -s -X POST "$BASE_URL/api/auth/signup" \
   -H "Content-Type: application/json" \
-  -d "{\"email\":\"$BOB_EMAIL\",\"username\":\"bob_${SUFFIX}\",\"password\":\"test1234\"}")
+  -d "{\"email\":\"$BOB_EMAIL\",\"username\":\"$BOB_USERNAME\",\"password\":\"test1234\"}")
 
 BOB_TOKEN=$(node -e "console.log(JSON.parse(process.argv[1]).token || '')" "$BOB_RES")
 BOB_ID=$(node -e "console.log(JSON.parse(process.argv[1]).user?.id || '')" "$BOB_RES")
@@ -57,11 +58,87 @@ fi
 echo "Bob créé (ID: $BOB_ID)"
 
 echo ""
-echo "=== 3. Workflow d'amitié ==="
+echo "=== 3. Recherche d'un utilisateur par pseudo ==="
 
-# Alice envoie une demande à Bob
-echo "Alice envoie une demande à Bob..."
-curl -k -fsSL -X POST "$BASE_URL/api/user/friends/request/$BOB_ID" \
+# Alice cherche Bob par son pseudo
+echo "Alice cherche Bob par son pseudo..."
+LOOKUP_STATUS=$(curl -k -s -o "$WORKDIR/lookup.json" -w "%{http_code}" \
+  "$BASE_URL/api/user/users/by-username/$BOB_USERNAME" \
+  -H "Authorization: Bearer $ALICE_TOKEN")
+
+if [ "$LOOKUP_STATUS" -ne 200 ]; then
+  echo "Échec de la recherche par pseudo (code HTTP $LOOKUP_STATUS)"
+  cat "$WORKDIR/lookup.json"
+  exit 1
+fi
+
+LOOKUP_RES=$(cat "$WORKDIR/lookup.json")
+LOOKUP_ID=$(node -e "console.log(JSON.parse(process.argv[1]).id || '')" "$LOOKUP_RES")
+LOOKUP_USERNAME=$(node -e "console.log(JSON.parse(process.argv[1]).username || '')" "$LOOKUP_RES")
+
+if [ "$LOOKUP_ID" != "$BOB_ID" ] || [ "$LOOKUP_USERNAME" != "$BOB_USERNAME" ]; then
+  echo "La recherche ne renvoie pas Bob"
+  echo "Réponse reçue : $LOOKUP_RES"
+  exit 1
+fi
+echo "Bob retrouvé par son pseudo (ID: $LOOKUP_ID)"
+
+# La réponse ne doit contenir que le profil public
+echo "Vérification que seuls les champs publics sont renvoyés..."
+PRIVATE_FIELDS=$(node -e "
+  const res = JSON.parse(process.argv[1]);
+  const forbidden = ['email', 'password', 'passwordHash', 'twoFactorSecret'];
+  console.log(forbidden.filter((f) => f in res).join(','));
+" "$LOOKUP_RES")
+
+if [ -n "$PRIVATE_FIELDS" ]; then
+  echo "La recherche expose des champs privés : $PRIVATE_FIELDS"
+  exit 1
+fi
+echo "Seuls les champs publics sont renvoyés"
+
+# Un pseudo inexistant renvoie 404
+echo "Recherche d'un pseudo inexistant..."
+UNKNOWN_STATUS=$(curl -k -s -o /dev/null -w "%{http_code}" \
+  "$BASE_URL/api/user/users/by-username/personne_${SUFFIX}" \
+  -H "Authorization: Bearer $ALICE_TOKEN")
+
+if [ "$UNKNOWN_STATUS" -ne 404 ]; then
+  echo "Un pseudo inexistant doit renvoyer 404 (code HTTP $UNKNOWN_STATUS)"
+  exit 1
+fi
+echo "Pseudo inexistant : 404"
+
+# Sans authentification, la route est refusée
+echo "Recherche sans être connecté..."
+NOAUTH_STATUS=$(curl -k -s -o /dev/null -w "%{http_code}" \
+  "$BASE_URL/api/user/users/by-username/$BOB_USERNAME")
+
+if [ "$NOAUTH_STATUS" -ne 401 ]; then
+  echo "Sans authentification, la route doit renvoyer 401 (code HTTP $NOAUTH_STATUS)"
+  exit 1
+fi
+echo "Sans authentification : 401"
+
+# La recherche est sensible à la casse
+echo "Recherche avec une casse différente..."
+UPPER_USERNAME=$(echo "$BOB_USERNAME" | tr '[:lower:]' '[:upper:]')
+CASE_STATUS=$(curl -k -s -o /dev/null -w "%{http_code}" \
+  "$BASE_URL/api/user/users/by-username/$UPPER_USERNAME" \
+  -H "Authorization: Bearer $ALICE_TOKEN")
+
+if [ "$CASE_STATUS" -ne 404 ]; then
+  echo "La recherche doit être sensible à la casse (code HTTP $CASE_STATUS)"
+  exit 1
+fi
+echo "Casse différente : 404"
+
+echo ""
+echo "=== 4. Workflow d'amitié ==="
+
+# Alice envoie une demande à Bob, avec l'id trouvé par la recherche
+echo "Alice envoie une demande à Bob (id trouvé par son pseudo)..."
+curl -k -fsSL -X POST "$BASE_URL/api/user/friends/request/$LOOKUP_ID" \
   -H "Authorization: Bearer $ALICE_TOKEN" > /dev/null
 
 # Bob consulte les demandes reçues
@@ -113,7 +190,7 @@ if echo "$ALICE_FRIENDS_AFTER" | grep -q "$BOB_ID"; then
 fi
 
 echo ""
-echo "=== 4. Match History ==="
+echo "=== 5. Match History ==="
 
 # Re-add friendship for game creation
 curl -k -fsSL -X POST "$BASE_URL/api/user/friends/request/$BOB_ID" \
