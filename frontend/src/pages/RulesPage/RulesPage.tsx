@@ -60,7 +60,7 @@ export function RulesPage() {
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-6">
       <header className="flex flex-col gap-2">
-        <MainTitle title="How to play"/>
+        <MainTitle title="How to play" />
         <p className="text-base-content/70">
           A fast, turn-based UNO game for 2 to 4 players. Be the first to empty
           your hand — and don't forget to call UNO.
