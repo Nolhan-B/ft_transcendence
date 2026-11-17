@@ -2,6 +2,49 @@
 
 /* Decorative "light rays" depth effect, shared by the auth page and the home
    hero. Tune the pivot with --rays-origin (e.g. [--rays-origin:50%_80%]). */
+/* Home hero: cards drifting in the background. Each card overrides the
+   duration/delay with arbitrary values ([animation-duration:9s]...). */
+@keyframes hero-float {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(var(--card-rotate, 0deg));
+  }
+  50% {
+    transform: translate3d(0, -18px, 0)
+      rotate(calc(var(--card-rotate, 0deg) + 4deg));
+  }
+}
+
+@utility hero-float {
+  animation: hero-float 7s ease-in-out infinite;
+  animation-delay: var(--card-delay, 0s);
+}
+
+/* Slow breathing glow behind the hero title. */
+@keyframes hero-glow {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.08);
+  }
+}
+
+@utility hero-glow {
+  animation: hero-glow 9s ease-in-out infinite;
+}
+
+/* Accessible: no movement for users who ask for it. */
+@media (prefers-reduced-motion: reduce) {
+  .hero-float,
+  .hero-glow {
+    animation: none;
+  }
+}
+
 @utility bg-rays {
   background-image: repeating-conic-gradient(
     from var(--rays-angle, 0deg) at var(--rays-origin, 50% 50%),

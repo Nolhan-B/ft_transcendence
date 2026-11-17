@@ -1,5 +1,5 @@
 import messageIcon from "../../assets/icons/message.svg";
-import { FriendChat } from "./components/FriendChat";
+import { FriendManager } from "../FriendManager/FriendManager";
 import { GameChat } from "./components/GameChat";
 
 export function FloatingMessageBox() {
@@ -23,7 +23,7 @@ export function FloatingMessageBox() {
         />
         <div className="tab-content h-[26rem] max-h-[calc(100vh-8rem)] bg-base-100 border-base-300 p-6">
           <div className="flex h-full flex-col">
-            <FriendChat />
+            <FriendManager />
           </div>
         </div>
         <input
