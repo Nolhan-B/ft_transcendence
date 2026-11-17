@@ -221,8 +221,8 @@ export function RulesPage() {
             <h3 className="mb-1 font-bold">Ranked</h3>
             <p className="text-sm">
               Join the matchmaking queue. Players are matched by Elo, and the
-              finishing order updates everyone's rating. Leaving early counts
-              as a loss.
+              finishing order updates everyone's rating. Leaving early counts as
+              a loss.
             </p>
           </div>
         </div>
