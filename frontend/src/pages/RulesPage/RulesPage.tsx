@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { MainTitle } from "../../components/texts/MainTitle";
 
 // Static rules page. Every rule below mirrors the game engine
 // (services/game/src/engine) and the gateway timers, so keep it in sync when
@@ -59,7 +60,7 @@ export function RulesPage() {
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-6">
       <header className="flex flex-col gap-2">
-        <h1 className="text-4xl font-black">How to play</h1>
+        <MainTitle title="How to play"/>
         <p className="text-base-content/70">
           A fast, turn-based UNO game for 2 to 4 players. Be the first to empty
           your hand — and don't forget to call UNO.
