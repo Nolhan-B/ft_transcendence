@@ -22,10 +22,6 @@ export function Footer() {
           {WEBSITE_DESCRIPTION}
         </p>
       </aside>
-      {/* <nav>
-        <h6 className="footer-title">TOS</h6>
-        <a className="link link-hover">WIP</a>
-      </nav> */}
       <nav>
         <h6 className="footer-title">LEGAL</h6>
         <Link className="link link-hover" to="/terms">
