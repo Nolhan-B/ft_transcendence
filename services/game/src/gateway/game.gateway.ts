@@ -39,7 +39,7 @@ import { handleLeaveQueue } from "./handlers/matchmaking/leave-queue.js";
 import { findMatch } from "../engine/matchmaking.js";
 import { computeEloChanges } from "../engine/elo.js";
 
-const TURN_TIMEOUT_MS = 20000;
+const TURN_TIMEOUT_MS = Number(process.env.TURN_TIMEOUT_MS) || 20000;
 const MAX_AFK_COUNT = 2;
 
 const rooms: Map<
@@ -412,7 +412,7 @@ export default async function gameGateway(fastify: FastifyInstance) {
           await handleDrawCard(ctx, message);
           break;
         case "call_uno":
-          handleCallUno(ctx);
+          handleCallUno(ctx, message);
           break;
         case "catch_uno":
           handleCatchUno(ctx, message);

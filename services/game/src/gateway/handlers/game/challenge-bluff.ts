@@ -16,6 +16,15 @@ export async function handleChallengeBluff(
     return;
   }
 
+  const target = game.players.find((p) => p.isCurrentTurn);
+  if (!target || target.userId !== ctx.userId) {
+    ctx.sendError(
+      ctx.socket,
+      "Only the targeted player can respond to this card",
+    );
+    return;
+  }
+
   if (ctx.bluffTimers.has(game.id)) {
     clearTimeout(ctx.bluffTimers.get(game.id));
     ctx.bluffTimers.delete(game.id);

@@ -1265,6 +1265,280 @@ test("bluffChallenge off: wild_draw4 fait piocher normalement", () => {
 });
 
 // ============================================================
+// COUP REFUSÉ = ÉTAT INCHANGÉ
+// ============================================================
+
+// Photo de tout ce qu'un coup peut modifier
+function snapshot(state: InternalGameState) {
+  return {
+    hands: state.players.map((p) => p.hand.map((c) => c.id).join(",")),
+    topCard: state.topCard.id,
+    discard: state.discardPile.length,
+    current: state.players.find((p) => p.isCurrentTurn)?.userId,
+    color: state.currentColor,
+    direction: state.direction,
+    pending: state.pendingDrawCount,
+    lastWildDraw4: state.lastWildDraw4 === undefined,
+  };
+}
+
+function assertUnchanged(
+  before: ReturnType<typeof snapshot>,
+  state: InternalGameState,
+) {
+  const after = snapshot(state);
+  assert(before.topCard === after.topCard, "La carte du dessus a changé");
+  assert(before.discard === after.discard, "La défausse a changé");
+  assert(before.current === after.current, "Le tour a changé");
+  assert(before.color === after.color, "La couleur courante a changé");
+  assert(before.direction === after.direction, "La direction a changé");
+  assert(before.pending === after.pending, "pendingDrawCount a changé");
+  assert(
+    before.lastWildDraw4 === after.lastWildDraw4,
+    "lastWildDraw4 a changé",
+  );
+  for (let i = 0; i < before.hands.length; i++) {
+    assert(
+      before.hands[i] === after.hands[i],
+      `La main du joueur ${i + 1} a changé`,
+    );
+  }
+}
+
+const AUDIT_SETTINGS = {
+  stacking: "none" as const,
+  sevenZeroRule: true,
+  jumpIn: true,
+  bluffChallenge: false,
+  unoCallout: false,
+};
+
+function auditGame(nbPlayers = 3) {
+  const participants = [
+    { id: "1", username: "A" },
+    { id: "2", username: "B" },
+    { id: "3", username: "C" },
+  ].slice(0, nbPlayers);
+  const state = createGame(participants, GameMode.CLASSIC, AUDIT_SETTINGS);
+  state.topCard = { id: "top", color: "red", value: "5" };
+  state.currentColor = "red";
+  return state;
+}
+
+test("audit: joker sans couleur → refusé, rien ne change", () => {
+  const state = auditGame();
+  state.players[0].hand = [
+    { id: "w", color: "wild", value: "wild" },
+    { id: "keep", color: "blue", value: "1" },
+  ];
+  const before = snapshot(state);
+  assert(playCard(state, "1", "w") === null, "Doit refuser");
+  assertUnchanged(before, state);
+});
+
+test("audit: joker avec une couleur invalide → refusé, rien ne change", () => {
+  const state = auditGame();
+  state.players[0].hand = [
+    { id: "w", color: "wild", value: "wild" },
+    { id: "keep", color: "blue", value: "1" },
+  ];
+  const before = snapshot(state);
+  assert(playCard(state, "1", "w", "purple") === null, "Doit refuser");
+  assertUnchanged(before, state);
+});
+
+test("audit: +4 sans couleur → refusé, rien ne change", () => {
+  const state = auditGame();
+  state.players[0].hand = [
+    { id: "wd", color: "wild", value: "wild_draw4" },
+    { id: "keep", color: "blue", value: "1" },
+  ];
+  const before = snapshot(state);
+  assert(playCard(state, "1", "wd") === null, "Doit refuser");
+  assertUnchanged(before, state);
+});
+
+test("audit: +4 avec une couleur invalide → refusé, rien ne change", () => {
+  const state = auditGame();
+  state.players[0].hand = [
+    { id: "wd", color: "wild", value: "wild_draw4" },
+    { id: "keep", color: "blue", value: "1" },
+  ];
+  const before = snapshot(state);
+  assert(playCard(state, "1", "wd", "purple") === null, "Doit refuser");
+  assertUnchanged(before, state);
+});
+
+test("audit: +4 avec la couleur 'wild' → refusé", () => {
+  const state = auditGame();
+  state.players[0].hand = [
+    { id: "wd", color: "wild", value: "wild_draw4" },
+    { id: "keep", color: "blue", value: "1" },
+  ];
+  const before = snapshot(state);
+  assert(
+    playCard(state, "1", "wd", "wild") === null,
+    "« wild » n'est pas une couleur jouable",
+  );
+  assertUnchanged(before, state);
+});
+
+test("audit: +4 avec une couleur valide → accepté", () => {
+  const state = auditGame();
+  state.players[0].hand = [
+    { id: "wd", color: "wild", value: "wild_draw4" },
+    { id: "keep", color: "blue", value: "1" },
+  ];
+  assert(playCard(state, "1", "wd", "green") !== null, "Doit accepter green");
+  assert(state.currentColor === "green", "La couleur doit être green");
+});
+
+test("audit: 7 sans cible → refusé, rien ne change", () => {
+  const state = auditGame();
+  state.players[0].hand = [
+    { id: "s7", color: "red", value: "7" },
+    { id: "keep", color: "blue", value: "1" },
+  ];
+  const before = snapshot(state);
+  assert(playCard(state, "1", "s7") === null, "Doit refuser");
+  assertUnchanged(before, state);
+});
+
+test("audit: 7 avec une cible déconnectée → refusé, rien ne change", () => {
+  const state = auditGame();
+  state.players[0].hand = [
+    { id: "s7", color: "red", value: "7" },
+    { id: "keep", color: "blue", value: "1" },
+  ];
+  state.players[1].disconnected = true;
+  const before = snapshot(state);
+  assert(playCard(state, "1", "s7", undefined, "2") === null, "Doit refuser");
+  assertUnchanged(before, state);
+});
+
+test("audit: 7 qui se vise lui-même → refusé, rien ne change", () => {
+  const state = auditGame();
+  state.players[0].hand = [
+    { id: "s7", color: "red", value: "7" },
+    { id: "keep", color: "blue", value: "1" },
+  ];
+  const before = snapshot(state);
+  assert(playCard(state, "1", "s7", undefined, "1") === null, "Doit refuser");
+  assertUnchanged(before, state);
+});
+
+test("audit: 7 avec une cible inconnue → refusé, rien ne change", () => {
+  const state = auditGame();
+  state.players[0].hand = [
+    { id: "s7", color: "red", value: "7" },
+    { id: "keep", color: "blue", value: "1" },
+  ];
+  const before = snapshot(state);
+  assert(
+    playCard(state, "1", "s7", undefined, "inconnu") === null,
+    "Doit refuser",
+  );
+  assertUnchanged(before, state);
+});
+
+test("audit: 7 avec une cible valide → accepté, les mains sont échangées", () => {
+  const state = auditGame();
+  state.players[0].hand = [
+    { id: "s7", color: "red", value: "7" },
+    { id: "a1", color: "blue", value: "1" },
+  ];
+  state.players[1].hand = [{ id: "b1", color: "green", value: "2" }];
+  assert(playCard(state, "1", "s7", undefined, "2") !== null, "Doit accepter");
+  assert(
+    state.players[0].hand.some((c) => c.id === "b1"),
+    "A doit avoir la main de B",
+  );
+  assert(
+    state.players[1].hand.some((c) => c.id === "a1"),
+    "B doit avoir la main de A",
+  );
+});
+
+test("audit: carte invalide → refusée, rien ne change", () => {
+  const state = auditGame();
+  state.players[0].hand = [
+    { id: "bad", color: "blue", value: "3" },
+    { id: "keep", color: "green", value: "1" },
+  ];
+  const before = snapshot(state);
+  assert(playCard(state, "1", "bad") === null, "Doit refuser");
+  assertUnchanged(before, state);
+});
+
+// ---------------- Jump-in ----------------
+
+test("audit: jump-in avec une carte différente → refusé, le tour ne bouge pas", () => {
+  const state = auditGame();
+  // C'est le tour de A ; C tente de couper avec une carte pas identique
+  state.players[2].hand = [
+    { id: "nope", color: "red", value: "3" },
+    { id: "keep", color: "blue", value: "1" },
+  ];
+  const before = snapshot(state);
+  assert(playCard(state, "3", "nope") === null, "Doit refuser");
+  assertUnchanged(before, state);
+  assert(state.players[0].isCurrentTurn, "Le tour doit rester à A");
+  assert(!state.players[2].isCurrentTurn, "C ne doit pas avoir pris le tour");
+});
+
+test("audit: jump-in avec un joker identique mais sans couleur → refusé, le tour ne bouge pas", () => {
+  const state = auditGame();
+  state.topCard = { id: "topw", color: "wild", value: "wild" };
+  state.currentColor = "red";
+  state.players[2].hand = [
+    { id: "w2", color: "wild", value: "wild" },
+    { id: "keep", color: "blue", value: "1" },
+  ];
+  const before = snapshot(state);
+  assert(playCard(state, "3", "w2") === null, "Doit refuser");
+  assertUnchanged(before, state);
+  assert(state.players[0].isCurrentTurn, "Le tour doit rester à A");
+});
+
+test("audit: jump-in avec un 7 identique mais sans cible → refusé, le tour ne bouge pas", () => {
+  const state = auditGame();
+  state.topCard = { id: "top7", color: "red", value: "7" };
+  state.currentColor = "red";
+  state.players[2].hand = [
+    { id: "s7", color: "red", value: "7" },
+    { id: "keep", color: "blue", value: "1" },
+  ];
+  const before = snapshot(state);
+  assert(playCard(state, "3", "s7") === null, "Doit refuser");
+  assertUnchanged(before, state);
+  assert(state.players[0].isCurrentTurn, "Le tour doit rester à A");
+});
+
+test("audit: jump-in désactivé → refusé, le tour ne bouge pas", () => {
+  const state = auditGame();
+  state.settings = { ...AUDIT_SETTINGS, jumpIn: false };
+  state.players[2].hand = [
+    { id: "same", color: "red", value: "5" },
+    { id: "keep", color: "blue", value: "1" },
+  ];
+  const before = snapshot(state);
+  assert(playCard(state, "3", "same") === null, "Doit refuser");
+  assertUnchanged(before, state);
+});
+
+test("audit: jump-in valide → accepté, le tour repart du joueur qui coupe", () => {
+  const state = auditGame();
+  state.players[2].hand = [
+    { id: "same", color: "red", value: "5" },
+    { id: "keep", color: "blue", value: "1" },
+  ];
+  assert(playCard(state, "3", "same") !== null, "Doit accepter");
+  assert(state.topCard.id === "same", "La carte de C doit être sur la table");
+  assert(state.players[0].isCurrentTurn, "Après C, le tour revient à A");
+  assert(!state.players[1].isCurrentTurn, "B a été sauté");
+});
+
+// ============================================================
 // RÉSULTATS
 // ============================================================
 
