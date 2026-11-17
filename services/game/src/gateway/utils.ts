@@ -78,8 +78,6 @@ export function validateMessage(raw: unknown): ClientMessage | null {
         return null;
       if (msg.chosenColor && typeof msg.chosenColor !== "string") return null;
       break;
-    case "call_uno":
-      break;
     case "catch_uno":
       if (
         typeof msg.gameId !== "string" ||
@@ -89,6 +87,7 @@ export function validateMessage(raw: unknown): ClientMessage | null {
       break;
     case "challenge_bluff":
     case "accept_wild_draw4":
+    case "call_uno":
       if (typeof msg.gameId !== "string") return null;
       break;
     case "create_room":

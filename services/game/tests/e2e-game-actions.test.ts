@@ -607,6 +607,159 @@ const tests = [
       );
     });
   }),
+
+  // ---------------- call_uno ----------------
+
+  test("uno: dire UNO prévient tous les joueurs", async () => {
+    await withServer(async (server) => {
+      const { players, gameId } = await setupUno(server);
+      const [a, b, c] = players;
+      const forB = waitForMessage(b.ws, "uno_called");
+      const forC = waitForMessage(c.ws, "uno_called");
+      send(a.ws, { type: "call_uno", gameId });
+      const [mB, mC] = await Promise.all([forB, forC]);
+      assert(
+        mB.userId === a.id && mC.userId === a.id,
+        "L'annonce doit concerner A",
+      );
+    });
+  }),
+
+  test("uno: le joueur qui dit UNO reçoit aussi l'annonce", async () => {
+    await withServer(async (server) => {
+      const { players, gameId } = await setupUno(server);
+      const [a] = players;
+      const forA = waitForMessage(a.ws, "uno_called");
+      send(a.ws, { type: "call_uno", gameId });
+      const msg = await forA;
+      assert(msg.userId === a.id, "L'annonce doit concerner A");
+    });
+  }),
+
+  test("uno: un spectateur reçoit l'annonce", async () => {
+    await withServer(async (server) => {
+      const { players, gameId } = await setupUno(server);
+      const [a] = players;
+      const watcher = await connectUser(server, uniqueUserId("watcher"));
+      send(watcher, { type: "spectate_game", gameId });
+      await waitForMessage(watcher, "spectate_started");
+
+      const announced = waitForMessage(watcher, "uno_called");
+      send(a.ws, { type: "call_uno", gameId });
+      const msg = await announced;
+      assert(msg.userId === a.id, "Le spectateur doit voir l'UNO de A");
+    });
+  }),
+
+  test("uno: après avoir dit UNO, on ne peut plus être attrapé", async () => {
+    await withServer(async (server) => {
+      const { players, gameId, game } = await setupUno(server);
+      const [a, b] = players;
+      const announced = waitForMessage(b.ws, "uno_called");
+      send(a.ws, { type: "call_uno", gameId });
+      await announced;
+
+      send(b.ws, { type: "catch_uno", gameId, targetUserId: a.id });
+      const err = await waitForMessage(b.ws, "error");
+      assert(
+        err.message === "Player already called UNO or not in UNO state",
+        `Message inattendu : ${err.message}`,
+      );
+      assert(game.players[0].hand.length === 1, "A ne doit pas piocher");
+    });
+  }),
+
+  test("uno: dire UNO hors de la fenêtre UNO → erreur, rien n'est annoncé", async () => {
+    await withServer(async (server) => {
+      const { players, gameId } = await setupGame(server);
+      const [a, b] = players;
+      const msgsB = collect(b.ws, 400);
+      send(a.ws, { type: "call_uno", gameId });
+      const err = await waitForMessage(a.ws, "error");
+      assert(
+        err.message === "Nothing to call",
+        `Message inattendu : ${err.message}`,
+      );
+      assert(
+        !(await msgsB).some((m) => m.type === "uno_called"),
+        "Un faux UNO ne doit pas être annoncé",
+      );
+    });
+  }),
+
+  test("uno: dire UNO deux fois → la seconde est refusée", async () => {
+    await withServer(async (server) => {
+      const { players, gameId } = await setupUno(server);
+      const [a, b] = players;
+      const announced = waitForMessage(b.ws, "uno_called");
+      send(a.ws, { type: "call_uno", gameId });
+      await announced;
+
+      const msgsB = collect(b.ws, 400);
+      send(a.ws, { type: "call_uno", gameId });
+      const err = await waitForMessage(a.ws, "error");
+      assert(
+        err.message === "Nothing to call",
+        `Message inattendu : ${err.message}`,
+      );
+      assert(
+        !(await msgsB).some((m) => m.type === "uno_called"),
+        "Le second UNO ne doit pas être annoncé",
+      );
+    });
+  }),
+
+  test("uno: un autre joueur ne peut pas dire UNO à la place de la cible", async () => {
+    await withServer(async (server) => {
+      const { players, gameId, game } = await setupUno(server);
+      const [a, b] = players;
+      // B n'est pas dans la fenêtre UNO : son annonce est refusée…
+      send(b.ws, { type: "call_uno", gameId });
+      await waitForMessage(b.ws, "error");
+      // …et A peut toujours être attrapé
+      const caught = waitForMessage(b.ws, "uno_caught");
+      send(b.ws, { type: "catch_uno", gameId, targetUserId: a.id });
+      await caught;
+      assert(game.players[0].hand.length === 3, "A doit être pénalisé");
+    });
+  }),
+
+  test("uno: un utilisateur extérieur ne peut pas dire UNO", async () => {
+    await withServer(async (server) => {
+      const { gameId } = await setupUno(server);
+      const outsider = await connectUser(server, uniqueUserId("outsider"));
+      send(outsider, { type: "call_uno", gameId });
+      const err = await waitForMessage(outsider, "error");
+      assert(
+        err.message === "You are not part of this game",
+        `Message inattendu : ${err.message}`,
+      );
+    });
+  }),
+
+  test("uno: call_uno pour une partie inexistante → erreur", async () => {
+    await withServer(async (server) => {
+      const ws = await connectUser(server, uniqueUserId("player"));
+      send(ws, { type: "call_uno", gameId: "partie-qui-existe-pas" });
+      const err = await waitForMessage(ws, "error");
+      assert(
+        err.message === "Game not found",
+        `Message inattendu : ${err.message}`,
+      );
+    });
+  }),
+
+  test("uno: call_uno sans gameId → message refusé", async () => {
+    await withServer(async (server) => {
+      const ws = await connectUser(server, uniqueUserId("player"));
+      send(ws, { type: "call_uno" });
+      const err = await waitForMessage(ws, "error");
+      assert(
+        err.message === "Invalid message format",
+        `Message inattendu : ${err.message}`,
+      );
+    });
+  }),
 ];
 
 // ============================================================

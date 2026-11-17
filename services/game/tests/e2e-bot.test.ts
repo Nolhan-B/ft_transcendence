@@ -36,7 +36,6 @@ async function buildServer() {
   const fastify = Fastify({ logger: false });
   const gameManager = new GameManager();
   const roomManager = new RoomManager();
-  const queueManager = new QueueManager();
 
   fastify.register(cookie);
   fastify.register(jwt, { secret: JWT_SECRET });
@@ -56,7 +55,7 @@ async function buildServer() {
 
   fastify.decorate("gameManager", gameManager);
   fastify.decorate("roomManager", roomManager);
-  fastify.decorate("queueManager", queueManager);
+  fastify.decorate("queueManager", new QueueManager());
 
   fastify.register(websocket);
   fastify.register(gameGateway);
@@ -175,6 +174,45 @@ async function setupBotGame(ws: WebSocket, maxPlayers = 2): Promise<string> {
   await waitForMessage(ws, "game_updated");
 
   return gameId;
+}
+
+// Comme setupBotGame, mais avec la règle UNO activée
+async function setupBotGameWithUno(ws: WebSocket): Promise<string> {
+  const roomCode = await createRoom(ws, 2, "Bot UNO");
+
+  send(ws, {
+    type: "update_room",
+    roomCode,
+    settings: {
+      stacking: "none",
+      sevenZeroRule: false,
+      jumpIn: false,
+      bluffChallenge: false,
+      unoCallout: true,
+    },
+  });
+  await waitForMessage(ws, "room_updated");
+
+  send(ws, { type: "add_bot", roomCode });
+  await waitForMessage(ws, "room_updated");
+
+  send(ws, { type: "start_game", roomCode });
+  const gameStarted = await waitForMessage(ws, "game_started");
+  const gameId = gameStarted.gameId;
+
+  send(ws, { type: "join_game", gameId });
+  await waitForMessage(ws, "game_updated");
+  return gameId;
+}
+
+// Donne au bot deux cartes, dont une seule jouable : après son coup, il en aura une
+function prepareBotForLastCard(game: any, bot: any) {
+  game.topCard = { id: "top", color: "red", value: "5" };
+  game.currentColor = "red";
+  bot.hand = [
+    { id: "bot-red", color: "red", value: "3" },
+    { id: "bot-blue", color: "blue", value: "9" },
+  ];
 }
 
 // ============================================================
@@ -441,6 +479,166 @@ const tests = [
         ended !== null || !game || game.status === GameStatus.FINISHED,
         "La partie doit se terminer",
       );
+    });
+  }),
+  // ---------------- Le bot ne joue que son propre tour ----------------
+
+  test("e2e: un tour de bot programmé ne joue pas si le tour a changé entre-temps", async () => {
+    await withClient(async ({ ws, gameManager, userId }) => {
+      const gameId = await setupBotGame(ws);
+      const game = gameManager.getGame(gameId)!;
+      const human = game.players.find((p) => p.userId === userId)!;
+      const bot = game.players.find((p) => p.userId.startsWith("bot_"))!;
+
+      // L'humain pioche : le tour du bot est programmé (0,5 à 1,5 s)
+      send(ws, { type: "draw_card", gameId });
+      await waitForMessage(ws, "game_updated");
+      assert(bot.isCurrentTurn, "Ce doit être au tour du bot");
+
+      // Avant que le bot joue, le tour revient à l'humain
+      bot.isCurrentTurn = false;
+      human.isCurrentTurn = true;
+      const handBefore = human.hand.map((c) => c.id).join();
+      const topBefore = game.topCard.id;
+
+      await sleep(1800);
+
+      assert(
+        human.hand.map((c) => c.id).join() === handBefore,
+        "Le bot ne doit pas avoir joué une carte de l'humain",
+      );
+      assert(
+        game.topCard.id === topBefore,
+        "Aucune carte ne doit avoir été posée",
+      );
+      assert(human.isCurrentTurn, "Ce doit toujours être au tour de l'humain");
+    });
+  }),
+
+  test("e2e: un tour de bot programmé ne joue pas si la partie s'est terminée", async () => {
+    await withClient(async ({ ws, gameManager }) => {
+      const gameId = await setupBotGame(ws);
+      const game = gameManager.getGame(gameId)!;
+      const bot = game.players.find((p) => p.userId.startsWith("bot_"))!;
+
+      send(ws, { type: "draw_card", gameId });
+      await waitForMessage(ws, "game_updated");
+      assert(bot.isCurrentTurn, "Ce doit être au tour du bot");
+
+      // La partie se termine avant que le bot joue
+      game.status = GameStatus.FINISHED;
+      const handBefore = bot.hand.map((c) => c.id).join();
+      const topBefore = game.topCard.id;
+
+      await sleep(1800);
+
+      assert(
+        bot.hand.map((c) => c.id).join() === handBefore,
+        "Le bot ne doit pas avoir joué",
+      );
+      assert(
+        game.topCard.id === topBefore,
+        "Aucune carte ne doit avoir été posée",
+      );
+    });
+  }),
+
+  // ---------------- Le bot dit UNO ----------------
+
+  test("e2e: le bot dit UNO quand il n'a plus qu'une carte", async () => {
+    await withClient(async ({ ws, gameManager }) => {
+      const gameId = await setupBotGameWithUno(ws);
+      const game = gameManager.getGame(gameId)!;
+      const bot = game.players.find((p) => p.userId.startsWith("bot_"))!;
+
+      prepareBotForLastCard(game, bot);
+
+      // Math.random fixé à 0,5 : le bot n'oublie pas de dire UNO
+      const origRandom = Math.random;
+      Math.random = () => 0.5;
+      let announce: any;
+      try {
+        send(ws, { type: "draw_card", gameId });
+        await waitForMessage(ws, "game_updated");
+        // L'humain doit recevoir l'annonce du bot
+        announce = await waitForMessage(ws, "uno_called", 3000);
+      } finally {
+        Math.random = origRandom;
+      }
+
+      assert(announce.userId === bot.userId, "L'annonce doit venir du bot");
+      assert(
+        bot.hand.length === 1,
+        `Le bot doit avoir 1 carte, en a ${bot.hand.length}`,
+      );
+
+      // Il a dit UNO : on ne peut pas l'attraper
+      send(ws, { type: "catch_uno", gameId, targetUserId: bot.userId });
+      const err = await waitForMessage(ws, "error");
+      assert(
+        err.message === "Player already called UNO or not in UNO state",
+        `Le bot doit avoir dit UNO, message : ${err.message}`,
+      );
+      assert(bot.hand.length === 1, "Le bot ne doit pas piocher");
+    });
+  }),
+
+  test("e2e: un bot qui oublie de dire UNO peut être attrapé", async () => {
+    await withClient(async ({ ws, gameManager }) => {
+      const gameId = await setupBotGameWithUno(ws);
+      const game = gameManager.getGame(gameId)!;
+      const bot = game.players.find((p) => p.userId.startsWith("bot_"))!;
+
+      prepareBotForLastCard(game, bot);
+
+      // Math.random fixé à 0,05 : le bot oublie (10 % de chance en temps normal)
+      const origRandom = Math.random;
+      Math.random = () => 0.05;
+      try {
+        send(ws, { type: "draw_card", gameId });
+        await waitForMessage(ws, "game_updated");
+        await sleep(1000);
+      } finally {
+        Math.random = origRandom;
+      }
+
+      assert(
+        bot.hand.length === 1,
+        `Le bot doit avoir 1 carte, en a ${bot.hand.length}`,
+      );
+
+      const caught = waitForMessage(ws, "uno_caught");
+      send(ws, { type: "catch_uno", gameId, targetUserId: bot.userId });
+      await caught;
+      assert(
+        bot.hand.length === 3,
+        `Le bot doit piocher 2 cartes, en a ${bot.hand.length}`,
+      );
+    });
+  }),
+
+  test("e2e: le bot ne dit pas UNO si la règle est désactivée", async () => {
+    await withClient(async ({ ws, gameManager }) => {
+      const gameId = await setupBotGame(ws); // unoCallout désactivé par défaut
+      const game = gameManager.getGame(gameId)!;
+      const bot = game.players.find((p) => p.userId.startsWith("bot_"))!;
+
+      prepareBotForLastCard(game, bot);
+
+      const origRandom = Math.random;
+      Math.random = () => 0.5;
+      try {
+        send(ws, { type: "draw_card", gameId });
+        await waitForMessage(ws, "game_updated");
+        await sleep(1800);
+      } finally {
+        Math.random = origRandom;
+      }
+
+      // Sans la règle, il n'y a rien à attraper
+      send(ws, { type: "catch_uno", gameId, targetUserId: bot.userId });
+      await waitForMessage(ws, "error");
+      assert(bot.hand.length === 1, "Le bot ne doit pas piocher");
     });
   }),
 ];

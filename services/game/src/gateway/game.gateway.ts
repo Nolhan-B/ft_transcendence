@@ -412,7 +412,7 @@ export default async function gameGateway(fastify: FastifyInstance) {
           await handleDrawCard(ctx, message);
           break;
         case "call_uno":
-          handleCallUno(ctx);
+          handleCallUno(ctx, message);
           break;
         case "catch_uno":
           handleCatchUno(ctx, message);
