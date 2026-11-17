@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ErrorAlert } from "../ui/ErrorAlert";
 import { useRegister } from "../../hooks/auth/useRegister";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 export function RegisterForm() {
   const { submit, loading, error } = useRegister();
@@ -13,7 +13,7 @@ export function RegisterForm() {
   const navigate = useNavigate();
 
   async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault(); // Anti browser reloading
+    e.preventDefault(); // Prevent default browser form submission
     if (password != passwordConfirmation) {
       setFormError("Passwords not matching.");
       return;
@@ -85,6 +85,28 @@ export function RegisterForm() {
         )}
         Sign-up
       </button>
+      {/* Link legal policies directly from the sign-up flow */}
+      <p className="text-center text-xs opacity-75">
+        By creating an account, you agree to our{" "}
+        <Link
+          to="/terms"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="link link-primary"
+        >
+          Terms of Service
+        </Link>{" "}
+        and{" "}
+        <Link
+          to="/privacy"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="link link-primary"
+        >
+          Privacy Policy
+        </Link>
+        .
+      </p>
     </form>
   );
 }
