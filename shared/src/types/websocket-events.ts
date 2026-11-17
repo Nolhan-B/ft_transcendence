@@ -209,6 +209,7 @@ export type ServerEvent =
   | ChatMessageEvent
   | ErrorEvent
   | UnoCaughtEvent
+  | UnoCalledEvent
   | BluffResultEvent
   | BluffResultEvent
   | SpectateStartedEvent
