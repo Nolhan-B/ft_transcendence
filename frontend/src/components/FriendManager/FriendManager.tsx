@@ -100,68 +100,108 @@ export function FriendManager() {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-6 pt-1">
-      <div className="flex shrink-0 flex-col gap-1">
-        Send a friend request
+    <div className="flex min-h-0 flex-1 flex-col gap-4 pt-1">
+      <div className="flex shrink-0 flex-col gap-2">
+        <h2 className="text-xs font-semibold tracking-wide uppercase opacity-60">
+          Add a friend
+        </h2>
         <AddFriendField onAdd={handleAddFriend} />
       </div>
 
-      <div className="flex shrink-0 flex-col gap-1">
-        Pending Friend requests
+      <div className="flex shrink-0 flex-col gap-2">
+        <h2 className="flex items-center gap-2 text-xs font-semibold tracking-wide uppercase opacity-60">
+          Pending requests
+          {friendRequests.length > 0 && (
+            <span className="badge badge-warning badge-xs">
+              {friendRequests.length}
+            </span>
+          )}
+        </h2>
         {friendRequestsError ? (
-          <p className="text-error text-sm">
+          <p className="text-sm text-error">
             Could not load requests: {friendRequestsError}
           </p>
         ) : friendRequests.length === 0 ? (
-          <p className="text-sm opacity-60">No pending requests</p>
+          <p className="text-sm opacity-50">No pending requests</p>
         ) : (
-          friendRequests.map((request) => (
-            <FriendRequestItem
-              key={request.id}
-              name={request.username}
-              avatarUrl={request.avatarUrl}
-              onAccept={() => handleAcceptFriendRequest(request.id)}
-              onDecline={() => handleDeclineFriendRequest(request.id)}
-            />
-          ))
+          <div className="flex flex-col gap-1">
+            {friendRequests.map((request) => (
+              <FriendRequestItem
+                key={request.id}
+                name={request.username}
+                avatarUrl={request.avatarUrl}
+                onAccept={() => handleAcceptFriendRequest(request.id)}
+                onDecline={() => handleDeclineFriendRequest(request.id)}
+              />
+            ))}
+          </div>
         )}
       </div>
-      <div className="divider"></div>
+
+      <div className="divider my-0"></div>
+
       {currentOpenedFriendChat ? (
-        <div className="flex min-h-0 flex-1 flex-col gap-1">
-          <div className="flex shrink-0 items-center gap-2">
+        <div className="flex min-h-0 flex-1 flex-col gap-2">
+          <div className="flex shrink-0 items-center gap-2 rounded-box bg-base-200 p-1">
             <button
+              type="button"
               onClick={() => setCurrentOpenedFriendChat(null)}
-              className="btn border-0"
+              aria-label="Back to friends list"
+              className="btn btn-ghost btn-sm btn-circle"
             >
-              ←
+              <svg
+                viewBox="0 0 24 24"
+                className="size-4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M15 18l-6-6 6-6" />
+              </svg>
             </button>
-            Chat with {currentOpenedFriendChat.username}
+            <span className="min-w-0 flex-1 truncate text-sm font-medium">
+              {currentOpenedFriendChat.username}
+            </span>
           </div>
           <FriendChat profile={currentOpenedFriendChat} />
         </div>
       ) : (
-        <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
-          Your friends
-          {friendListError ? (
-            <p className="text-error text-sm">
-              Could not load friends: {friendListError}
-            </p>
-          ) : loading ? (
-            <p className="text-sm opacity-60">Loading friends…</p>
-          ) : friends.length === 0 ? (
-            <p className="text-sm opacity-60">You have no friends :(</p>
-          ) : (
-            friends.map((friend) => (
-              <FriendListItem
-                key={friend.id}
-                name={friend.username}
-                avatarUrl={friend.avatarUrl}
-                onRemove={() => handleDeclineFriendRequest(friend.id)}
-                onClick={() => setCurrentOpenedFriendChat(friend)}
-              />
-            ))
-          )}
+        <div className="flex min-h-0 flex-1 flex-col gap-2">
+          <h2 className="flex shrink-0 items-center gap-2 text-xs font-semibold tracking-wide uppercase opacity-60">
+            Friends
+            {!loading && friends.length > 0 && (
+              <span className="badge badge-ghost badge-xs">
+                {friends.length}
+              </span>
+            )}
+          </h2>
+          <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
+            {friendListError ? (
+              <p className="text-sm text-error">
+                Could not load friends: {friendListError}
+              </p>
+            ) : loading ? (
+              <p className="flex items-center gap-2 text-sm opacity-50">
+                <span className="loading loading-spinner loading-xs" />
+                Loading friends…
+              </p>
+            ) : friends.length === 0 ? (
+              <p className="text-sm opacity-50">You have no friends :(</p>
+            ) : (
+              friends.map((friend) => (
+                <FriendListItem
+                  key={friend.id}
+                  name={friend.username}
+                  avatarUrl={friend.avatarUrl}
+                  onRemove={() => handleDeclineFriendRequest(friend.id)}
+                  onClick={() => setCurrentOpenedFriendChat(friend)}
+                />
+              ))
+            )}
+          </div>
         </div>
       )}
     </div>

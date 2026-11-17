@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Profile } from "shared";
+import { useState, useEffect } from "react";
+import type { Profile } from "shared";
 
 export type AddFriendFieldProps = {
   // Called with the trimmed username when the form is submitted
@@ -11,57 +11,99 @@ export function AddFriendField({ onAdd }: AddFriendFieldProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    function removeErrorMessage() {
+      if (username == '') {
+        setError(null);
+      }
+    }
+
+    removeErrorMessage();
+  }, [username]);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault(); // Anti browser reloading
     setError(null);
-    if (username === "") return;
-    setLoading(true);
-
-    // Get the user-id from the username
-    const res = await fetch("/api/user/users/by-username/" + username, {
-      credentials: "include",
-    });
-    if (res.status === 404) setError("Player not found !");
-    if (!res.ok) setError("Failed to add this user.");
-    const user = (await res.json()) as Profile;
-
-    // Send friend request
-    await fetch(`/api/user/friends/request/${user.id}`, {
-      method: "POST",
-      credentials: "include",
-    });
 
     const trimmed = username.trim();
     if (trimmed === "") return;
+    setLoading(true);
 
-    onAdd(trimmed);
-    setUsername("");
-    setLoading(false);
+    try {
+      // Get the user-id from the username
+      const res = await fetch(
+        `/api/user/users/by-username/${encodeURIComponent(trimmed)}`,
+        { credentials: "include" },
+      );
+      if (res.status === 404) throw new Error("Player not found.");
+      if (!res.ok) throw new Error("Failed to add this user.");
+      const user = (await res.json()) as Profile;
+
+      // Send friend request
+      const request = await fetch(`/api/user/friends/request/${user.id}`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!request.ok) throw new Error("Failed to send the request.");
+
+      onAdd(trimmed);
+      setUsername("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
-    <form className="flex flex-col flex-1 gap-3" onSubmit={handleSubmit}>
-      <div className="flex flex-1 gap-2">
+    <form className="flex flex-col gap-2" onSubmit={handleSubmit}>
+      <label className="input input-sm flex w-full items-center gap-2 bg-base-300/60 focus-within:outline-2 focus-within:outline-base-content/20">
+        <svg
+          viewBox="0 0 24 24"
+          className="size-4 shrink-0 opacity-50"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <circle cx="11" cy="11" r="7" />
+          <path d="M20 20l-3.5-3.5" />
+        </svg>
         <input
           type="text"
           value={username}
-          placeholder="Username"
+          placeholder="Search a username"
           aria-label="Player name"
-          className="flex flex-1 input input-sm"
+          className="grow"
           onChange={(e) => setUsername(e.target.value)}
         />
-        <button type="submit" className="btn btn-sm">
-          {loading ? "Sending request..." : "Add friend"}
-        </button>
-      </div>
+      </label>
 
-      {error ? (
-        <div role="alert" className="alert alert-error">
+      <button
+        type="submit"
+        className="btn btn-secondary btn-soft btn-sm w-full"
+        disabled={loading || username.trim() === ""}
+      >
+        {loading ? (
+          <>
+            <span className="loading loading-spinner loading-xs" />
+            Sending…
+          </>
+        ) : (
+          "Add friend"
+        )}
+      </button>
+
+      {error && (
+        <div role="alert" className="alert alert-error alert-soft">
           <svg
             xmlns="http://www.w3.org/2000/svg"
-            className="h-6 w-6 shrink-0 stroke-current"
+            className="size-4 shrink-0 stroke-current"
             fill="none"
             viewBox="0 0 24 24"
+            aria-hidden="true"
           >
             <path
               strokeLinecap="round"
@@ -72,8 +114,6 @@ export function AddFriendField({ onAdd }: AddFriendFieldProps) {
           </svg>
           <span>{error}</span>
         </div>
-      ) : (
-        ""
       )}
     </form>
   );
