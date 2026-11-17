@@ -13,7 +13,7 @@ export function AddFriendField({ onAdd }: AddFriendFieldProps) {
 
   useEffect(() => {
     function removeErrorMessage() {
-      if (username == '') {
+      if (username == "") {
         setError(null);
       }
     }
