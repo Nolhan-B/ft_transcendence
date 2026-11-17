@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import unoLogo from "../../../assets/images/uno-logo.svg";
 import { StartPlayingButton } from "../Components/StartPlayingButton";
 import { WEBSITE_DESCRIPTION, WEBSITE_NAME } from "../../../constants";
@@ -96,9 +97,9 @@ export function HomeHero() {
 
         <div className="flex flex-wrap items-center justify-center gap-4">
           <StartPlayingButton>Play now</StartPlayingButton>
-          <a href="/rules" className="btn btn-outline btn-lg">
+          <Link to="/rules" className="btn btn-outline btn-lg">
             How to play
-          </a>
+          </Link>
         </div>
 
         <ul className="mt-4 flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-sm text-base-content/60">
