@@ -10,6 +10,7 @@ import multipart from "@fastify/multipart";
 import staticPlugin from "@fastify/static";
 import path from "path";
 import { setupMetrics } from "shared";
+import leaderboardRoutes from "./routes/leaderboard.routes.js";
 
 if (fs.existsSync("/run/secrets/db_url")) {
   process.env.DATABASE_URL = fs
@@ -89,6 +90,7 @@ fastify.register(jwt, {
 
 fastify.register(profileRoutes);
 fastify.register(friendsRoutes);
+fastify.register(leaderboardRoutes);
 
 fastify.route({
   method: ["GET", "HEAD"],
