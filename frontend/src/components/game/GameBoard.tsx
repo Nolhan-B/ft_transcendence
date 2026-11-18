@@ -1,12 +1,19 @@
 import { useState } from "react";
 import type { Card, CardColor, GameState, Player } from "shared";
+import { useCountdown } from "../../hooks/game/useCountdown";
 import { useGame } from "../../hooks/ws/useGame";
 import { ChoiceDialog } from "./ChoiceDialog";
 import { Hand } from "../cards/Hand";
 import { toHandCard } from "./handCards";
 import { GameTable } from "./GameTable";
+import { CardFlights } from "./CardFlights";
+import { TurnAnnouncement } from "./TurnAnnouncement";
 import { OpponentSeat } from "./OpponentSeat";
 import type { Seat } from "./OpponentSeat";
+
+// Length of a turn on the server (TURN_TIMEOUT_MS, 20 s by default). It does
+// not send the remaining time: the countdown restarts with each new state.
+const TURN_SECONDS = 20;
 
 const COLOR_CHOICES: { color: CardColor; label: string; button: string }[] = [
   { color: "red", label: "Red", button: "btn-primary" },
@@ -58,7 +65,8 @@ interface Props {
 // Basic board: opponents on top, the table (draw pile and top card) in the
 // middle, my hand at the bottom
 export function GameBoard({ state, myId }: Props) {
-  const { playCard, drawCard, callUno, catchUno } = useGame();
+  const { playCard, drawCard, callUno, catchUno, turnStartedAt } = useGame();
+  const turnLeft = useCountdown(turnStartedAt, TURN_SECONDS);
   // A card waiting for a choice: its color (wild) or the player to swap with (7)
   const [asking, setAsking] = useState<{
     card: Card;
@@ -66,6 +74,7 @@ export function GameBoard({ state, myId }: Props) {
   } | null>(null);
 
   const me = state.players.find((player) => player.userId === myId);
+  const turnPlayer = state.players.find((player) => player.isCurrentTurn);
   const seated = seatOpponents(state.players, myId);
   const myTurn = me?.isCurrentTurn ?? false;
   // Cards stay visible when it is not your turn (except with jump-in)
@@ -73,10 +82,17 @@ export function GameBoard({ state, myId }: Props) {
   const handCards = (me?.hand ?? []).map((card) =>
     toHandCard(card, !canPlayNow),
   );
-  // The fan opens at most 56 degrees, whatever the number of cards
-  const step = Math.min(8, 56 / Math.max(handCards.length - 1, 1));
+  // Visible part of each card: 70% of it, less when the hand is large
+  const overlap = `calc(var(--card-w) * -1 + min(var(--card-w) * 0.7, ${60 / Math.max(handCards.length - 1, 1)}rem))`;
   const opponents = seated.map(({ player }) => player);
   const unoCallout = state.settings.unoCallout;
+  // Bots play after a short delay, without a timer
+  const timerFor = (player: Player) =>
+    player.isCurrentTurn &&
+    !player.disconnected &&
+    !player.userId.startsWith("bot_")
+      ? turnLeft
+      : null;
 
   function play(card: Card) {
     if (card.color === "wild") setAsking({ card, kind: "color" });
@@ -91,7 +107,8 @@ export function GameBoard({ state, myId }: Props) {
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    // Frame of the game: a background image will go here later
+    <div className="flex flex-1 flex-col justify-around gap-6 rounded-box border-4 border-base-content/20 bg-base-200 p-4 short:gap-2 short:p-2">
       {/* Opponents around the board: left, top and right */}
       <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] grid-rows-[auto_auto] items-center gap-4 short:gap-2">
         <>
@@ -99,7 +116,6 @@ export function GameBoard({ state, myId }: Props) {
             <div key={player.userId} className={SEAT_CELL[seat]}>
               <OpponentSeat
                 player={player}
-                seat={seat}
                 canCatchUno={unoCallout && player.hand.length === 1}
                 onCatchUno={() => catchUno(player.userId)}
               />
@@ -109,18 +125,21 @@ export function GameBoard({ state, myId }: Props) {
 
         {/* Central board */}
         <div className="col-start-2 row-start-2">
-          <GameTable state={state} myTurn={myTurn} onDraw={drawCard} />
+          <GameTable
+            state={state}
+            myTurn={myTurn}
+            onDraw={drawCard}
+            turnName={turnPlayer?.username ?? ""}
+            secondsLeft={turnPlayer ? timerFor(turnPlayer) : null}
+            turnSeconds={TURN_SECONDS}
+            botTurn={turnPlayer?.userId.startsWith("bot_") ?? false}
+          />
         </div>
       </div>
 
-      {/* My hand, at the bottom */}
-      <div className="flex flex-col items-center gap-4 short:gap-1">
-        <div className="flex items-center gap-3">
-          {myTurn ? (
-            <span className="badge badge-accent badge-lg">Your turn</span>
-          ) : (
-            <span className="badge badge-ghost badge-lg">Waiting...</span>
-          )}
+      {/* Me: the UNO button beside my hand */}
+      <div className="relative flex items-end justify-center">
+        <div className="absolute bottom-0 left-0 z-10 flex flex-col items-center gap-2 pb-4 short:pb-0">
           {unoCallout && me && me.hand.length <= 2 && (
             <button
               type="button"
@@ -132,12 +151,16 @@ export function GameBoard({ state, myId }: Props) {
           )}
         </div>
 
-        <div className="pt-8 pb-2 short:pt-3 short:pb-0">
+        <div
+          className="pt-8 pb-2 short:pt-3 short:pb-0"
+          data-anchor={`seat-${myId}`}
+        >
           <Hand
             cards={handCards}
-            step={step}
-            className="w-28 short:w-16"
-            cardClassName="border-[5px]! short:border-[3px]!"
+            fan="row"
+            className="max-w-full"
+            overlap={overlap}
+            cardClassName="[--card-w:9.75rem] w-(--card-w) border-4! short:[--card-w:6.75rem] short:border-2!"
             onSelect={(id) => {
               const card = me?.hand.find((c) => c.id === id);
               if (card) play(card);
@@ -145,6 +168,14 @@ export function GameBoard({ state, myId }: Props) {
           />
         </div>
       </div>
+
+      <CardFlights state={state} />
+
+      <TurnAnnouncement
+        playerId={turnPlayer?.userId}
+        name={turnPlayer?.username ?? ""}
+        mine={myTurn}
+      />
 
       <ChoiceDialog
         open={asking?.kind === "color"}

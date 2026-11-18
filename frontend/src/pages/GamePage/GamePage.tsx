@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import type { GameStatus } from "shared";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { GameBoard } from "../../components/game/GameBoard";
+import { GameOverDialog } from "../../components/game/GameOverDialog";
 import { RotateDevice } from "../../components/game/RotateDevice";
 import { useAuth } from "../../hooks/auth/useAuth";
 import { useGame } from "../../hooks/ws/useGame";
@@ -51,19 +52,17 @@ export function GamePage() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 short:gap-2">
+    <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 short:gap-2">
       <RotateDevice />
       {finished && (
-        <div role="alert" className="alert alert-success">
-          <span className="text-lg font-bold">
-            {winner?.userId === user.id
+        <GameOverDialog
+          title={
+            winner?.userId === user.id
               ? "You won!"
-              : `${winner?.username ?? "Someone"} won the game.`}
-          </span>
-          <button type="button" className="btn btn-sm" onClick={backToLobby}>
-            Back to the lobby
-          </button>
-        </div>
+              : `${winner?.username ?? "Someone"} won the game`
+          }
+          onLeave={backToLobby}
+        />
       )}
       <GameBoard state={state} myId={user.id} />
     </div>

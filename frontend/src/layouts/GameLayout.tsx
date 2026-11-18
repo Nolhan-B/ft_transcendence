@@ -17,7 +17,7 @@ export function GameLayout() {
       <div className="short:hidden">
         <Header />
       </div>
-      <main className="container mx-auto flex-1 px-4 py-4 short:px-2 short:py-2">
+      <main className="container mx-auto flex flex-1 flex-col px-4 py-4 short:px-2 short:py-2">
         <Outlet />
       </main>
       <SideButton />

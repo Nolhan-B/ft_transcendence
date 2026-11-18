@@ -1,69 +1,52 @@
 import type { Player } from "shared";
-import { Hand } from "../cards/Hand";
-import type { HandCard } from "../cards/Hand";
+import { Card } from "../cards/Card";
 import { UserAvatar } from "../user/UserAvatar";
 import { CardBack } from "./CardFace";
 
 export type Seat = "top" | "left" | "right";
 
+// Hidden cards shown at most (the badge gives the real count)
 const MAX_BACKS = 7;
 
 interface Props {
   player: Player;
-  seat: Seat;
   // Shows the "Catch UNO" button (rule enabled and one card left)
   canCatchUno: boolean;
   onCatchUno: () => void;
 }
 
-// One opponent: avatar, name, number of cards and their hidden hand
-export function OpponentSeat({ player, seat, canCatchUno, onCatchUno }: Props) {
-  const backs: HandCard[] = Array.from(
-    { length: Math.min(player.hand.length, MAX_BACKS) },
-    (_, i) => ({
-      id: `${player.userId}-${i}`,
-      color: "neutral",
-      label: "Hidden card",
-      content: <CardBack />,
-    }),
-  );
-  // The top seat puts the name next to the avatar, the side seats under it
-  const vertical = seat !== "top";
-
+// One opponent: a square with avatar, name and number of cards
+export function OpponentSeat({ player, canCatchUno, onCatchUno }: Props) {
   return (
     <div
-      className={`card items-center gap-2 bg-base-200 p-2 shadow-xl transition-shadow sm:p-3 ${
+      data-anchor={`seat-${player.userId}`}
+      className={`card relative aspect-square w-52 items-center justify-center gap-1 bg-base-200 p-2 shadow-xl transition-shadow short:w-40 ${
         player.isCurrentTurn ? "ring-4 ring-accent" : ""
       } ${player.disconnected ? "opacity-40" : ""}`}
     >
-      <div
-        className={`flex flex-col items-center gap-2 ${vertical ? "" : "sm:flex-row sm:gap-3"}`}
-      >
-        <UserAvatar username={player.username} size="md" />
-        <div className="flex flex-col items-center gap-1">
-          <span className="max-w-20 truncate text-sm font-semibold sm:max-w-24 sm:text-base">
-            {player.username}
-          </span>
-          <span className="badge badge-outline">
-            {player.hand.length} cards
-          </span>
-        </div>
-      </div>
+      <UserAvatar username={player.username} size="md" />
+      <span className="w-full truncate text-center text-base font-semibold">
+        {player.username}
+      </span>
 
-      {/* The hidden hand, as a small fan */}
-      <div className="hidden pt-2 sm:block short:hidden" aria-hidden="true">
-        <Hand
-          cards={backs}
-          step={6}
-          className="w-9"
-          cardClassName="border-2!"
-        />
+      {/* The hidden hand, a flat row of overlapping cards */}
+      <div className="flex -space-x-6 pt-1" aria-hidden="true">
+        {Array.from({ length: Math.min(player.hand.length, MAX_BACKS) }).map(
+          (_, i) => (
+            <Card key={i} color="neutral" className="w-11 border-2!">
+              <CardBack />
+            </Card>
+          ),
+        )}
       </div>
+      <span className="badge badge-lg badge-primary text-xl font-bold">
+        {player.hand.length} cards
+      </span>
 
       {canCatchUno && (
         <button
           type="button"
-          className="btn btn-warning btn-xs"
+          className="btn btn-warning btn-xs absolute -bottom-3"
           onClick={onCatchUno}
         >
           Catch UNO
