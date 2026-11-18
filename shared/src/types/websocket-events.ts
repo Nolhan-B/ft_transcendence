@@ -161,6 +161,11 @@ export interface BluffResultEvent {
   penaltyCount: number;
 }
 
+export interface UnoCalledEvent {
+  type: "uno_called";
+  userId: string;
+}
+
 export interface SpectateStartedEvent {
   type: "spectate_started";
   state: GameState;
@@ -204,6 +209,7 @@ export type ServerEvent =
   | ChatMessageEvent
   | ErrorEvent
   | UnoCaughtEvent
+  | UnoCalledEvent
   | BluffResultEvent
   | BluffResultEvent
   | SpectateStartedEvent

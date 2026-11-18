@@ -38,5 +38,12 @@ export async function handleJoinGame(
     JSON.stringify({ type: "game_updated", state: playerGameState }),
   );
 
-  ctx.startTurnTimer(msg.gameId);
+  const current = game.players.find((p) => p.isCurrentTurn);
+  if (
+    !ctx.turnTimers.has(msg.gameId) &&
+    current &&
+    !current.userId.startsWith("bot_")
+  ) {
+    ctx.startTurnTimer(msg.gameId);
+  }
 }

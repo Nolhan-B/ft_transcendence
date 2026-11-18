@@ -79,25 +79,24 @@ export function playCard(
   chosenColor?: string,
   targetUserId?: string,
 ): InternalGameState | null {
+  // PHASE 1 : tout verifier, sans rien modifier
   if (state.status === GameStatus.FINISHED) return null;
 
   const player: Player | undefined = getPlayer(state, playerId);
-
   if (!player || player.disconnected) return null;
+
   const playedCard: Card | undefined = getCardFromHand(player, cardId);
   if (!playedCard) return null;
 
-  if (!player.isCurrentTurn) {
+  // Jump-in : on verifie seulement, le tour sera transfere en phase 2
+  const isJumpIn = !player.isCurrentTurn;
+  if (isJumpIn) {
     if (!state.settings.jumpIn) return null;
     if (
       playedCard.color !== state.topCard.color ||
       playedCard.value !== state.topCard.value
     )
       return null;
-
-    const currentPlayer = state.players.find((p) => p.isCurrentTurn);
-    if (currentPlayer) currentPlayer.isCurrentTurn = false;
-    player.isCurrentTurn = true;
   }
 
   if (
@@ -110,6 +109,29 @@ export function playCard(
     )
   )
     return null;
+
+  const effect = getCardEffect(playedCard);
+  const validColors = ["red", "yellow", "green", "blue"];
+
+  // Joker et +4 : une couleur valide est obligatoire
+  if (effect.type === "wild" || effect.type === "wild_draw") {
+    if (!chosenColor || !validColors.includes(chosenColor)) return null;
+  }
+
+  // Regle 7-0 : le 7 a besoin d'une cible valide, qui n'est pas le joueur lui-meme
+  const isSwap = state.settings.sevenZeroRule && playedCard.value === "7";
+  if (isSwap) {
+    if (!targetUserId || targetUserId === player.userId) return null;
+    const target = getPlayer(state, targetUserId);
+    if (!target || target.disconnected) return null;
+  }
+
+  // PHASE 2 : appliquer le coup (plus aucun return null apres ici)
+  if (isJumpIn) {
+    const currentPlayer = state.players.find((p) => p.isCurrentTurn);
+    if (currentPlayer) currentPlayer.isCurrentTurn = false;
+    player.isCurrentTurn = true;
+  }
 
   // Check bluff avant de retirer la carte de la main
   const hadMatchingColorBeforePlay =
@@ -124,16 +146,10 @@ export function playCard(
   state.topCard = playedCard;
   state.discardPile.push(playedCard);
 
-  const validColors = ["red", "yellow", "green", "blue"];
-  const effect = getCardEffect(playedCard);
-
   switch (effect.type) {
     case "none":
-      if (state.settings.sevenZeroRule && playedCard.value === "7") {
-        if (!targetUserId) return null;
-        const target = getPlayer(state, targetUserId);
-        if (!target || target.disconnected) return null;
-        swapHands(state, player.userId, target.userId);
+      if (isSwap) {
+        swapHands(state, player.userId, targetUserId!);
       } else if (state.settings.sevenZeroRule && playedCard.value === "0") {
         rotateHands(state);
       }
@@ -163,17 +179,15 @@ export function playCard(
       }
       break;
     case "wild":
-      if (!chosenColor || !validColors.includes(chosenColor)) return null;
       state.currentColor = chosenColor as CardColor;
       advanceToNextPlayer(state);
       break;
     case "wild_draw": {
-      if (!chosenColor) return null;
       const previousColor = state.currentColor;
       state.currentColor = chosenColor as CardColor;
 
       if (state.settings.bluffChallenge) {
-        // Stocker l'info pour un éventuel challenge, ne pas faire piocher
+        // Stocker l'info pour un eventuel challenge, ne pas faire piocher
         state.lastWildDraw4 = {
           playerId: player.userId,
           hadMatchingColor: hadMatchingColorBeforePlay,

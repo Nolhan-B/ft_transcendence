@@ -5,12 +5,14 @@ import {
   chooseCard,
   chooseColor,
   chooseSwapTarget,
+  shouldCallUno,
   shouldChallengeBluff,
 } from "../../../engine/ai.js";
 import { handleChallengeBluff } from "./challenge-bluff.js";
 import { handleDrawCard } from "./draw-card.js";
 import { handleAcceptWildDraw4 } from "./accept-wild-draw4.js";
 import { handlePlayCard } from "./play-card.js";
+import { handleCallUno } from "./call-uno.js";
 
 export function scheduleBotTurnIfNeeded(
   ctx: GatewayContext,
@@ -19,27 +21,32 @@ export function scheduleBotTurnIfNeeded(
 ): void {
   const currentPlayer = gameState.players.find((p) => p.isCurrentTurn);
   if (!currentPlayer || !currentPlayer.userId.startsWith("bot_")) return;
-
   if (gameState.status === GameStatus.FINISHED) return;
+
+  // On retient QUEL bot doit jouer : au declenchement, on verifiera que c'est toujours lui
+  const botId = currentPlayer.userId;
 
   setTimeout(
     async () => {
-      const botPlayer = gameState.players.find(
-        (p) => p.isCurrentTurn === true,
-      )!;
+      // On relit l'etat à jour : il a pu changer pendant le delai de reflexion
+      const game = ctx.manager.getGame(gameId);
+      if (!game || game.status !== GameStatus.IN_PROGRESS) return;
 
-      // Les erreurs du bot ne partent pas chez l'humain : on note juste l'échec
+      const botPlayer = game.players.find((p) => p.isCurrentTurn);
+      if (!botPlayer || botPlayer.userId !== botId) return;
+
+      // Les erreurs du bot ne partent pas chez l'humain : on note juste l'echec
       let failed = false;
       const botCtx: GatewayContext = {
         ...ctx,
-        userId: botPlayer.userId,
+        userId: botId,
         sendError: () => {
           failed = true;
         },
       };
 
-      if (gameState.lastWildDraw4) {
-        if (shouldChallengeBluff(botPlayer.hand, gameState.currentColor)) {
+      if (game.lastWildDraw4) {
+        if (shouldChallengeBluff(botPlayer.hand, game.currentColor)) {
           await handleChallengeBluff(botCtx, { gameId });
         } else {
           handleAcceptWildDraw4(botCtx, { gameId });
@@ -49,10 +56,10 @@ export function scheduleBotTurnIfNeeded(
 
       const cardToPlay = chooseCard(
         botPlayer.hand,
-        gameState.topCard,
-        gameState.currentColor,
-        gameState.pendingDrawCount,
-        gameState.settings.stacking,
+        game.topCard,
+        game.currentColor,
+        game.pendingDrawCount,
+        game.settings.stacking,
       );
 
       if (cardToPlay) {
@@ -62,11 +69,10 @@ export function scheduleBotTurnIfNeeded(
               gameId,
               cardId: cardToPlay.id,
               targetUserId: chooseSwapTarget(
-                gameState.players.map((p) => ({
-                  userId: p.userId,
-                  handCount: p.hand.length,
-                })),
-                botPlayer.userId,
+                game.players
+                  .filter((p) => !p.disconnected)
+                  .map((p) => ({ userId: p.userId, handCount: p.hand.length })),
+                botId,
               ),
             });
             break;
@@ -82,16 +88,28 @@ export function scheduleBotTurnIfNeeded(
             await handlePlayCard(botCtx, { gameId, cardId: cardToPlay.id });
             break;
         }
-        if (!failed) return;
+
+        if (!failed) {
+          // Plus qu'une carte : le bot dit UNO (ou l'oublie, une fois sur dix)
+          const after = ctx.manager.getGame(gameId);
+          const me = after?.players.find((p) => p.userId === botId);
+          if (
+            after?.status === GameStatus.IN_PROGRESS &&
+            after.settings.unoCallout &&
+            me &&
+            shouldCallUno(me.hand)
+          ) {
+            handleCallUno(botCtx, { gameId });
+          }
+          return;
+        }
         // Coup refusé : on pioche à la place
         failed = false;
       }
 
       await handleDrawCard(botCtx, { gameId });
       if (failed) {
-        console.error(
-          `[bot-turn] ${botPlayer.userId} bloqué dans la partie ${gameId}`,
-        );
+        console.error(`[bot-turn] ${botId} bloqué dans la partie ${gameId}`);
       }
     },
     500 + Math.random() * 1000,
