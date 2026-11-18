@@ -86,3 +86,35 @@ export async function getMe(
     elo: user.elo,
   };
 }
+
+export async function changePassword(
+  prisma: PrismaClient,
+  userId: string,
+  currentPassword: string,
+  newPassword: string,
+  code?: string,
+): Promise<"OK" | "INVALID_CREDENTIALS" | "SAME_PASSWORD"> {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user || !user.password) return "INVALID_CREDENTIALS";
+
+  const validPassword = await bcrypt.compare(currentPassword, user.password);
+  if (!validPassword) return "INVALID_CREDENTIALS";
+
+  if (user.twoFactorSecretEnabled) {
+    if (!code || !user.twoFactorSecret) return "INVALID_CREDENTIALS";
+    if (!authenticator.verify({ token: code, secret: user.twoFactorSecret })) {
+      return "INVALID_CREDENTIALS";
+    }
+  }
+
+  const isSamePassword = await bcrypt.compare(newPassword, user.password);
+  if (isSamePassword) return "SAME_PASSWORD";
+
+  const hashedPassword = await bcrypt.hash(newPassword, 10);
+  await prisma.user.update({
+    where: { id: userId },
+    data: { password: hashedPassword },
+  });
+
+  return "OK";
+}

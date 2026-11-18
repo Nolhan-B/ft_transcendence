@@ -5,7 +5,7 @@ import cookie from "@fastify/cookie";
 import jwt from "@fastify/jwt";
 import websocket from "@fastify/websocket";
 import type { WebSocket } from "ws";
-import type { SendDirectMessagePayload } from "shared";
+import type { FriendSocketEvent, SendDirectMessagePayload } from "shared";
 import prismaPlugin from "./plugins/prisma.js";
 import messageHistoryRoutes from "./routes/message_history.js";
 import { setupMetrics } from "shared";
@@ -26,6 +26,11 @@ const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAX_MESSAGE_LENGTH = 2000;
 const MAX_ROOM_ID_LENGTH = 100;
+const ALLOWED_FRIEND_EVENTS = new Set([
+  "friend_request_received",
+  "friend_request_accepted",
+  "friend_removed",
+]);
 
 const fastify = Fastify({
   logger: true,
@@ -85,6 +90,34 @@ fastify.route({
   url: "/health",
   logLevel: "silent",
   handler: async () => ({ service: "chat", status: "ok" }),
+});
+
+// Internal service-to-service endpoint (blocked from public gateway in nginx.conf)
+// Allows user-service to push real-time friend events onto an active user's WebSocket
+fastify.post("/internal/events", async (request, reply) => {
+  const body = request.body as {
+    targetUserId?: unknown;
+    event?: FriendSocketEvent;
+  } | null;
+
+  if (
+    !body ||
+    typeof body.targetUserId !== "string" ||
+    !UUID_REGEX.test(body.targetUserId) ||
+    !body.event ||
+    typeof body.event.type !== "string" ||
+    !ALLOWED_FRIEND_EVENTS.has(body.event.type)
+  ) {
+    return reply.code(400).send({ error: "Invalid internal event payload" });
+  }
+
+  const recipientSocket = connectedClients.get(body.targetUserId);
+  if (recipientSocket && recipientSocket.readyState === 1) {
+    recipientSocket.send(JSON.stringify(body.event));
+    return reply.send({ delivered: true });
+  }
+
+  return reply.send({ delivered: false });
 });
 
 fastify.register(async function (fastify) {
