@@ -43,14 +43,10 @@ export interface FriendRemovedEvent {
 }
 
 export type FriendSocketEvent =
-  | FriendRequestReceivedEvent
-  | FriendRequestAcceptedEvent
-  | FriendRemovedEvent;
+  FriendRequestReceivedEvent | FriendRequestAcceptedEvent | FriendRemovedEvent;
 
 export type ChatServerEvent =
-  | DirectMessageEvent
-  | FriendSocketEvent
-  | { type: "error"; message: string };
+  DirectMessageEvent | FriendSocketEvent | { type: "error"; message: string };
 
 // Payload returned by the GET /conversations/:otherUserId/messages endpoint
 export interface GetConversationHistoryResponse {
