@@ -1,6 +1,8 @@
 import type { Player } from "shared";
-import { PlayingCard } from "./PlayingCard";
+import { Hand } from "../cards/Hand";
+import type { HandCard } from "../cards/Hand";
 import { UserAvatar } from "../user/UserAvatar";
+import { CardBack } from "./CardFace";
 
 export type Seat = "top" | "left" | "right";
 
@@ -16,8 +18,16 @@ interface Props {
 
 // One opponent: avatar, name, number of cards and their hidden hand
 export function OpponentSeat({ player, seat, canCatchUno, onCatchUno }: Props) {
-  const backs = Math.min(player.hand.length, MAX_BACKS);
-  // Side seats stack the cards, the top seat spreads them
+  const backs: HandCard[] = Array.from(
+    { length: Math.min(player.hand.length, MAX_BACKS) },
+    (_, i) => ({
+      id: `${player.userId}-${i}`,
+      color: "neutral",
+      label: "Hidden card",
+      content: <CardBack />,
+    }),
+  );
+  // The top seat puts the name next to the avatar, the side seats under it
   const vertical = seat !== "top";
 
   return (
@@ -40,13 +50,14 @@ export function OpponentSeat({ player, seat, canCatchUno, onCatchUno }: Props) {
         </div>
       </div>
 
-      <div
-        className={`hidden sm:flex ${vertical ? "flex-col -space-y-12" : "-space-x-6"}`}
-        aria-hidden="true"
-      >
-        {Array.from({ length: backs }, (_, i) => (
-          <PlayingCard key={i} faceDown size="xs" />
-        ))}
+      {/* The hidden hand, as a small fan */}
+      <div className="hidden pt-2 sm:block short:hidden" aria-hidden="true">
+        <Hand
+          cards={backs}
+          step={6}
+          className="w-9"
+          cardClassName="border-2!"
+        />
       </div>
 
       {canCatchUno && (

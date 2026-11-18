@@ -2,10 +2,11 @@ import { useState } from "react";
 import type { Card, CardColor, GameState, Player } from "shared";
 import { useGame } from "../../hooks/ws/useGame";
 import { ChoiceDialog } from "./ChoiceDialog";
+import { Hand } from "../cards/Hand";
+import { toHandCard } from "./handCards";
 import { GameTable } from "./GameTable";
 import { OpponentSeat } from "./OpponentSeat";
 import type { Seat } from "./OpponentSeat";
-import { PlayingCard } from "./PlayingCard";
 
 const COLOR_CHOICES: { color: CardColor; label: string; button: string }[] = [
   { color: "red", label: "Red", button: "btn-primary" },
@@ -66,8 +67,15 @@ export function GameBoard({ state, myId }: Props) {
 
   const me = state.players.find((player) => player.userId === myId);
   const seated = seatOpponents(state.players, myId);
-  const opponents = seated.map(({ player }) => player);
   const myTurn = me?.isCurrentTurn ?? false;
+  // Cards stay visible when it is not your turn (except with jump-in)
+  const canPlayNow = myTurn || state.settings.jumpIn;
+  const handCards = (me?.hand ?? []).map((card) =>
+    toHandCard(card, !canPlayNow),
+  );
+  // The fan opens at most 56 degrees, whatever the number of cards
+  const step = Math.min(8, 56 / Math.max(handCards.length - 1, 1));
+  const opponents = seated.map(({ player }) => player);
   const unoCallout = state.settings.unoCallout;
 
   function play(card: Card) {
@@ -124,17 +132,17 @@ export function GameBoard({ state, myId }: Props) {
           )}
         </div>
 
-        <div className="flex max-w-full flex-wrap justify-center gap-2 short:flex-nowrap short:justify-start short:gap-0 short:-space-x-5 short:overflow-x-auto short:px-2 short:pt-2">
-          {me?.hand.map((card) => (
-            <PlayingCard
-              key={card.id}
-              color={card.color}
-              value={card.value}
-              size="md"
-              disabled={!myTurn && !state.settings.jumpIn}
-              onClick={() => play(card)}
-            />
-          ))}
+        <div className="pt-8 pb-2 short:pt-3 short:pb-0">
+          <Hand
+            cards={handCards}
+            step={step}
+            className="w-28 short:w-16"
+            cardClassName="border-[5px]! short:border-[3px]!"
+            onSelect={(id) => {
+              const card = me?.hand.find((c) => c.id === id);
+              if (card) play(card);
+            }}
+          />
         </div>
       </div>
 

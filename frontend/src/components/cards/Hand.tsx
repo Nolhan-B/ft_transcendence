@@ -7,6 +7,7 @@ export interface HandCard {
   color: CardColor;
   label: string; // accessible name, used when the card is clickable
   content?: ReactNode; // shown in the card's central panel
+  disabled?: boolean; // visible but not clickable (not your turn...)
 }
 
 interface HandProps {
@@ -19,6 +20,7 @@ interface HandProps {
   // "center": symmetrical fan (game). "left": the last card is the base and
   // the others fan out to its left (auth page).
   fan?: "center" | "left";
+  cardClassName?: string; // added to every card (e.g. a thinner border)
   className?: string; // width of the cards (default: 3/4 of the space on mobile, capped so that a card fits the screen height)
 }
 
@@ -29,6 +31,7 @@ export function Hand({
   onSelect,
   step = 10,
   fan = "center",
+  cardClassName = "",
   className = "w-3/4 max-w-[max(14rem,min(24rem,calc((100dvh_-_9rem)*56/87)))] sm:w-full",
 }: HandProps) {
   const selectedIndex = cards.findIndex((card) => card.id === selectedId);
@@ -46,7 +49,7 @@ export function Hand({
         const pivot =
           fan === "left" ? cards.length - 1 : (cards.length - 1) / 2;
         const angle = selected ? 0 : (index - pivot) * step;
-        const clickable = onSelect !== undefined && !selected;
+        const clickable = onSelect !== undefined && !selected && !card.disabled;
 
         return (
           <Card
@@ -67,7 +70,9 @@ export function Hand({
                   }
                 : undefined
             }
-            className={`col-start-1 row-start-1 origin-bottom transition-all duration-300 [rotate:var(--angle)] ${
+            className={`col-start-1 row-start-1 origin-bottom transition-all duration-300 [rotate:var(--angle)] ${cardClassName} ${
+              card.disabled ? "brightness-75" : ""
+            } ${
               selected
                 ? "z-10 hover:-translate-y-2 hover:scale-[1.02] hover:shadow-[0_25px_50px_-12px] hover:shadow-primary/50"
                 : `z-0 ${
