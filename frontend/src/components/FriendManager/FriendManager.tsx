@@ -40,7 +40,7 @@ export function FriendManager() {
     }
 
     fetchFriends();
-  }, []);
+  }, [friendRequests]);
 
   useEffect(() => {
     async function fetchFriendRequests() {

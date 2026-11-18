@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import type { Profile } from "shared";
+import { useAuth } from "../../../hooks/auth/useAuth";
 
 export type AddFriendFieldProps = {
   // Called with the trimmed username when the form is submitted
@@ -11,6 +12,7 @@ export function AddFriendField({ onAdd }: AddFriendFieldProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sentFriendRequest, setSentFriendRequest] = useState(false);
+  const {user} = useAuth();
 
   useEffect(() => {
     function removeErrorMessage() {
@@ -28,6 +30,10 @@ export function AddFriendField({ onAdd }: AddFriendFieldProps) {
 
     const trimmed = username.trim();
     if (trimmed === "") return;
+    if (user?.username == username) {
+      setError("Cannot add yourself as a friend.")
+      return ;
+    }
     setLoading(true);
 
     try {
@@ -49,11 +55,11 @@ export function AddFriendField({ onAdd }: AddFriendFieldProps) {
 
       onAdd(trimmed);
       setUsername("");
+      setSentFriendRequest(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
       setLoading(false);
-      setSentFriendRequest(true);
     }
   }
 
