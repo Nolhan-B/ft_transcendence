@@ -1,5 +1,3 @@
-import React from "react";
-
 export default function ErrorMessage() {
   return (
     <div role="alert" className="alert alert-error">
