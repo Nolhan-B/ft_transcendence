@@ -9,6 +9,11 @@ export type FriendListItemProps = {
   onRemove?: () => void;
 } & ButtonHTMLAttributes<HTMLButtonElement>;
 
+function openConfirm() {
+  const doc = document.getElementById("my_modal_1") as HTMLDialogElement | null;
+  doc?.showModal();
+}
+
 // The remove button cannot live inside the main button: a nested <button> is
 // invalid HTML and breaks keyboard navigation. The row is a flex container
 // holding two sibling buttons instead.
@@ -50,7 +55,8 @@ export function FriendListItem({
         className="btn btn-ghost btn-sm btn-circle text-error opacity-60 transition-opacity hover:opacity-100"
         aria-label={`Remove ${name ?? "friend"}`}
         title="Remove friend"
-        onClick={onRemove}
+        // onClick={() => onRemove}
+        onClick={openConfirm}
       >
         <svg
           viewBox="0 0 24 24"
@@ -65,6 +71,23 @@ export function FriendListItem({
           <path d="M6 6l12 12M18 6L6 18" />
         </svg>
       </button>
+      <dialog id="my_modal_1" className="modal">
+        <div className="modal-box">
+          <h3 className="font-bold text-lg">Remove {name} ?</h3>
+          <p className="py-4">Are you sure about that ?</p>
+          <div className="modal-action">
+            <form method="dialog">
+              {/* if there is a button in form, it will close the modal */}
+              <div className="flex gap-3">
+                <button className="btn btn-error" onClick={onRemove}>
+                  Remove
+                </button>
+                <button className="btn">Cancel</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </dialog>
     </div>
   );
 }

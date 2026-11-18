@@ -20,7 +20,7 @@ export function MainLayout() {
         <Outlet />
       </main>
       <Footer />
-      { user ? <SideButton /> : <></> }
+      {user ? <SideButton /> : <></>}
     </div>
   );
 }
