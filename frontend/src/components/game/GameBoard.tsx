@@ -6,6 +6,7 @@ import { ChoiceDialog } from "./ChoiceDialog";
 import { Hand } from "../cards/Hand";
 import { toHandCard } from "./handCards";
 import { GameTable } from "./GameTable";
+import floorImage from "../../assets/images/game-floor.jpg";
 import { CardFlights } from "./CardFlights";
 import { TurnAnnouncement } from "./TurnAnnouncement";
 import { OpponentSeat } from "./OpponentSeat";
@@ -107,8 +108,14 @@ export function GameBoard({ state, myId }: Props) {
   }
 
   return (
-    // Frame of the game: a background image will go here later
-    <div className="flex flex-1 flex-col justify-around gap-6 rounded-box border-4 border-base-content/20 bg-base-200 p-4 short:gap-2 short:p-2">
+    // Frame of the game: a tiled parquet floor, darkened on the edges
+    <div
+      className="flex flex-1 flex-col justify-around gap-6 rounded-box border-4 border-base-content/20 bg-base-200 p-4 shadow-[inset_0_0_120px_var(--color-base-300)] short:gap-2 short:p-2"
+      style={{
+        backgroundImage: `url(${floorImage})`,
+        backgroundSize: "480px",
+      }}
+    >
       {/* Opponents around the board: left, top and right */}
       <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] grid-rows-[auto_auto] items-center gap-4 short:gap-2">
         <>

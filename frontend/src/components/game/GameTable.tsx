@@ -15,10 +15,10 @@ const TEXT: Record<GameColor, string> = {
 
 // Translucent veil over the table, in the color to play
 const VEIL: Record<GameColor, string> = {
-  red: "before:bg-primary/25",
-  blue: "before:bg-secondary/25",
-  yellow: "before:bg-accent/25",
-  green: "before:bg-success/25",
+  red: "before:bg-primary/40",
+  blue: "before:bg-secondary/40",
+  yellow: "before:bg-accent/40",
+  green: "before:bg-success/40",
   wild: "before:bg-transparent",
 };
 
@@ -26,7 +26,8 @@ const VEIL: Record<GameColor, string> = {
 const PILE = "w-24 sm:w-28 short:w-16";
 // The discard pile is bigger: it is the card to play on
 const DISCARD = "w-32 sm:w-40 short:w-24";
-const BORDER = "w-full border-[5px]! short:border-[3px]!";
+// Inlaid in the felt: no white border, no cast shadow
+const BORDER = "w-full border-0! shadow-none!";
 
 interface Props {
   state: GameState;
@@ -53,8 +54,17 @@ export function GameTable({
 }: Props) {
   return (
     <div
-      className={`relative isolate flex items-center justify-center gap-4 rounded-box before:absolute before:inset-0 before:-z-10 before:rounded-[inherit] before:transition-colors before:duration-500 before:content-[''] ${VEIL[state.currentColor]}  border-2 border-base-content/10 bg-base-300 px-3 py-8 shadow-inner sm:gap-6 sm:px-5 sm:py-14 short:gap-3 short:px-2 short:py-4`}
+      className={`relative isolate flex items-center justify-center gap-4 rounded-box before:absolute before:inset-0 before:-z-10 before:rounded-[inherit] before:transition-colors before:duration-500 before:content-[''] ${VEIL[state.currentColor]}  border-4 border-base-100 bg-base-300 px-3 py-8 shadow-[inset_0_0_40px_var(--color-base-300),0_10px_30px_var(--color-base-300)] sm:gap-6 sm:px-5 sm:py-14 short:gap-3 short:px-2 short:py-4`}
     >
+      {/* Felt grain and the stitched edge of the cloth */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 -z-10 rounded-[inherit] bg-felt opacity-60 mix-blend-overlay"
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-2 -z-10 rounded-[inherit] border-2 border-dashed border-base-content/20"
+      />
       <div className="flex flex-col items-center gap-2 short:gap-1">
         <button
           type="button"
@@ -68,7 +78,7 @@ export function GameTable({
             <CardBack />
           </Card>
         </button>
-        <span className="badge badge-outline">
+        <span className="badge border-0 bg-base-200/70 backdrop-blur-sm">
           {state.pendingDrawCount > 0
             ? `Draw ${state.pendingDrawCount}`
             : `Draw pile (${state.drawPileCount})`}
@@ -86,12 +96,14 @@ export function GameTable({
             <CardFace value={state.topCard.value} />
           </Card>
         </div>
-        <span className="badge badge-outline">Discard pile</span>
+        <span className="badge border-0 bg-base-200/70 backdrop-blur-sm">
+          Discard pile
+        </span>
       </div>
 
       {/* Whose turn it is: the text takes the color to play */}
       <div
-        className={`flex w-32 flex-col items-center gap-2 rounded-box border-2 border-base-content/10 bg-base-200 p-3 text-center short:w-24 short:gap-1 short:p-2 ${TEXT[state.currentColor]}`}
+        className={`flex w-32 flex-col items-center gap-2 rounded-box border-2 border-base-content/10 bg-base-200/70 p-3 backdrop-blur-sm text-center short:w-24 short:gap-1 short:p-2 ${TEXT[state.currentColor]}`}
         aria-label={`Color to play: ${state.currentColor}`}
       >
         <span className="w-full truncate text-lg font-bold short:text-base">

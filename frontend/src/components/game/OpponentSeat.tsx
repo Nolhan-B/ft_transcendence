@@ -20,7 +20,7 @@ export function OpponentSeat({ player, canCatchUno, onCatchUno }: Props) {
   return (
     <div
       data-anchor={`seat-${player.userId}`}
-      className={`card relative aspect-square w-52 items-center justify-center gap-1 bg-base-200 p-2 shadow-xl transition-shadow short:w-40 ${
+      className={`card relative aspect-square w-52 items-center justify-center gap-1 bg-base-200/70 p-2 shadow-xl backdrop-blur-sm transition-shadow short:w-40 ${
         player.isCurrentTurn ? "ring-4 ring-accent" : ""
       } ${player.disconnected ? "opacity-40" : ""}`}
     >
