@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* Landscape phones: the viewport is wide but only ~350-450px tall. */
+@custom-variant short (@media (max-height: 500px));
+
 /* Decorative "light rays" depth effect, shared by the auth page and the home
    hero. Tune the pivot with --rays-origin (e.g. [--rays-origin:50%_80%]). */
 /* Home hero: cards drifting in the background. Each card overrides the

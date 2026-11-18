@@ -1,8 +1,10 @@
 import { useState } from "react";
-import type { Card, CardColor, GameState } from "shared";
+import type { Card, CardColor, GameState, Player } from "shared";
 import { useGame } from "../../hooks/ws/useGame";
-import { UserAvatar } from "../user/UserAvatar";
 import { ChoiceDialog } from "./ChoiceDialog";
+import { GameTable } from "./GameTable";
+import { OpponentSeat } from "./OpponentSeat";
+import type { Seat } from "./OpponentSeat";
 import { PlayingCard } from "./PlayingCard";
 
 const COLOR_CHOICES: { color: CardColor; label: string; button: string }[] = [
@@ -11,6 +13,41 @@ const COLOR_CHOICES: { color: CardColor; label: string; button: string }[] = [
   { color: "green", label: "Green", button: "btn-success" },
   { color: "blue", label: "Blue", button: "btn-secondary" },
 ];
+
+// Where the opponents sit, by number of opponents. They are placed in turn
+// order starting after me: the next player is on my left.
+const SEATS: Record<number, Seat[]> = {
+  1: ["top"],
+  2: ["left", "right"],
+  3: ["left", "top", "right"],
+};
+
+// Grid cell of each seat around the central board
+const SEAT_CELL: Record<Seat, string> = {
+  top: "col-start-2 row-start-1 justify-self-center",
+  left: "col-start-1 row-start-2 self-center",
+  right: "col-start-3 row-start-2 self-center",
+};
+
+function seatOpponents(players: Player[], myId: string) {
+  const mine = Math.max(
+    0,
+    players.findIndex((player) => player.userId === myId),
+  );
+  const others = players
+    .map((player, index) => ({
+      player,
+      order: (index - mine + players.length) % players.length,
+    }))
+    .filter(({ player }) => player.userId !== myId)
+    .sort((a, b) => a.order - b.order)
+    .map(({ player }) => player);
+  const seats = SEATS[others.length] ?? [];
+  return others.map((player, index) => ({
+    player,
+    seat: seats[index] ?? "top",
+  }));
+}
 
 interface Props {
   state: GameState;
@@ -28,7 +65,8 @@ export function GameBoard({ state, myId }: Props) {
   } | null>(null);
 
   const me = state.players.find((player) => player.userId === myId);
-  const opponents = state.players.filter((player) => player.userId !== myId);
+  const seated = seatOpponents(state.players, myId);
+  const opponents = seated.map(({ player }) => player);
   const myTurn = me?.isCurrentTurn ?? false;
   const unoCallout = state.settings.unoCallout;
 
@@ -46,76 +84,29 @@ export function GameBoard({ state, myId }: Props) {
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Opponents */}
-      <div className="flex flex-wrap justify-center gap-4">
-        {opponents.map((player) => (
-          <div
-            key={player.userId}
-            className={`card bg-base-200 shadow-xl ${
-              player.isCurrentTurn ? "ring-4 ring-accent" : ""
-            } ${player.disconnected ? "opacity-40" : ""}`}
-          >
-            <div className="card-body items-center gap-2 p-4">
-              <UserAvatar username={player.username} size="md" />
-              <span className="font-semibold">{player.username}</span>
-              <span className="badge badge-outline">
-                {player.hand.length} cards
-              </span>
-              {unoCallout && player.hand.length === 1 && (
-                <button
-                  type="button"
-                  className="btn btn-warning btn-xs"
-                  onClick={() => catchUno(player.userId)}
-                >
-                  Catch UNO
-                </button>
-              )}
+      {/* Opponents around the board: left, top and right */}
+      <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] grid-rows-[auto_auto] items-center gap-4 short:gap-2">
+        <>
+          {seated.map(({ player, seat }) => (
+            <div key={player.userId} className={SEAT_CELL[seat]}>
+              <OpponentSeat
+                player={player}
+                seat={seat}
+                canCatchUno={unoCallout && player.hand.length === 1}
+                onCatchUno={() => catchUno(player.userId)}
+              />
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </>
 
-      {/* Table */}
-      <div className="flex flex-wrap items-center justify-center gap-8 rounded-box bg-base-200 p-6 shadow-inner">
-        <div className="flex flex-col items-center gap-2">
-          <button
-            type="button"
-            disabled={!myTurn}
-            onClick={drawCard}
-            className="cursor-pointer transition-transform enabled:hover:-translate-y-1 disabled:cursor-not-allowed disabled:opacity-60"
-            aria-label="Draw a card"
-          >
-            <PlayingCard faceDown size="md" />
-          </button>
-          <span className="badge badge-outline">
-            {state.pendingDrawCount > 0
-              ? `Draw ${state.pendingDrawCount}`
-              : `Draw (${state.drawPileCount})`}
-          </span>
-        </div>
-
-        <div className="flex flex-col items-center gap-2">
-          <PlayingCard
-            color={state.topCard.color}
-            value={state.topCard.value}
-            size="lg"
-          />
-          <span className="badge badge-outline">Top card</span>
-        </div>
-
-        <div className="flex flex-col items-center gap-3">
-          <div className="flex items-center gap-2">
-            <span>Color</span>
-            <PlayingCard color={state.currentColor} size="sm" />
-          </div>
-          <span className="text-2xl" title="Direction of play">
-            {state.direction === 1 ? "↻" : "↺"}
-          </span>
+        {/* Central board */}
+        <div className="col-start-2 row-start-2">
+          <GameTable state={state} myTurn={myTurn} onDraw={drawCard} />
         </div>
       </div>
 
-      {/* My hand */}
-      <div className="flex flex-col items-center gap-4">
+      {/* My hand, at the bottom */}
+      <div className="flex flex-col items-center gap-4 short:gap-1">
         <div className="flex items-center gap-3">
           {myTurn ? (
             <span className="badge badge-accent badge-lg">Your turn</span>
@@ -133,7 +124,7 @@ export function GameBoard({ state, myId }: Props) {
           )}
         </div>
 
-        <div className="flex flex-wrap justify-center gap-2">
+        <div className="flex max-w-full flex-wrap justify-center gap-2 short:flex-nowrap short:justify-start short:gap-0 short:-space-x-5 short:overflow-x-auto short:px-2 short:pt-2">
           {me?.hand.map((card) => (
             <PlayingCard
               key={card.id}

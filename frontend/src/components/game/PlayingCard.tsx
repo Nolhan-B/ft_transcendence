@@ -18,9 +18,10 @@ const SYMBOLS: Partial<Record<CardValue, string>> = {
 };
 
 const SIZES = {
-  sm: "w-12 text-lg border-4",
-  md: "w-20 text-3xl border-4",
-  lg: "w-24 text-4xl border-8",
+  xs: "w-10 text-sm border-2",
+  sm: "w-12 short:w-9 text-lg short:text-sm border-4 short:border-2",
+  md: "w-20 short:w-14 text-3xl short:text-xl border-4 short:border-2",
+  lg: "w-24 short:w-16 text-4xl short:text-2xl border-8 short:border-4",
 };
 
 interface Props {
@@ -45,7 +46,7 @@ export function PlayingCard({
   const face = faceDown
     ? "bg-base-300 text-base-content border-base-content/30"
     : `${COLORS[color]} border-primary-content`;
-  const classes = `flex aspect-[56/87] items-center justify-center rounded-box font-black shadow-lg ${SIZES[size]} ${face}`;
+  const classes = `flex shrink-0 aspect-[56/87] items-center justify-center rounded-box font-black shadow-lg ${SIZES[size]} ${face}`;
   const content = faceDown ? (
     <span className="text-[0.5em] tracking-widest">UNO</span>
   ) : (

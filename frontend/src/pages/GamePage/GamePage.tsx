@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import type { GameStatus } from "shared";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { GameBoard } from "../../components/game/GameBoard";
+import { RotateDevice } from "../../components/game/RotateDevice";
 import { useAuth } from "../../hooks/auth/useAuth";
 import { useGame } from "../../hooks/ws/useGame";
 
@@ -40,6 +41,7 @@ export function GamePage() {
   if (!state || !user) {
     return (
       <div className="mx-auto flex max-w-3xl flex-col items-center gap-4">
+        <RotateDevice />
         <div className="skeleton h-64 w-full" />
         <Link to="/play" className="btn btn-ghost">
           Back to the lobby
@@ -49,7 +51,8 @@ export function GamePage() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 short:gap-2">
+      <RotateDevice />
       {finished && (
         <div role="alert" className="alert alert-success">
           <span className="text-lg font-bold">
