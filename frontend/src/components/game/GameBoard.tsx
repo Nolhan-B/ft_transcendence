@@ -84,7 +84,7 @@ export function GameBoard({ state, myId }: Props) {
     toHandCard(card, !canPlayNow),
   );
   // Visible part of each card: 70% of it, less when the hand is large
-  const overlap = `calc(var(--card-w) * -1 + min(var(--card-w) * 0.7, ${60 / Math.max(handCards.length - 1, 1)}rem))`;
+  const overlap = `calc(var(--card-w) * -1 + min(var(--card-w) * 0.7, ${60 / Math.max(handCards.length - 1, 1)}rem, ${85 / Math.max(handCards.length - 1, 1)}vw))`;
   const opponents = seated.map(({ player }) => player);
   const unoCallout = state.settings.unoCallout;
   // Bots play after a short delay, without a timer
@@ -110,14 +110,14 @@ export function GameBoard({ state, myId }: Props) {
   return (
     // Frame of the game: a tiled parquet floor, darkened on the edges
     <div
-      className="flex flex-1 flex-col justify-around gap-6 rounded-box border-4 border-base-content/20 bg-base-200 p-4 shadow-[inset_0_0_120px_var(--color-base-300)] short:gap-2 short:p-2"
+      className="flex flex-1 flex-col justify-around gap-6 rounded-box border-4 border-base-content/20 bg-base-200 p-4 shadow-[inset_0_0_120px_var(--color-base-300)] compact:gap-3 compact:p-2 snug:gap-2 snug:p-1 short:gap-2 tiny:gap-1 tiny:border-2 tiny:p-1"
       style={{
         backgroundImage: `url(${floorImage})`,
         backgroundSize: "480px",
       }}
     >
       {/* Opponents around the board: left, top and right */}
-      <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] grid-rows-[auto_auto] items-center gap-4 short:gap-2">
+      <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] grid-rows-[auto_auto] items-center gap-4 compact:gap-2 snug:gap-1 tiny:gap-1">
         <>
           {seated.map(({ player, seat }) => (
             <div key={player.userId} className={SEAT_CELL[seat]}>
@@ -159,7 +159,7 @@ export function GameBoard({ state, myId }: Props) {
         </div>
 
         <div
-          className="pt-8 pb-2 short:pt-3 short:pb-0"
+          className="pt-8 pb-2 compact:pt-3 compact:pb-0 snug:pt-1 tiny:pt-1"
           data-anchor={`seat-${myId}`}
         >
           <Hand
@@ -167,7 +167,7 @@ export function GameBoard({ state, myId }: Props) {
             fan="row"
             className="max-w-full"
             overlap={overlap}
-            cardClassName="[--card-w:9.75rem] w-(--card-w) border-4! short:[--card-w:6.75rem] short:border-2!"
+            cardClassName="[--card-w:min(9.75rem,16vw)] w-(--card-w) border-4! compact:[--card-w:min(5.5rem,16vw)] compact:border-2! snug:[--card-w:min(4.5rem,16vw)] short:[--card-w:min(4.75rem,16vw)] tiny:[--card-w:min(3.5rem,16vw)]"
             onSelect={(id) => {
               const card = me?.hand.find((c) => c.id === id);
               if (card) play(card);

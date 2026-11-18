@@ -1,7 +1,35 @@
 @import "tailwindcss";
 
+/* Safety net: no page can ever scroll sideways. "hidden" is the fallback for
+   browsers without "clip" (clip does not turn the page into a scroll
+   container, so nothing else changes). */
+html,
+body {
+  max-width: 100%;
+  overflow-x: hidden;
+  overflow-x: clip;
+}
+
+/* Smaller board: laptops (short window) and tablets (narrow window). Declared
+   before "short" so that "short" wins on screens that are both. */
+@custom-variant compact {
+  @media (max-height: 1150px) {
+    @slot;
+  }
+  @media (max-width: 1023px) {
+    @slot;
+  }
+}
+
+/* Even smaller board: windows of laptops (about 760px of height or less). */
+@custom-variant snug (@media (max-height: 760px));
+
 /* Landscape phones: the viewport is wide but only ~350-450px tall. */
-@custom-variant short (@media (max-height: 500px));
+@custom-variant short (@media (max-height: 600px));
+
+/* Small landscape phones (iPhone SE: about 320-340px of usable height).
+   Declared after "short" so that it wins over it. */
+@custom-variant tiny (@media (max-height: 480px));
 
 /* Decorative "light rays" depth effect, shared by the auth page and the home
    hero. Tune the pivot with --rays-origin (e.g. [--rays-origin:50%_80%]). */

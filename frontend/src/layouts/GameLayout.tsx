@@ -14,13 +14,16 @@ export function GameLayout() {
         <DebugHeader />
       )}
 
-      <div className="short:hidden">
+      <div className="snug:hidden">
         <Header />
       </div>
-      <main className="container mx-auto flex flex-1 flex-col px-4 py-4 short:px-2 short:py-2">
+      <main className="container mx-auto flex flex-1 flex-col px-4 py-4 compact:py-2 snug:py-1 short:px-2 tiny:py-1">
         <Outlet />
       </main>
-      <SideButton />
+      {/* On a small landscape phone the button covers the right seat */}
+      <div className="tiny:hidden">
+        <SideButton />
+      </div>
     </div>
   );
 }

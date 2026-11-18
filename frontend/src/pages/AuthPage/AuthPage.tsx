@@ -99,6 +99,9 @@ export function AuthPage() {
           selectedId={`card-${selected}`}
           step={5}
           fan="left"
+          // No "w-full" from the "sm" breakpoint: from 768px the section is only
+          // half of the screen, the fan would overflow it
+          className="w-2/3 max-w-[max(14rem,min(24rem,calc((100dvh_-_9rem)*56/87)))]"
           onSelect={(id) => setSelected(Number(id.slice(5)))}
         />
         <nav className="absolute inset-x-0 bottom-4 z-20 flex justify-center pointer-events-none gap-6 text-sm">

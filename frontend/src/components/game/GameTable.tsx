@@ -23,9 +23,9 @@ const VEIL: Record<GameColor, string> = {
 };
 
 // Width of a card on the table: the Card component is sized by its parent
-const PILE = "w-24 sm:w-28 short:w-16";
+const PILE = "w-24 sm:w-28 compact:w-20 snug:w-14 short:w-14 tiny:w-12";
 // The discard pile is bigger: it is the card to play on
-const DISCARD = "w-32 sm:w-40 short:w-24";
+const DISCARD = "w-32 sm:w-40 compact:w-24 snug:w-20 short:w-20 tiny:w-14";
 // Inlaid in the felt: no white border, no cast shadow
 const BORDER = "w-full border-0! shadow-none!";
 
@@ -54,7 +54,7 @@ export function GameTable({
 }: Props) {
   return (
     <div
-      className={`relative isolate flex items-center justify-center gap-4 rounded-box before:absolute before:inset-0 before:-z-10 before:rounded-[inherit] before:transition-colors before:duration-500 before:content-[''] ${VEIL[state.currentColor]}  border-4 border-base-100 bg-base-300 px-3 py-8 shadow-[inset_0_0_40px_var(--color-base-300),0_10px_30px_var(--color-base-300)] sm:gap-6 sm:px-5 sm:py-14 short:gap-3 short:px-2 short:py-4`}
+      className={`relative isolate flex items-center justify-center gap-4 rounded-box before:absolute before:inset-0 before:-z-10 before:rounded-[inherit] before:transition-colors before:duration-500 before:content-[''] ${VEIL[state.currentColor]}  border-4 border-base-100 bg-base-300 px-3 py-8 shadow-[inset_0_0_40px_var(--color-base-300),0_10px_30px_var(--color-base-300)] sm:gap-6 sm:px-5 sm:py-14 compact:gap-3 compact:px-3 compact:py-4 snug:py-2 short:gap-2 short:px-2 short:py-2 tiny:border-2 tiny:py-1`}
     >
       {/* Felt grain and the stitched edge of the cloth */}
       <div
@@ -78,7 +78,7 @@ export function GameTable({
             <CardBack />
           </Card>
         </button>
-        <span className="badge border-0 bg-base-200/70 backdrop-blur-sm">
+        <span className="badge border-0 tiny:badge-xs bg-base-200/70 backdrop-blur-sm">
           {state.pendingDrawCount > 0
             ? `Draw ${state.pendingDrawCount}`
             : `Draw pile (${state.drawPileCount})`}
@@ -96,20 +96,20 @@ export function GameTable({
             <CardFace value={state.topCard.value} />
           </Card>
         </div>
-        <span className="badge border-0 bg-base-200/70 backdrop-blur-sm">
+        <span className="badge border-0 tiny:badge-xs bg-base-200/70 backdrop-blur-sm">
           Discard pile
         </span>
       </div>
 
       {/* Whose turn it is: the text takes the color to play */}
       <div
-        className={`flex w-32 flex-col items-center gap-2 rounded-box border-2 border-base-content/10 bg-base-200/70 p-3 backdrop-blur-sm text-center short:w-24 short:gap-1 short:p-2 ${TEXT[state.currentColor]}`}
+        className={`flex w-32 flex-col items-center gap-2 rounded-box border-2 border-base-content/10 bg-base-200/70 p-3 backdrop-blur-sm text-center compact:w-28 compact:gap-1 compact:p-2 snug:w-24 snug:p-1 short:w-24 tiny:w-20 tiny:p-1 ${TEXT[state.currentColor]}`}
         aria-label={`Color to play: ${state.currentColor}`}
       >
-        <span className="w-full truncate text-lg font-bold short:text-base">
+        <span className="w-full truncate text-lg font-bold compact:text-base tiny:text-xs">
           {turnName}
         </span>
-        <div className="flex h-14 items-center justify-center short:h-12">
+        <div className="flex h-14 items-center justify-center compact:h-11 snug:h-10 short:h-10 tiny:h-9">
           {secondsLeft !== null && (
             <TurnTimer secondsLeft={secondsLeft} total={turnSeconds} />
           )}
@@ -121,7 +121,10 @@ export function GameTable({
             />
           )}
         </div>
-        <span className="text-3xl" title="Direction of play">
+        <span
+          className="text-3xl compact:text-2xl tiny:text-xl"
+          title="Direction of play"
+        >
           {state.direction === 1 ? "↻" : "↺"}
         </span>
       </div>
