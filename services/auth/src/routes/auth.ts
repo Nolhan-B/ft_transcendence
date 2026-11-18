@@ -123,6 +123,63 @@ export default async function authRoutes(fastify: FastifyInstance) {
     return { user };
   });
 
+  fastify.post(
+    "/password",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["currentPassword", "newPassword"],
+          properties: {
+            currentPassword: { type: "string", minLength: 1 },
+            newPassword: { type: "string", minLength: 8 },
+            code: { type: "string", minLength: 6, maxLength: 6 },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      await request.jwtVerify();
+      const { id } = request.user as JwtPayload;
+      const { currentPassword, newPassword, code } = request.body as {
+        currentPassword: string;
+        newPassword: string;
+        code?: string;
+      };
+
+      try {
+        const result = await authService.changePassword(
+          fastify.prisma,
+          id,
+          currentPassword,
+          newPassword,
+          code,
+        );
+
+        if (result === "INVALID_CREDENTIALS") {
+          return reply
+            .code(401)
+            .send({ error: "Invalid current password or 2FA code" });
+        }
+
+        if (result === "SAME_PASSWORD") {
+          return reply.code(400).send({
+            error: "New password must be different from current password",
+          });
+        }
+
+        return reply.send({ message: "Password updated successfully" });
+      } catch (err: unknown) {
+        const prismaError = err as { code?: string };
+        if (prismaError.code === "P2025") {
+          return reply.code(404).send({ error: "User not found" });
+        }
+        request.log.error(err);
+        return reply.code(500).send({ error: "Internal server error" });
+      }
+    },
+  );
+
   fastify.delete(
     "/account",
     {
@@ -162,7 +219,6 @@ export default async function authRoutes(fastify: FastifyInstance) {
         return reply.send({ message: "Account deleted" });
       } catch (err: unknown) {
         const prismaError = err as { code?: string };
-        // Handle concurrent delete race condition gracefully
         if (prismaError.code === "P2025") {
           reply.clearCookie("access_token", { path: "/" });
           return reply.code(404).send({ error: "Account already deleted" });
