@@ -12,7 +12,7 @@ export function AddFriendField({ onAdd }: AddFriendFieldProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sentFriendRequest, setSentFriendRequest] = useState(false);
-  const {user} = useAuth();
+  const { user } = useAuth();
 
   useEffect(() => {
     function removeErrorMessage() {
@@ -31,8 +31,8 @@ export function AddFriendField({ onAdd }: AddFriendFieldProps) {
     const trimmed = username.trim();
     if (trimmed === "") return;
     if (user?.username == username) {
-      setError("Cannot add yourself as a friend.")
-      return ;
+      setError("Cannot add yourself as a friend.");
+      return;
     }
     setLoading(true);
 
