@@ -23,6 +23,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const [gameId, setGameId] = useState<string | null>(null);
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [winnerId, setWinnerId] = useState<string | null>(null);
+  const [turnStartedAt, setTurnStartedAt] = useState<number | null>(null);
   const [inQueue, setInQueue] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -61,6 +62,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
           break;
         case "game_updated":
           setGameState(event.state);
+          setTurnStartedAt(Date.now());
           break;
         case "game_ended":
           setWinnerId(event.winnerId);
@@ -192,6 +194,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     setGameId(null);
     setGameState(null);
     setWinnerId(null);
+    setTurnStartedAt(null);
   }, []);
 
   const clearError = useCallback(() => setError(null), []);
@@ -202,6 +205,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       room,
       gameId,
       gameState,
+      turnStartedAt,
       winnerId,
       inQueue,
       error,
@@ -227,6 +231,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       room,
       gameId,
       gameState,
+      turnStartedAt,
       winnerId,
       inQueue,
       error,

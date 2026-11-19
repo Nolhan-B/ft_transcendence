@@ -1,13 +1,15 @@
 import type { HTMLAttributes, ReactNode } from "react";
 
 // Only theme colors (see styles/index.css), so the card follows the theme.
-export type CardColor = "primary" | "secondary" | "accent" | "success";
+export type CardColor =
+  "primary" | "secondary" | "accent" | "success" | "neutral";
 
 const COLOR_CLASSES: Record<CardColor, string> = {
   primary: "bg-primary",
   secondary: "bg-secondary",
   accent: "bg-accent",
   success: "bg-success",
+  neutral: "bg-neutral",
 };
 
 interface CardProps extends HTMLAttributes<HTMLDivElement> {
