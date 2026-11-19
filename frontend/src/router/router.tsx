@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { MainLayout } from "../layouts/MainLayout";
+import { GameLayout } from "../layouts/GameLayout";
 import { AuthLayout } from "../layouts/AuthLayout";
 
 import { HomePage } from "../pages/HomePage/HomePage";
@@ -39,14 +40,20 @@ function Router() {
           <Route element={<RequireAuth />}>
             <Route path="/play" element={<PlayPage />} />
             <Route path="/play/rooms/:code" element={<RoomPage />} />
-            <Route path="/games/:id" element={<GamePage />} />
-            <Route path="/games/:id/spectate" element={<SpectatePage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Route>
 
           {/* Unknown URL, inside the layout */}
           <Route path="*" element={<NotFoundPage />} />
+        </Route>
+
+        {/* Game pages: no footer */}
+        <Route element={<RequireAuth />}>
+          <Route element={<GameLayout />}>
+            <Route path="/games/:id" element={<GamePage />} />
+            <Route path="/games/:id/spectate" element={<SpectatePage />} />
+          </Route>
         </Route>
 
         {/* Visitors only */}

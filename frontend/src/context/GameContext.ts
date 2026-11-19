@@ -14,6 +14,8 @@ export interface GameContextValue {
   gameId: string | null;
   // Last state of the game sent by the server (the other hands are hidden)
   gameState: GameState | null;
+  // When the last state arrived: the server's turn timer restarts with it
+  turnStartedAt: number | null;
   // Set when the server announces the end of the game
   winnerId: string | null;
   // true while waiting for a ranked opponent

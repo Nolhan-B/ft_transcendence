@@ -703,8 +703,9 @@ export function DebugHeader() {
     </button>
   );
 
+  // Hidden on phones: a narrow screen, or a landscape one with no height to waste
   return (
-    <div className="border-b border-base-300 bg-base-200 text-xs">
+    <div className="border-b border-base-300 bg-base-200 text-xs max-md:hidden short:hidden">
       <div className="container mx-auto flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-1.5">
         <button
           type="button"

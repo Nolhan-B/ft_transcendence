@@ -1,9 +1,20 @@
 import { useState } from "react";
-import type { Card, CardColor, GameState } from "shared";
+import type { Card, CardColor, GameState, Player } from "shared";
+import { useCountdown } from "../../hooks/game/useCountdown";
 import { useGame } from "../../hooks/ws/useGame";
-import { UserAvatar } from "../user/UserAvatar";
 import { ChoiceDialog } from "./ChoiceDialog";
-import { PlayingCard } from "./PlayingCard";
+import { Hand } from "../cards/Hand";
+import { toHandCard } from "./handCards";
+import { GameTable } from "./GameTable";
+import floorImage from "../../assets/images/game-floor.jpg";
+import { CardFlights } from "./CardFlights";
+import { TurnAnnouncement } from "./TurnAnnouncement";
+import { OpponentSeat } from "./OpponentSeat";
+import type { Seat } from "./OpponentSeat";
+
+// Length of a turn on the server (TURN_TIMEOUT_MS, 20 s by default). It does
+// not send the remaining time: the countdown restarts with each new state.
+const TURN_SECONDS = 20;
 
 const COLOR_CHOICES: { color: CardColor; label: string; button: string }[] = [
   { color: "red", label: "Red", button: "btn-primary" },
@@ -11,6 +22,41 @@ const COLOR_CHOICES: { color: CardColor; label: string; button: string }[] = [
   { color: "green", label: "Green", button: "btn-success" },
   { color: "blue", label: "Blue", button: "btn-secondary" },
 ];
+
+// Where the opponents sit, by number of opponents. They are placed in turn
+// order starting after me: the next player is on my left.
+const SEATS: Record<number, Seat[]> = {
+  1: ["top"],
+  2: ["left", "right"],
+  3: ["left", "top", "right"],
+};
+
+// Grid cell of each seat around the central board
+const SEAT_CELL: Record<Seat, string> = {
+  top: "col-start-2 row-start-1 justify-self-center",
+  left: "col-start-1 row-start-2 self-center",
+  right: "col-start-3 row-start-2 self-center",
+};
+
+function seatOpponents(players: Player[], myId: string) {
+  const mine = Math.max(
+    0,
+    players.findIndex((player) => player.userId === myId),
+  );
+  const others = players
+    .map((player, index) => ({
+      player,
+      order: (index - mine + players.length) % players.length,
+    }))
+    .filter(({ player }) => player.userId !== myId)
+    .sort((a, b) => a.order - b.order)
+    .map(({ player }) => player);
+  const seats = SEATS[others.length] ?? [];
+  return others.map((player, index) => ({
+    player,
+    seat: seats[index] ?? "top",
+  }));
+}
 
 interface Props {
   state: GameState;
@@ -20,7 +66,8 @@ interface Props {
 // Basic board: opponents on top, the table (draw pile and top card) in the
 // middle, my hand at the bottom
 export function GameBoard({ state, myId }: Props) {
-  const { playCard, drawCard, callUno, catchUno } = useGame();
+  const { playCard, drawCard, callUno, catchUno, turnStartedAt } = useGame();
+  const turnLeft = useCountdown(turnStartedAt, TURN_SECONDS);
   // A card waiting for a choice: its color (wild) or the player to swap with (7)
   const [asking, setAsking] = useState<{
     card: Card;
@@ -28,9 +75,25 @@ export function GameBoard({ state, myId }: Props) {
   } | null>(null);
 
   const me = state.players.find((player) => player.userId === myId);
-  const opponents = state.players.filter((player) => player.userId !== myId);
+  const turnPlayer = state.players.find((player) => player.isCurrentTurn);
+  const seated = seatOpponents(state.players, myId);
   const myTurn = me?.isCurrentTurn ?? false;
+  // Cards stay visible when it is not your turn (except with jump-in)
+  const canPlayNow = myTurn || state.settings.jumpIn;
+  const handCards = (me?.hand ?? []).map((card) =>
+    toHandCard(card, !canPlayNow),
+  );
+  // Visible part of each card: 70% of it, less when the hand is large
+  const overlap = `calc(var(--card-w) * -1 + min(var(--card-w) * 0.7, ${60 / Math.max(handCards.length - 1, 1)}rem, ${85 / Math.max(handCards.length - 1, 1)}vw))`;
+  const opponents = seated.map(({ player }) => player);
   const unoCallout = state.settings.unoCallout;
+  // Bots play after a short delay, without a timer
+  const timerFor = (player: Player) =>
+    player.isCurrentTurn &&
+    !player.disconnected &&
+    !player.userId.startsWith("bot_")
+      ? turnLeft
+      : null;
 
   function play(card: Card) {
     if (card.color === "wild") setAsking({ card, kind: "color" });
@@ -45,83 +108,45 @@ export function GameBoard({ state, myId }: Props) {
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      {/* Opponents */}
-      <div className="flex flex-wrap justify-center gap-4">
-        {opponents.map((player) => (
-          <div
-            key={player.userId}
-            className={`card bg-base-200 shadow-xl ${
-              player.isCurrentTurn ? "ring-4 ring-accent" : ""
-            } ${player.disconnected ? "opacity-40" : ""}`}
-          >
-            <div className="card-body items-center gap-2 p-4">
-              <UserAvatar username={player.username} size="md" />
-              <span className="font-semibold">{player.username}</span>
-              <span className="badge badge-outline">
-                {player.hand.length} cards
-              </span>
-              {unoCallout && player.hand.length === 1 && (
-                <button
-                  type="button"
-                  className="btn btn-warning btn-xs"
-                  onClick={() => catchUno(player.userId)}
-                >
-                  Catch UNO
-                </button>
-              )}
+    // Frame of the game: a tiled parquet floor, darkened on the edges
+    <div
+      className="flex flex-1 flex-col justify-around gap-6 rounded-box border-4 border-base-content/20 bg-base-200 p-4 shadow-[inset_0_0_120px_var(--color-base-300)] compact:gap-3 compact:p-2 snug:gap-2 snug:p-1 short:gap-2 tiny:gap-1 tiny:border-2 tiny:p-1"
+      style={{
+        backgroundImage: `url(${floorImage})`,
+        backgroundSize: "480px",
+      }}
+    >
+      {/* Opponents around the board: left, top and right */}
+      <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] grid-rows-[auto_auto] items-center gap-4 compact:gap-2 snug:gap-1 tiny:gap-1">
+        <>
+          {seated.map(({ player, seat }) => (
+            <div key={player.userId} className={SEAT_CELL[seat]}>
+              <OpponentSeat
+                player={player}
+                canCatchUno={unoCallout && player.hand.length === 1}
+                onCatchUno={() => catchUno(player.userId)}
+              />
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </>
 
-      {/* Table */}
-      <div className="flex flex-wrap items-center justify-center gap-8 rounded-box bg-base-200 p-6 shadow-inner">
-        <div className="flex flex-col items-center gap-2">
-          <button
-            type="button"
-            disabled={!myTurn}
-            onClick={drawCard}
-            className="cursor-pointer transition-transform enabled:hover:-translate-y-1 disabled:cursor-not-allowed disabled:opacity-60"
-            aria-label="Draw a card"
-          >
-            <PlayingCard faceDown size="md" />
-          </button>
-          <span className="badge badge-outline">
-            {state.pendingDrawCount > 0
-              ? `Draw ${state.pendingDrawCount}`
-              : `Draw (${state.drawPileCount})`}
-          </span>
-        </div>
-
-        <div className="flex flex-col items-center gap-2">
-          <PlayingCard
-            color={state.topCard.color}
-            value={state.topCard.value}
-            size="lg"
+        {/* Central board */}
+        <div className="col-start-2 row-start-2">
+          <GameTable
+            state={state}
+            myTurn={myTurn}
+            onDraw={drawCard}
+            turnName={turnPlayer?.username ?? ""}
+            secondsLeft={turnPlayer ? timerFor(turnPlayer) : null}
+            turnSeconds={TURN_SECONDS}
+            botTurn={turnPlayer?.userId.startsWith("bot_") ?? false}
           />
-          <span className="badge badge-outline">Top card</span>
-        </div>
-
-        <div className="flex flex-col items-center gap-3">
-          <div className="flex items-center gap-2">
-            <span>Color</span>
-            <PlayingCard color={state.currentColor} size="sm" />
-          </div>
-          <span className="text-2xl" title="Direction of play">
-            {state.direction === 1 ? "↻" : "↺"}
-          </span>
         </div>
       </div>
 
-      {/* My hand */}
-      <div className="flex flex-col items-center gap-4">
-        <div className="flex items-center gap-3">
-          {myTurn ? (
-            <span className="badge badge-accent badge-lg">Your turn</span>
-          ) : (
-            <span className="badge badge-ghost badge-lg">Waiting...</span>
-          )}
+      {/* Me: the UNO button beside my hand */}
+      <div className="relative flex items-end justify-center">
+        <div className="absolute bottom-0 left-0 z-10 flex flex-col items-center gap-2 pb-4 short:pb-0">
           {unoCallout && me && me.hand.length <= 2 && (
             <button
               type="button"
@@ -133,19 +158,31 @@ export function GameBoard({ state, myId }: Props) {
           )}
         </div>
 
-        <div className="flex flex-wrap justify-center gap-2">
-          {me?.hand.map((card) => (
-            <PlayingCard
-              key={card.id}
-              color={card.color}
-              value={card.value}
-              size="md"
-              disabled={!myTurn && !state.settings.jumpIn}
-              onClick={() => play(card)}
-            />
-          ))}
+        <div
+          className="pt-8 pb-2 compact:pt-3 compact:pb-0 snug:pt-1 tiny:pt-1"
+          data-anchor={`seat-${myId}`}
+        >
+          <Hand
+            cards={handCards}
+            fan="row"
+            className="max-w-full"
+            overlap={overlap}
+            cardClassName="[--card-w:min(9.75rem,16vw)] w-(--card-w) border-4! compact:[--card-w:min(5.5rem,16vw)] compact:border-2! snug:[--card-w:min(4.5rem,16vw)] short:[--card-w:min(4.75rem,16vw)] tiny:[--card-w:min(3.5rem,16vw)]"
+            onSelect={(id) => {
+              const card = me?.hand.find((c) => c.id === id);
+              if (card) play(card);
+            }}
+          />
         </div>
       </div>
+
+      <CardFlights state={state} />
+
+      <TurnAnnouncement
+        playerId={turnPlayer?.userId}
+        name={turnPlayer?.username ?? ""}
+        mine={myTurn}
+      />
 
       <ChoiceDialog
         open={asking?.kind === "color"}
