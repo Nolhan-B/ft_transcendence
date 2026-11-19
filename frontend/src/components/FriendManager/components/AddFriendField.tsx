@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import type { Profile } from "shared";
 import { useAuth } from "../../../hooks/auth/useAuth";
+import { useChat } from "../../../hooks/ws/useChat";
 
 export type AddFriendFieldProps = {
   // Called with the trimmed username when the form is submitted
@@ -12,7 +13,12 @@ export function AddFriendField({ onAdd }: AddFriendFieldProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sentFriendRequest, setSentFriendRequest] = useState(false);
+  const { friends } = useChat();
   const { user } = useAuth();
+
+  useEffect(() => {
+    setSentFriendRequest(false);
+  }, [friends]);
 
   useEffect(() => {
     function removeErrorMessage() {

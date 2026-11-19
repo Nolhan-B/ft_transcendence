@@ -1,20 +1,30 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Profile } from "shared";
 import { AddFriendField } from "./components/AddFriendField";
 import { FriendListItem } from "./components/FriendListItem";
 import { FriendRequestItem } from "./components/FriendRequestItem";
-import FriendChat from "./components/FriendChat";
 import { useChat } from "../../hooks/ws/useChat";
 
-export function FriendManager() {
+export type FriendManagerProps = {
+  currentOpenedFriendChat: Profile | null;
+  setCurrentOpenedFriendChat: (profile: Profile | null) => void;
+};
+
+export function FriendManager({
+  currentOpenedFriendChat,
+  setCurrentOpenedFriendChat,
+}: FriendManagerProps) {
   const { friends, friendRequests, setFriendRequests, error } = useChat();
 
   const [friendRequestsError, setFriendRequestsError] = useState<string | null>(
     null,
   );
 
-  const [currentOpenedFriendChat, setCurrentOpenedFriendChat] =
-    useState<Profile | null>(null);
+  useEffect(() => {
+    if (currentOpenedFriendChat && !friends.includes(currentOpenedFriendChat)) {
+      setCurrentOpenedFriendChat(null);
+    }
+  }, [friends]);
 
   function handleAddFriend(username: string) {
     console.log("WIP, add friend: " + username);
@@ -81,41 +91,28 @@ export function FriendManager() {
         )}
       </div>
       <div className="divider"></div>
-      {currentOpenedFriendChat ? (
-        <div className="flex min-h-0 flex-1 flex-col gap-1">
-          <div className="flex shrink-0 items-center gap-2">
-            <button
-              onClick={() => setCurrentOpenedFriendChat(null)}
-              className="btn border-0"
-            >
-              ←
-            </button>
-            Chat with {currentOpenedFriendChat.username}
-          </div>
-          <FriendChat profile={currentOpenedFriendChat} />
-        </div>
-      ) : (
-        <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
-          Your friends
-          {error ? (
-            <p className="text-error text-sm">
-              Could not load friends: {error}
-            </p>
-          ) : friends.length === 0 ? (
-            <p className="text-sm opacity-60">You have no friends :(</p>
-          ) : (
-            friends.map((friend) => (
-              <FriendListItem
-                key={friend.id}
-                name={friend.username}
-                avatarUrl={friend.avatarUrl}
-                onRemove={() => handleDeclineFriendRequest(friend.id)}
-                onClick={() => setCurrentOpenedFriendChat(friend)}
-              />
-            ))
-          )}
-        </div>
-      )}
+      <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
+        Your friends
+        {error ? (
+          <p className="text-error text-sm">Could not load friends: {error}</p>
+        ) : friends.length === 0 ? (
+          <p className="text-sm opacity-60">You have no friends :(</p>
+        ) : (
+          friends.map((friend) => (
+            <FriendListItem
+              key={friend.id}
+              name={friend.username}
+              avatarUrl={friend.avatarUrl}
+              onRemove={() => handleDeclineFriendRequest(friend.id)}
+              onClick={() =>
+                currentOpenedFriendChat
+                  ? setCurrentOpenedFriendChat(null)
+                  : setCurrentOpenedFriendChat(friend)
+              }
+            />
+          ))
+        )}
+      </div>
     </div>
   );
 }
