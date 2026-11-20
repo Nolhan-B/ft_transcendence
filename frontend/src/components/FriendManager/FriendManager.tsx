@@ -20,8 +20,9 @@ export function FriendManager({
     null,
   );
 
+  // Close chat if friend is removed
   useEffect(() => {
-    if (currentOpenedFriendChat && !friends.includes(currentOpenedFriendChat)) {
+    if (!friends.some((f) => f.id === currentOpenedFriendChat?.id)) {
       setCurrentOpenedFriendChat(null);
     }
   }, [friends]);

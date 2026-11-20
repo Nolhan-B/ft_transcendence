@@ -1,4 +1,4 @@
-import { ButtonHTMLAttributes } from "react";
+import { ButtonHTMLAttributes, useRef } from "react";
 import defaultProfilePicture from "../../../assets/images/default-profile-picture.png";
 
 // Friend list item
@@ -8,11 +8,6 @@ export type FriendListItemProps = {
   elo?: number | null;
   onRemove?: () => void;
 } & ButtonHTMLAttributes<HTMLButtonElement>;
-
-function openConfirm() {
-  const doc = document.getElementById("my_modal_1") as HTMLDialogElement | null;
-  doc?.showModal();
-}
 
 // The remove button cannot live inside the main button: a nested <button> is
 // invalid HTML and breaks keyboard navigation. The row is a flex container
@@ -25,6 +20,12 @@ export function FriendListItem({
   className,
   ...rest
 }: FriendListItemProps) {
+  const dialogRef = useRef<HTMLDialogElement | null>(null);
+
+  function openConfirm() {
+    dialogRef.current?.showModal();
+  }
+
   return (
     <div className="flex items-center gap-1 rounded-box border border-base-content/10 bg-base-200 pr-1 transition-colors hover:border-base-content/25">
       <button
@@ -71,7 +72,7 @@ export function FriendListItem({
           <path d="M6 6l12 12M18 6L6 18" />
         </svg>
       </button>
-      <dialog id="my_modal_1" className="modal">
+      <dialog ref={dialogRef} id="my_modal_1" className="modal">
         <div className="modal-box">
           <h3 className="font-bold text-lg">Remove {name} ?</h3>
           <p className="py-4">Are you sure about that ?</p>
