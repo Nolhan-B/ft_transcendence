@@ -3,6 +3,7 @@ import { FriendManager } from "../FriendManager/FriendManager";
 import FriendChat from "../FriendManager/components/FriendChat";
 import { Profile } from "shared";
 import { useIsMobile } from "../../hooks/useMediaQuery";
+import { useChat } from "../../hooks/ws/useChat";
 
 // Vertical button glued to the right edge of the window, vertically centered.
 // Opens a drawer sliding in from the right.
@@ -12,6 +13,8 @@ export function SideButton() {
     useState<Profile | null>(null);
   const isMobile = useIsMobile();
   const chatReplacesDrawer = isMobile && currentOpenedFriendChat !== null;
+  const { friendRequests } = useChat();
+  const showNotification = friendRequests.length !== 0;
 
   function closeMenu() {
     setOpen(false);
@@ -39,7 +42,14 @@ export function SideButton() {
         aria-expanded={open}
         className="btn btn-secondary fixed right-0 top-1/2 z-20 h-auto -translate-y-1/2 rounded-r-none px-2 py-4 [writing-mode:vertical-rl]"
       >
-        Friends
+        <div className="flex gap-1 items-center">
+          {showNotification ? (
+            <div className="status status-accent animate-bounce"></div>
+          ) : (
+            ""
+          )}
+          Friends
+        </div>
       </button>
 
       <div

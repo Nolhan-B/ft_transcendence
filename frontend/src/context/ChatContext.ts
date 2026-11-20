@@ -8,6 +8,8 @@ export interface ChatContextValue {
   conversations: Record<string, DirectMessage[]>;
   friendRequests: Profile[];
   friends: Profile[];
+  unreadSenders: string[];
+  setUnreadSenders: Dispatch<SetStateAction<string[]>>;
   setFriendRequests: Dispatch<SetStateAction<Profile[]>>;
   error: string | null;
   clearError: () => void;

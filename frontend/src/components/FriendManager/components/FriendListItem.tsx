@@ -1,5 +1,6 @@
 import { ButtonHTMLAttributes, useRef } from "react";
 import defaultProfilePicture from "../../../assets/images/default-profile-picture.png";
+import { useChat } from "../../../hooks/ws/useChat";
 
 // Friend list item
 export type FriendListItemProps = {
@@ -7,6 +8,7 @@ export type FriendListItemProps = {
   avatarUrl?: string | null;
   elo?: number | null;
   onRemove?: () => void;
+  uid?: string | null;
 } & ButtonHTMLAttributes<HTMLButtonElement>;
 
 // The remove button cannot live inside the main button: a nested <button> is
@@ -18,9 +20,11 @@ export function FriendListItem({
   elo,
   onRemove,
   className,
+  uid,
   ...rest
 }: FriendListItemProps) {
   const dialogRef = useRef<HTMLDialogElement | null>(null);
+  const { unreadSenders } = useChat();
 
   function openConfirm() {
     dialogRef.current?.showModal();
@@ -42,7 +46,14 @@ export function FriendListItem({
           </div>
         </div>
 
-        <span className="min-w-0 flex-1 truncate font-medium">{name}</span>
+        <span className="min-w-0 flex-1 truncate font-medium gap-2 flex items-center">
+          {name}
+          {uid && unreadSenders.includes(uid) ? (
+            <div aria-label="warning" className="status status-warning"></div>
+          ) : (
+            ""
+          )}
+        </span>
 
         {typeof elo === "number" && (
           <span className="badge badge-sm badge-ghost shrink-0 font-mono">

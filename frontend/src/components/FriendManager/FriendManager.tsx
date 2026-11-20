@@ -14,11 +14,22 @@ export function FriendManager({
   currentOpenedFriendChat,
   setCurrentOpenedFriendChat,
 }: FriendManagerProps) {
-  const { friends, friendRequests, setFriendRequests, error } = useChat();
+  const {
+    friends,
+    friendRequests,
+    setFriendRequests,
+    error,
+    setUnreadSenders,
+  } = useChat();
 
   const [friendRequestsError, setFriendRequestsError] = useState<string | null>(
     null,
   );
+
+  function removeNotification(uid: string) {
+    if (!uid) return;
+    setUnreadSenders((all) => all.filter((id) => id !== uid));
+  }
 
   // Close chat if friend is removed
   useEffect(() => {
@@ -100,12 +111,16 @@ export function FriendManager({
               key={friend.id}
               name={friend.username}
               avatarUrl={friend.avatarUrl}
+              uid={friend.id}
               onRemove={() => handleDeclineFriendRequest(friend.id)}
-              onClick={() =>
-                currentOpenedFriendChat
-                  ? setCurrentOpenedFriendChat(null)
-                  : setCurrentOpenedFriendChat(friend)
-              }
+              onClick={() => {
+                if (currentOpenedFriendChat) {
+                  setCurrentOpenedFriendChat(null);
+                } else {
+                  setCurrentOpenedFriendChat(friend);
+                  removeNotification(friend.id);
+                }
+              }}
             />
           ))
         )}

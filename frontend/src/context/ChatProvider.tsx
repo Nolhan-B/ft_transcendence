@@ -29,6 +29,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [conversations, setConversations] = useState<
     Record<string, DirectMessage[]>
   >({});
+  const [unreadSenders, setUnreadSenders] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const addMessages = useCallback(
@@ -48,6 +49,12 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       if (event.type === "direct_message") {
         const otherUserId =
           event.senderId === user?.id ? event.receiverId : event.senderId;
+        // Add the sender to the list of unread messages
+        if (user) {
+          if (!unreadSenders.includes(user?.id)) {
+            setUnreadSenders([...unreadSenders, event.senderId]);
+          }
+        }
         addMessages(otherUserId, [event]);
       } else if (event.type === "friend_request_received") {
         setFriendRequests((prev) => {
@@ -149,6 +156,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       friendRequests,
       friends,
       setFriendRequests,
+      unreadSenders,
+      setUnreadSenders,
       error,
       clearError,
       sendMessage,
@@ -160,6 +169,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       friendRequests,
       friends,
       setFriendRequests,
+      unreadSenders,
+      setUnreadSenders,
       error,
       clearError,
       sendMessage,
