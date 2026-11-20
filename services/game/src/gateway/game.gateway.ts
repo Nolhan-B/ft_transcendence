@@ -518,6 +518,7 @@ export default async function gameGateway(fastify: FastifyInstance) {
           }
         }
         if (!found) continue;
+        if ([...room].some((c) => c.userId === userId)) continue; // deja revenu
 
         broadCastToRoom(gameId, { type: "player_left", userId });
 
@@ -569,15 +570,19 @@ export default async function gameGateway(fastify: FastifyInstance) {
         for (const client of sockets) {
           if (client.socket === socket) {
             sockets.delete(client);
-            roomManager.leaveRoom(roomCode, userId);
-            const room = roomManager.getRoom(roomCode);
-            if (room) {
-              broadcastToRoomSockets(roomCode, {
-                type: "room_updated",
-                room: toRoomInfo(room),
-              });
-            } else {
-              roomSockets.delete(roomCode);
+            // Le joueur est deja revenu avec un autre socket : on ne le retire pas
+            const stillHere = [...sockets].some((c) => c.userId === userId);
+            if (!stillHere) {
+              roomManager.leaveRoom(roomCode, userId);
+              const room = roomManager.getRoom(roomCode);
+              if (room) {
+                broadcastToRoomSockets(roomCode, {
+                  type: "room_updated",
+                  room: toRoomInfo(room),
+                });
+              } else {
+                roomSockets.delete(roomCode);
+              }
             }
             break;
           }
