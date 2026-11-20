@@ -1,9 +1,10 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, useEffect } from "react";
 import type { ReactNode } from "react";
 import type {
   DirectMessage,
-  DirectMessageEvent,
+  ChatServerEvent,
   GetConversationHistoryResponse,
+  Profile,
 } from "shared";
 import { useAuth } from "../hooks/auth/useAuth";
 import { useWebSocket } from "../hooks/ws/useWebSocket";
@@ -23,10 +24,13 @@ function merge(
 
 export function ChatProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
+  const [friendRequests, setFriendRequests] = useState<Profile[]>([]);
+  const [friends, setFriends] = useState<Profile[]>([]);
   const [conversations, setConversations] = useState<
     Record<string, DirectMessage[]>
   >({});
   const [error, setError] = useState<string | null>(null);
+
   const addMessages = useCallback(
     (otherUserId: string, messages: DirectMessage[]) => {
       setConversations((prev) => ({
@@ -36,20 +40,83 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     },
     [],
   );
+
   const { status, send } = useWebSocket({
     path: "/api/chat/ws",
     onMessage: (message) => {
-      const event = message as
-        DirectMessageEvent | { type: "error"; message: string };
+      const event = message as ChatServerEvent;
       if (event.type === "direct_message") {
         const otherUserId =
           event.senderId === user?.id ? event.receiverId : event.senderId;
         addMessages(otherUserId, [event]);
+      } else if (event.type === "friend_request_received") {
+        setFriendRequests((prev) => {
+          const alreadyThere = prev.some(
+            (request) => request.id === event.sender.id,
+          );
+          if (alreadyThere) return prev;
+          return [...prev, event.sender];
+        });
+      } else if (event.type === "friend_request_accepted") {
+        setFriendRequests((prev) => {
+          return prev.filter((request) => request.id !== event.friend.id);
+        });
+        setFriends((prev) => {
+          return [...prev, event.friend];
+        });
+      } else if (event.type === "friend_removed") {
+        setFriendRequests((prev) => {
+          return prev.filter((request) => request.id !== event.userId);
+        });
+        setFriends((prev) => {
+          return prev.filter((request) => request.id !== event.userId);
+        });
       } else if (event.type === "error") {
         setError(event.message);
       }
     },
   });
+
+  useEffect(() => {
+    async function fetchFriendRequests() {
+      try {
+        const res = await fetch("/api/user/friends/requests/received", {
+          credentials: "include", // the session lives in an httpOnly cookie
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        const data = (await res.json()) as { receivedRequests: Profile[] };
+        setFriendRequests(data.receivedRequests);
+      } catch (err) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Unknown error during the fetch of the friend requests",
+        );
+      }
+    }
+
+    fetchFriendRequests();
+  }, [user?.id]);
+
+  useEffect(() => {
+    async function fetchFriends() {
+      try {
+        const res = await fetch("/api/user/friends", {
+          credentials: "include", // the session lives in an httpOnly cookie
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        const data = (await res.json()) as { friends: Profile[] };
+        setFriends(data.friends);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Unknown error");
+      }
+    }
+
+    fetchFriends();
+  }, [friendRequests]);
+
   const sendMessage = useCallback(
     (receiverId: string, content: string) => {
       setError(null);
@@ -79,12 +146,25 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     () => ({
       status,
       conversations,
+      friendRequests,
+      friends,
+      setFriendRequests,
       error,
       clearError,
       sendMessage,
       loadHistory,
     }),
-    [status, conversations, error, clearError, sendMessage, loadHistory],
+    [
+      status,
+      conversations,
+      friendRequests,
+      friends,
+      setFriendRequests,
+      error,
+      clearError,
+      sendMessage,
+      loadHistory,
+    ],
   );
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;

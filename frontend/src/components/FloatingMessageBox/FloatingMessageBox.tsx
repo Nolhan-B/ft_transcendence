@@ -1,5 +1,4 @@
 import messageIcon from "../../assets/icons/message.svg";
-import { FriendManager } from "../FriendManager/FriendManager";
 import { GameChat } from "./components/GameChat";
 
 export function FloatingMessageBox() {
@@ -23,7 +22,11 @@ export function FloatingMessageBox() {
         />
         <div className="tab-content h-[26rem] max-h-[calc(100vh-8rem)] bg-base-100 border-base-300 p-6">
           <div className="flex h-full flex-col">
-            <FriendManager />
+            <p>
+              this code is dead. if the Floating message box is not implemented
+              in prod, to be removed. This used to be an include of
+              FriendManager
+            </p>
           </div>
         </div>
         <input
