@@ -27,10 +27,6 @@ export function FriendManager({
     }
   }, [friends]);
 
-  function handleAddFriend(username: string) {
-    console.log("WIP, add friend: " + username);
-  }
-
   async function handleAcceptFriendRequest(userId: string) {
     try {
       const res = await fetch(`/api/user/friends/accept/${userId}`, {
@@ -68,7 +64,7 @@ export function FriendManager({
     <div className="flex min-h-0 flex-1 flex-col gap-6 pt-1">
       <div className="flex shrink-0 flex-col gap-1">
         Send a friend request
-        <AddFriendField onAdd={handleAddFriend} />
+        <AddFriendField />
       </div>
 
       <div className="flex shrink-0 flex-col gap-1">

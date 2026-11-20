@@ -3,12 +3,8 @@ import type { Profile } from "shared";
 import { useAuth } from "../../../hooks/auth/useAuth";
 import { useChat } from "../../../hooks/ws/useChat";
 
-export type AddFriendFieldProps = {
-  // Called with the trimmed username when the form is submitted
-  onAdd: (username: string) => void;
-};
 
-export function AddFriendField({ onAdd }: AddFriendFieldProps) {
+export function AddFriendField() {
   const [username, setUsername] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -59,7 +55,6 @@ export function AddFriendField({ onAdd }: AddFriendFieldProps) {
       });
       if (!request.ok) throw new Error("Failed to send the request.");
 
-      onAdd(trimmed);
       setUsername("");
       setSentFriendRequest(true);
     } catch (err) {
