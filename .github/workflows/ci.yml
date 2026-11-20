@@ -48,6 +48,9 @@ jobs:
       - name: Run reconnect integration tests
         run: npm run test-reconnect
 
+      - name: Run websocket session integration tests
+        run: npm run test-ws-session
+
       - name: Run spectator integration tests
         run: npm run test-spectator
 
