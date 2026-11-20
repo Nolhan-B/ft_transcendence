@@ -39,6 +39,30 @@ import { handleLeaveQueue } from "./handlers/matchmaking/leave-queue.js";
 import { findMatch } from "../engine/matchmaking.js";
 import { computeEloChanges } from "../engine/elo.js";
 
+const ALIVE_CHECK_MS = Number(process.env.ALIVE_CHECK_MS) || 2000;
+
+// true si le socket répond encore, false s'il se ferme ou ne répond pas
+function isStillAlive(ws: WebSocket): Promise<boolean> {
+  if (ws.readyState !== WebSocket.OPEN) return Promise.resolve(false);
+  return new Promise((resolve) => {
+    const done = (alive: boolean) => {
+      clearTimeout(timer);
+      ws.off("pong", onPong);
+      ws.off("close", onClose);
+      resolve(alive);
+    };
+    const onPong = () => done(true);
+    const onClose = () => done(false);
+    const timer = setTimeout(() => {
+      ws.terminate(); // connexion morte : on la tue, ça déclenche son "close"
+      done(false);
+    }, ALIVE_CHECK_MS);
+    ws.on("pong", onPong);
+    ws.on("close", onClose);
+    ws.ping();
+  });
+}
+
 const TURN_TIMEOUT_MS = Number(process.env.TURN_TIMEOUT_MS) || 20000;
 const MAX_AFK_COUNT = 2;
 
@@ -350,14 +374,23 @@ export default async function gameGateway(fastify: FastifyInstance) {
       return;
     }
 
-    if (connectedUser.has(userId)) {
-      const existing = connectedUser.get(userId)!;
-      if (existing.readyState === WebSocket.OPEN) {
-        sendError(socket, "Already connected");
-        socket.close();
-        return;
-      }
+    // Les messages qui arrivent pendant la vérification sont gardés de côté
+    const pending: RawData[] = [];
+    const buffer = (data: RawData) => pending.push(data);
+    socket.on("message", buffer);
+
+    // Refresh : l'ancien socket est mort ou en train de se fermer → on accepte
+    // Deuxième onglet : l'ancien répond au ping → on refuse
+    const existing = connectedUser.get(userId);
+    if (existing && existing !== socket && (await isStillAlive(existing))) {
+      sendError(socket, "Already connected");
+      socket.close();
+      return;
     }
+
+    // Le nouveau client a pu abandonner pendant l'attente
+    if (socket.readyState !== WebSocket.OPEN) return;
+
     connectedUser.set(userId, socket);
 
     const ctx: GatewayContext = {
@@ -386,7 +419,7 @@ export default async function gameGateway(fastify: FastifyInstance) {
       toRoomInfo,
     };
 
-    socket.on("message", async (data: RawData) => {
+    const onMessage = async (data: RawData) => {
       let parsed: unknown;
       try {
         parsed = JSON.parse(data.toString());
@@ -460,10 +493,14 @@ export default async function gameGateway(fastify: FastifyInstance) {
           handleLeaveQueue(ctx);
           break;
       }
-    });
+    };
 
     socket.on("close", async () => {
-      queueManager.leave(userId);
+      // L'ancien socket peut se fermer après l'arrivée du nouveau :
+      // il ne doit pas effacer ce qui appartient au nouveau
+      const isCurrent = connectedUser.get(userId) === socket;
+      if (isCurrent) queueManager.leave(userId);
+
       for (const [gameId, watchers] of spectators) {
         for (const client of watchers) {
           if (client.socket === socket) watchers.delete(client);
@@ -547,9 +584,13 @@ export default async function gameGateway(fastify: FastifyInstance) {
         }
       }
 
-      connectedUser.delete(userId);
+      if (isCurrent) connectedUser.delete(userId);
     });
 
+    // On branche le vrai handler et on rejoue les messages gardés de côté
+    socket.off("message", buffer);
+    socket.on("message", onMessage);
     socket.send(JSON.stringify({ type: "connected" }));
+    for (const data of pending) await onMessage(data);
   });
 }
