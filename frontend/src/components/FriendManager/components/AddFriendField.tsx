@@ -3,7 +3,6 @@ import type { Profile } from "shared";
 import { useAuth } from "../../../hooks/auth/useAuth";
 import { useChat } from "../../../hooks/ws/useChat";
 
-
 export function AddFriendField() {
   const [username, setUsername] = useState("");
   const [loading, setLoading] = useState(false);
