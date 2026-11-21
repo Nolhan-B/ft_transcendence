@@ -1,6 +1,7 @@
 import { ButtonHTMLAttributes, useRef } from "react";
 import defaultProfilePicture from "../../../assets/images/default-profile-picture.png";
 import { useChat } from "../../../hooks/ws/useChat";
+import { Profile } from "shared";
 
 // Friend list item
 export type FriendListItemProps = {
@@ -9,6 +10,7 @@ export type FriendListItemProps = {
   elo?: number | null;
   onRemove?: () => void;
   uid?: string | null;
+  currentOpenedChat: Profile | null;
 } & ButtonHTMLAttributes<HTMLButtonElement>;
 
 // The remove button cannot live inside the main button: a nested <button> is
@@ -21,6 +23,7 @@ export function FriendListItem({
   onRemove,
   className,
   uid,
+  currentOpenedChat,
   ...rest
 }: FriendListItemProps) {
   const dialogRef = useRef<HTMLDialogElement | null>(null);
@@ -48,7 +51,9 @@ export function FriendListItem({
 
         <span className="min-w-0 flex-1 truncate font-medium gap-2 flex items-center">
           {name}
-          {uid && unreadSenders.includes(uid) ? (
+          {uid &&
+          unreadSenders.includes(uid) &&
+          currentOpenedChat?.id != uid ? (
             <div aria-label="warning" className="status status-warning"></div>
           ) : (
             ""

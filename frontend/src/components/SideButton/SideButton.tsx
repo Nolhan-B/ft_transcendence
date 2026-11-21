@@ -13,8 +13,9 @@ export function SideButton() {
     useState<Profile | null>(null);
   const isMobile = useIsMobile();
   const chatReplacesDrawer = isMobile && currentOpenedFriendChat !== null;
-  const { friendRequests } = useChat();
-  const showNotification = friendRequests.length !== 0;
+  const { friendRequests, unreadSenders } = useChat();
+  const showNotification =
+    friendRequests.length !== 0 || unreadSenders.length !== 0;
 
   function closeMenu() {
     setOpen(false);

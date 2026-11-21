@@ -50,10 +50,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         const otherUserId =
           event.senderId === user?.id ? event.receiverId : event.senderId;
         // Add the sender to the list of unread messages
-        if (user) {
-          if (!unreadSenders.includes(user?.id)) {
-            setUnreadSenders([...unreadSenders, event.senderId]);
-          }
+        if (user && event.senderId !== user.id) {
+          setUnreadSenders((all) =>
+            all.includes(event.senderId) ? all : [...all, event.senderId],
+          );
         }
         addMessages(otherUserId, [event]);
       } else if (event.type === "friend_request_received") {
