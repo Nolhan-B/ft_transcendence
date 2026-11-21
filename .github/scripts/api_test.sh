@@ -245,7 +245,121 @@ fi
 echo "Sans authentification : 401"
 
 echo ""
-echo "=== 5. Workflow d'amitié ==="
+echo "=== 5. Leaderboard ==="
+
+# Lit un champ d'un JSON : json <fichier> <expression JS sur r>
+json() {
+  node -e "const r = JSON.parse(require('fs').readFileSync(process.argv[1])); console.log($2)" "$1"
+}
+
+lb_get() {
+  # lb_get <chemin> <token|""> : écrit la réponse dans $WORKDIR/lb.json et renvoie le code HTTP
+  if [ -n "$2" ]; then
+    curl -k -s -o "$WORKDIR/lb.json" -w "%{http_code}" "$BASE_URL/api/user$1" \
+      -H "Authorization: Bearer $2"
+  else
+    curl -k -s -o "$WORKDIR/lb.json" -w "%{http_code}" "$BASE_URL/api/user$1"
+  fi
+}
+
+fail() {
+  echo "$1"
+  cat "$WORKDIR/lb.json" 2>/dev/null && echo ""
+  exit 1
+}
+
+# Alice et Bob passent tout en haut du classement
+db "UPDATE \"User\" SET elo = 999999 WHERE id = '$ALICE_ID';" >/dev/null
+db "UPDATE \"User\" SET elo = 999998 WHERE id = '$BOB_ID';" >/dev/null
+
+echo "Top 10 par défaut..."
+[ "$(lb_get /leaderboard "$ALICE_TOKEN")" -eq 200 ] || fail "GET /leaderboard doit renvoyer 200"
+COUNT=$(json "$WORKDIR/lb.json" "r.leaderboard.length")
+[ "$COUNT" -ge 2 ] && [ "$COUNT" -le 10 ] || fail "Le classement doit contenir entre 2 et 10 joueurs, en a $COUNT"
+[ "$(json "$WORKDIR/lb.json" "r.leaderboard[0].id")" = "$ALICE_ID" ] || fail "Alice doit être 1re"
+[ "$(json "$WORKDIR/lb.json" "r.leaderboard[0].rank")" = "1" ] || fail "Alice doit avoir le rang 1"
+[ "$(json "$WORKDIR/lb.json" "r.leaderboard[1].id")" = "$BOB_ID" ] || fail "Bob doit être 2e"
+[ "$(json "$WORKDIR/lb.json" "r.leaderboard[1].rank")" = "2" ] || fail "Bob doit avoir le rang 2"
+[ "$(json "$WORKDIR/lb.json" "r.leaderboard[0].elo")" = "999999" ] || fail "L'ELO d'Alice doit être renvoyé"
+echo "Alice 1re, Bob 2e"
+
+echo "Classement trié par ELO décroissant..."
+SORTED=$(json "$WORKDIR/lb.json" "r.leaderboard.every((e, i, a) => i === 0 || a[i - 1].elo >= e.elo)")
+[ "$SORTED" = "true" ] || fail "Le classement doit être trié par ELO décroissant"
+echo "Tri correct"
+
+echo "Seuls les champs publics sont renvoyés..."
+LEAK=$(json "$WORKDIR/lb.json" "r.leaderboard.some((e) => ['email', 'password', 'passwordHash', 'twoFactorSecret'].some((f) => f in e))")
+[ "$LEAK" = "false" ] || fail "Le classement expose des champs privés"
+echo "Aucun champ privé"
+
+echo "Paramètre limit..."
+[ "$(lb_get "/leaderboard?limit=1" "$ALICE_TOKEN")" -eq 200 ] || fail "limit=1 doit renvoyer 200"
+[ "$(json "$WORKDIR/lb.json" "r.leaderboard.length")" = "1" ] || fail "limit=1 doit renvoyer 1 joueur"
+[ "$(json "$WORKDIR/lb.json" "r.leaderboard[0].id")" = "$ALICE_ID" ] || fail "limit=1 doit renvoyer Alice"
+
+[ "$(lb_get "/leaderboard?limit=2.5" "$ALICE_TOKEN")" -eq 200 ] || fail "limit=2.5 doit être accepté (arrondi à 2)"
+[ "$(json "$WORKDIR/lb.json" "r.leaderboard.length")" = "2" ] || fail "limit=2.5 doit renvoyer 2 joueurs"
+
+[ "$(lb_get "/leaderboard?limit=abc" "$ALICE_TOKEN")" -eq 200 ] || fail "limit=abc doit retomber sur la valeur par défaut"
+[ "$(json "$WORKDIR/lb.json" "r.leaderboard.length <= 10")" = "true" ] || fail "limit=abc doit renvoyer au plus 10 joueurs"
+
+[ "$(lb_get "/leaderboard?limit=-5" "$ALICE_TOKEN")" -eq 200 ] || fail "limit=-5 doit être accepté (ramené à 1)"
+[ "$(json "$WORKDIR/lb.json" "r.leaderboard.length")" = "1" ] || fail "limit=-5 doit renvoyer 1 joueur"
+
+[ "$(lb_get "/leaderboard?limit=100000" "$ALICE_TOKEN")" -eq 200 ] || fail "limit=100000 doit être accepté (plafonné à 100)"
+[ "$(json "$WORKDIR/lb.json" "r.leaderboard.length <= 100")" = "true" ] || fail "limit doit être plafonné à 100"
+echo "limit : 1, décimal, texte, négatif et énorme gérés"
+
+echo "Rang du joueur connecté..."
+[ "$(lb_get /leaderboard/me "$ALICE_TOKEN")" -eq 200 ] || fail "GET /leaderboard/me doit renvoyer 200"
+[ "$(json "$WORKDIR/lb.json" "r.rank")" = "1" ] || fail "Alice doit être 1re dans /me"
+[ "$(json "$WORKDIR/lb.json" "r.id")" = "$ALICE_ID" ] || fail "/me doit renvoyer Alice"
+[ "$(json "$WORKDIR/lb.json" "'email' in r")" = "false" ] || fail "/me ne doit pas exposer l'email"
+
+[ "$(lb_get /leaderboard/me "$BOB_TOKEN")" -eq 200 ] || fail "GET /leaderboard/me doit renvoyer 200 pour Bob"
+[ "$(json "$WORKDIR/lb.json" "r.rank")" = "2" ] || fail "Bob doit être 2e dans /me"
+echo "Alice rang 1, Bob rang 2"
+
+echo "Rang d'un joueur hors du top..."
+[ "$(lb_get /leaderboard/me "$CAROL_TOKEN")" -eq 200 ] || fail "GET /leaderboard/me doit renvoyer 200 pour Carol"
+CAROL_RANK=$(json "$WORKDIR/lb.json" "r.rank")
+CAROL_ELO=$(json "$WORKDIR/lb.json" "r.elo")
+BETTER=$(db "SELECT COUNT(*) FROM \"User\" WHERE elo > $CAROL_ELO;" | tr -d '[:space:]')
+[ "$CAROL_RANK" = "$((BETTER + 1))" ] || fail "Le rang de Carol doit valoir 1 + le nombre de joueurs mieux classés ($((BETTER + 1))), vaut $CAROL_RANK"
+[ "$CAROL_RANK" -gt 2 ] || fail "Carol doit être derrière Alice et Bob"
+echo "Carol rang $CAROL_RANK, cohérent avec la base"
+
+echo "Égalité entre Alice et Bob..."
+db "UPDATE \"User\" SET elo = 999999 WHERE id = '$BOB_ID';" >/dev/null
+[ "$(lb_get /leaderboard "$ALICE_TOKEN")" -eq 200 ] || fail "GET /leaderboard doit renvoyer 200"
+[ "$(json "$WORKDIR/lb.json" "r.leaderboard[0].rank")" = "1" ] || fail "En cas d'égalité, le 1er doit avoir le rang 1"
+[ "$(json "$WORKDIR/lb.json" "r.leaderboard[1].rank")" = "1" ] || fail "En cas d'égalité, le 2e doit aussi avoir le rang 1"
+THIRD_RANK=$(json "$WORKDIR/lb.json" "r.leaderboard[2] ? r.leaderboard[2].rank : 3")
+[ "$THIRD_RANK" = "3" ] || fail "Après deux ex aequo au rang 1, le suivant doit être 3e, est $THIRD_RANK"
+FIRST_TWO=$(json "$WORKDIR/lb.json" "r.leaderboard.slice(0, 2).map((e) => e.id).sort().join(',')")
+EXPECTED=$(printf '%s\n%s\n' "$ALICE_ID" "$BOB_ID" | sort | paste -sd, -)
+[ "$FIRST_TWO" = "$EXPECTED" ] || fail "Alice et Bob doivent occuper les deux premières places"
+
+[ "$(lb_get /leaderboard/me "$BOB_TOKEN")" -eq 200 ] || fail "GET /leaderboard/me doit renvoyer 200 pour Bob"
+[ "$(json "$WORKDIR/lb.json" "r.rank")" = "1" ] || fail "Bob ex aequo doit avoir le rang 1 dans /me"
+echo "Ex aequo au rang 1, le suivant au rang 3"
+
+echo "Ordre stable entre deux appels..."
+lb_get /leaderboard "$ALICE_TOKEN" >/dev/null
+ORDER_1=$(json "$WORKDIR/lb.json" "r.leaderboard.map((e) => e.id).join(',')")
+lb_get /leaderboard "$ALICE_TOKEN" >/dev/null
+ORDER_2=$(json "$WORKDIR/lb.json" "r.leaderboard.map((e) => e.id).join(',')")
+[ "$ORDER_1" = "$ORDER_2" ] || fail "L'ordre du classement doit être le même d'un appel à l'autre"
+echo "Ordre stable"
+
+echo "Sans authentification..."
+[ "$(lb_get /leaderboard "")" -eq 401 ] || fail "GET /leaderboard sans auth doit renvoyer 401"
+[ "$(lb_get /leaderboard/me "")" -eq 401 ] || fail "GET /leaderboard/me sans auth doit renvoyer 401"
+echo "Sans authentification : 401"
+
+echo ""
+echo "=== 6. Workflow d'amitié ==="
 
 # Alice envoie une demande à Bob, avec l'id trouvé par la recherche
 echo "Alice envoie une demande à Bob (id trouvé par son pseudo)..."
@@ -301,7 +415,7 @@ if echo "$ALICE_FRIENDS_AFTER" | grep -q "$BOB_ID"; then
 fi
 
 echo ""
-echo "=== 6. Match History ==="
+echo "=== 7. Match History ==="
 
 # Re-add friendship for game creation
 curl -k -fsSL -X POST "$BASE_URL/api/user/friends/request/$BOB_ID" \

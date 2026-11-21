@@ -100,3 +100,11 @@ export type FriendshipWithUser = {
     elo: number;
   };
 };
+
+export interface LeaderboardEntry {
+  rank: number;
+  id: string;
+  username: string;
+  avatarUrl: string | null;
+  elo: number;
+}
