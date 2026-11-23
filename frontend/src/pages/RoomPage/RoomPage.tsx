@@ -74,7 +74,18 @@ export function RoomPage() {
         />
       </div>
 
-      <div className="flex justify-end gap-3">
+      <div className="flex flex-wrap items-center justify-end gap-3">
+        {/* Why nothing happens yet: the disabled button alone is hard to see */}
+        {isLeader && room.players.length < 2 && (
+          <span className="text-sm font-semibold text-warning">
+            Add a player or a bot to start
+          </span>
+        )}
+        {!isLeader && (
+          <span className="text-sm font-semibold text-info">
+            Waiting for the leader to start the game...
+          </span>
+        )}
         <button type="button" className="btn" onClick={leave}>
           Leave
         </button>
