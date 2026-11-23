@@ -31,6 +31,7 @@ export function handleStartGame(
     type: "game_started",
     gameId,
   } as ServerEvent);
+  if (gameId) ctx.cancelGameIfNeverJoined(gameId);
   ctx.roomSockets.delete(msg.roomCode);
   ctx.roomManager.removeRoom(msg.roomCode);
 }

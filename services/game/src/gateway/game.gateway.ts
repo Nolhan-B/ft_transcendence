@@ -108,8 +108,7 @@ const disconnectTimers: Map<string, NodeJS.Timeout> = new Map();
 const RECONNECT_GRACE_MS = Number(process.env.RECONNECT_GRACE_MS) || 30000;
 
 const MATCHMAKING_TICK_MS = Number(process.env.MATCHMAKING_TICK_MS) || 2000;
-const MATCH_JOIN_TIMEOUT_MS =
-  Number(process.env.MATCH_JOIN_TIMEOUT_MS) || 15000;
+const GAME_JOIN_TIMEOUT_MS = Number(process.env.GAME_JOIN_TIMEOUT_MS) || 15000;
 
 export default async function gameGateway(fastify: FastifyInstance) {
   const manager = fastify.gameManager;
@@ -345,6 +344,18 @@ export default async function gameGateway(fastify: FastifyInstance) {
     }
   }
 
+  // Partie creee mais jamais rejointe (onglet ferme, joueur parti) : sans ce
+  // nettoyage elle reste en memoire et bloque ses joueurs ("Already in a game").
+  // On teste "personne n'a jamais rejoint" et pas "salle vide", pour ne pas
+  // supprimer une partie dont les joueurs sont en train de se reconnecter
+  function cancelGameIfNeverJoined(gameId: string): void {
+    setTimeout(() => {
+      if (manager.getGame(gameId) && !rooms.has(gameId)) {
+        manager.removeGame(gameId);
+      }
+    }, GAME_JOIN_TIMEOUT_MS);
+  }
+
   function runMatchmaking(): void {
     const now = Date.now();
     let group = findMatch(queueManager.list(), now);
@@ -372,12 +383,8 @@ export default async function gameGateway(fastify: FastifyInstance) {
           if (socket?.readyState === WebSocket.OPEN) socket.send(event);
         }
 
-        // Si personne ne rejoint la partie, on l'annule sans toucher à l'ELO
-        setTimeout(() => {
-          const game = manager.getGame(gameId);
-          const room = rooms.get(gameId);
-          if (game && (!room || room.size === 0)) manager.removeGame(gameId);
-        }, MATCH_JOIN_TIMEOUT_MS);
+        // Si personne ne rejoint la partie, on l'annule sans toucher a l'ELO
+        cancelGameIfNeverJoined(gameId);
       }
 
       group = findMatch(queueManager.list(), now);
@@ -447,6 +454,7 @@ export default async function gameGateway(fastify: FastifyInstance) {
       sendError,
       startTurnTimer: (gameId) => startTurnTimer(gameId, ctx),
       endGame,
+      cancelGameIfNeverJoined,
       toRoomInfo,
     };
 

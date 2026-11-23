@@ -12,6 +12,8 @@ import { QueueManager } from "../src/managers/queue.manager.js";
 const TURN_MS = 1500;
 process.env.TURN_TIMEOUT_MS = String(TURN_MS);
 process.env.RECONNECT_GRACE_MS = "5000";
+const JOIN_TIMEOUT_MS = 1000;
+process.env.GAME_JOIN_TIMEOUT_MS = String(JOIN_TIMEOUT_MS);
 
 let gameGateway: any;
 
@@ -873,6 +875,55 @@ const tests = [
       assert(b.hand.length >= bHand + 4, "B doit avoir pioché les 4 cartes");
       assert(played, "Le bot doit avoir joué après le timer de bluff");
       assert(!b.disconnected, "B ne doit pas être compté AFK pendant le bluff");
+    });
+  }),
+
+  // ---------------- Partie de room jamais rejointe ----------------
+
+  test("room: une partie lancée mais jamais rejointe est supprimée", async () => {
+    await withServer(async (server) => {
+      const a = { id: uniqueUserId("alice") } as Human;
+      const b = { id: uniqueUserId("bob") } as Human;
+      a.ws = await connectUser(server, a.id);
+      b.ws = await connectUser(server, b.id);
+
+      send(a.ws, {
+        type: "create_room",
+        mode: GameMode.CLASSIC,
+        maxPlayers: 2,
+        name: "ghost",
+      });
+      const roomCode = (await waitForMessage(a.ws, "room_updated")).room.code;
+      send(b.ws, { type: "join_room", roomCode });
+      await waitForMessage(b.ws, "room_updated");
+      const started = waitForMessage(a.ws, "game_started");
+      send(a.ws, { type: "start_game", roomCode });
+      const { gameId } = await started;
+
+      // Personne ne fait join_game (onglets fermes, navigation ailleurs...)
+      await sleep(JOIN_TIMEOUT_MS + 300);
+      assert(
+        server.gameManager.getGame(gameId) === undefined,
+        "La partie fantôme doit être supprimée",
+      );
+
+      // Les joueurs ne sont plus bloques : ils peuvent lancer une ranked
+      send(a.ws, { type: "join_queue" });
+      await waitForMessage(a.ws, "queue_joined");
+    });
+  }),
+
+  test("room: une partie rejointe puis quittée (refresh) n'est pas supprimée", async () => {
+    await withServer(async (server) => {
+      const { players, gameId } = await setupGame(server, 2);
+      for (const p of players) p.ws.close();
+
+      // Salle vide mais joueurs en delai de reconnexion : la partie reste
+      await sleep(JOIN_TIMEOUT_MS + 300);
+      assert(
+        server.gameManager.getGame(gameId) !== undefined,
+        "La partie doit attendre la reconnexion des joueurs",
+      );
     });
   }),
 

@@ -14,7 +14,7 @@ const TICK_MS = 100;
 const JOIN_TIMEOUT_MS = 500;
 const GRACE_MS = 300;
 process.env.MATCHMAKING_TICK_MS = String(TICK_MS);
-process.env.MATCH_JOIN_TIMEOUT_MS = String(JOIN_TIMEOUT_MS);
+process.env.GAME_JOIN_TIMEOUT_MS = String(JOIN_TIMEOUT_MS);
 process.env.RECONNECT_GRACE_MS = String(GRACE_MS);
 
 let gameGateway: any;
