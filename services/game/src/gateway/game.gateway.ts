@@ -32,7 +32,11 @@ import {
 } from "./handlers/room/index.js";
 import { handleChatMessage } from "./handlers/chat/index.js";
 import type { GatewayContext } from "./types.js";
-import { advanceToNextPlayer } from "../engine/game-state.js";
+import {
+  advanceToNextPlayer,
+  finishPlayer,
+  recordAction,
+} from "../engine/game-state.js";
 import {
   continueTurn,
   scheduleBotTurnIfNeeded,
@@ -145,6 +149,12 @@ export default async function gameGateway(fastify: FastifyInstance) {
     gameId: string,
     state: InternalGameState,
   ): void {
+    // Les actions notees depuis le dernier envoi deviennent lastActions. Si rien
+    // de neuf, lastActions reste le dernier lot (memes seq : le client l'ignore)
+    if (state.pendingActions.length > 0) {
+      state.lastActions = state.pendingActions;
+      state.pendingActions = [];
+    }
     const room = rooms.get(gameId);
     if (room) {
       for (const client of room) {
@@ -219,6 +229,12 @@ export default async function gameGateway(fastify: FastifyInstance) {
 
       if (count >= MAX_AFK_COUNT) {
         currentPlayer.disconnected = true;
+        recordAction(game, {
+          type: "player_kicked",
+          userId: currentPlayer.userId,
+          reason: "afk",
+          auto: true,
+        });
         const activePlayers = game.players.filter((p) => !p.disconnected);
         if (activePlayers.length <= 1) {
           await endGame(gameId, game);
@@ -232,7 +248,7 @@ export default async function gameGateway(fastify: FastifyInstance) {
         game.drawPileCount = game.drawPile.length;
         broadCastStateToRoom(gameId, game);
       } else {
-        manager.drawCard(gameId, currentPlayer.userId);
+        manager.drawCard(gameId, currentPlayer.userId, true);
         broadCastStateToRoom(gameId, game);
       }
 
@@ -309,7 +325,7 @@ export default async function gameGateway(fastify: FastifyInstance) {
       // juste apres ceux qui ont deja fini (en ranked, un joueur a pu finir avant)
       const last = activePlayers.length === 1 ? activePlayers[0] : null;
       if (last && !game.ranking.includes(last.userId)) {
-        game.ranking.push(last.userId);
+        finishPlayer(game, last.userId);
       }
       game.winnerId = game.ranking[0] ?? null;
     }
@@ -594,7 +610,15 @@ export default async function gameGateway(fastify: FastifyInstance) {
               return;
 
             const player = game.players.find((p) => p.userId === userId);
-            if (player) player.disconnected = true;
+            if (player) {
+              player.disconnected = true;
+              recordAction(game, {
+                type: "player_kicked",
+                userId,
+                reason: "abandoned",
+                auto: true,
+              });
+            }
 
             const activePlayers = game.players.filter((p) => !p.disconnected);
             if (

@@ -1,5 +1,6 @@
 import { GatewayContext } from "../../types.js";
 import { GameStatus } from "shared";
+import { recordAction } from "../../../engine/game-state.js";
 
 export function handleCallUno(
   ctx: GatewayContext,
@@ -26,5 +27,7 @@ export function handleCallUno(
   clearTimeout(ctx.unoTimers.get(ctx.userId));
   ctx.unoTimers.delete(ctx.userId);
 
+  recordAction(game, { type: "uno_called", userId: ctx.userId });
   ctx.broadCastToRoom(msg.gameId, { type: "uno_called", userId: ctx.userId });
+  ctx.broadCastStateToRoom(game.id, game);
 }

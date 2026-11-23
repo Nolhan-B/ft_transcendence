@@ -1,6 +1,6 @@
 import { GatewayContext } from "../../types.js";
 import { GameStatus, type ServerEvent } from "shared";
-import { drawCardsForPlayer } from "../../../engine/game-state.js";
+import { drawAndRecord, recordAction } from "../../../engine/game-state.js";
 
 export function handleCatchUno(
   ctx: GatewayContext,
@@ -40,7 +40,12 @@ export function handleCatchUno(
   clearTimeout(ctx.unoTimers.get(msg.targetUserId));
   ctx.unoTimers.delete(msg.targetUserId);
 
-  drawCardsForPlayer(game, msg.targetUserId, 2);
+  recordAction(game, {
+    type: "uno_caught",
+    userId: ctx.userId,
+    targetUserId: msg.targetUserId,
+  });
+  drawAndRecord(game, msg.targetUserId, 2, "uno_penalty");
 
   ctx.broadCastToRoom(msg.gameId, {
     type: "uno_caught",

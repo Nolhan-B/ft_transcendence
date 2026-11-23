@@ -1014,6 +1014,157 @@ const tests = [
       assert(gain(ids[2]) > gain(ids[1]), "C doit gagner plus d'ELO que B");
     });
   }),
+  // ---------------- lastActions ----------------
+
+  test("actions: la carte piochée n'est visible que par celui qui pioche", async () => {
+    await withServer(async (server) => {
+      const { players, gameId } = await setupGame(server, 2);
+      const [a, b] = players;
+      const forA = waitForMessage(a.ws, "game_updated");
+      const forB = waitForMessage(b.ws, "game_updated");
+      send(a.ws, { type: "draw_card", gameId });
+      const [mA, mB] = await Promise.all([forA, forB]);
+
+      const drawnA = mA.state.lastActions[0];
+      const drawnB = mB.state.lastActions[0];
+      assert(drawnA.type === "cards_drawn", "A reçoit l'action de pioche");
+      assert(drawnA.cards?.length === 1, "A voit la carte piochée");
+      assert(drawnB.count === 1, "B sait que A a pioché 1 carte");
+      assert(drawnB.cards === undefined, "B ne voit pas la carte de A");
+      assert(drawnA.seq === drawnB.seq, "même action, même seq");
+    });
+  }),
+
+  test("actions: call_uno diffuse l'état avec uno_called", async () => {
+    await withServer(async (server) => {
+      const { players, gameId } = await setupUno(server);
+      const [a, , c] = players;
+      const forC = waitForMessage(c.ws, "game_updated");
+      send(a.ws, { type: "call_uno", gameId });
+      const m = await forC;
+      const [called] = m.state.lastActions;
+      assert(
+        called.type === "uno_called" && called.userId === a.id,
+        `uno_called attendu, reçu ${JSON.stringify(m.state.lastActions)}`,
+      );
+    });
+  }),
+
+  test("actions: catch_uno note l'attrape puis la pénalité", async () => {
+    await withServer(async (server) => {
+      const { players, gameId } = await setupUno(server);
+      const [a, b, c] = players;
+      const forC = waitForMessage(c.ws, "game_updated");
+      send(b.ws, { type: "catch_uno", gameId, targetUserId: a.id });
+      const m = await forC;
+      const [caught, penalty] = m.state.lastActions;
+      assert(
+        caught.type === "uno_caught" &&
+          caught.userId === b.id &&
+          caught.targetUserId === a.id,
+        "B a attrapé A",
+      );
+      assert(
+        penalty.type === "cards_drawn" &&
+          penalty.userId === a.id &&
+          penalty.count === 2 &&
+          penalty.reason === "uno_penalty",
+        "A pioche 2 cartes de pénalité",
+      );
+    });
+  }),
+
+  test("actions: la pioche forcée par le chrono est notée auto", async () => {
+    await withServer(async (server) => {
+      const { players, game } = await setupGame(server, 2);
+      const [a, b] = players;
+      const forB = waitForMessage(b.ws, "game_updated", TURN_MS + 2000);
+      const m = await forB;
+      const [afk] = m.state.lastActions;
+      assert(
+        afk.type === "cards_drawn" &&
+          afk.userId === a.id &&
+          afk.reason === "afk" &&
+          afk.auto === true,
+        `pioche AFK attendue, reçu ${JSON.stringify(m.state.lastActions)}`,
+      );
+      assert(game.players[1].isCurrentTurn, "la main passe à B");
+    });
+  }),
+
+  test("actions: à la reconnexion, lastActions revient avec les mêmes seq", async () => {
+    await withServer(async (server) => {
+      const { players, gameId } = await setupGame(server, 2);
+      const [a, b] = players;
+      const forB = waitForMessage(b.ws, "game_updated");
+      send(a.ws, { type: "draw_card", gameId });
+      const before = (await forB).state.lastActions;
+
+      b.ws.close();
+      await sleep(100);
+      const ws2 = await connectUser(server, b.id);
+      send(ws2, { type: "join_game", gameId });
+      const after = (await waitForMessage(ws2, "game_updated")).state
+        .lastActions;
+
+      assert(
+        after.length === before.length &&
+          after.every((x: any, i: number) => x.seq === before[i].seq),
+        "le client peut ignorer les actions déjà affichées",
+      );
+    });
+  }),
+  test("actions: un +4 contesté note le challenge puis la pénalité", async () => {
+    await withServer(async (server) => {
+      const { players, gameId } = await setupBluff(server);
+      const [a, b, c] = players;
+      const forC = waitForMessage(c.ws, "game_updated");
+      send(b.ws, { type: "challenge_bluff", gameId });
+      const m = await forC;
+      const [challenge, penalty] = m.state.lastActions;
+      assert(
+        challenge.type === "bluff_challenged" &&
+          challenge.userId === b.id &&
+          challenge.targetUserId === a.id,
+        "B conteste le +4 de A",
+      );
+      const loser = challenge.wasBluff ? a.id : b.id;
+      assert(
+        penalty.type === "cards_drawn" &&
+          penalty.userId === loser &&
+          penalty.reason === "bluff_penalty" &&
+          penalty.count === (challenge.wasBluff ? 4 : 6),
+        "le perdant du challenge pioche la pénalité",
+      );
+    });
+  }),
+
+  test("actions: un joueur exclu pour AFK est noté player_kicked", async () => {
+    await withServer(async (server) => {
+      const { players, game } = await setupGame(server, 3);
+      const [a, , c] = players;
+      // A, B et C ne jouent pas : au 2e timeout de A, il est exclu
+      const kicked = await new Promise<any>((resolve, reject) => {
+        const timeout = setTimeout(
+          () => reject(new Error("Pas de player_kicked")),
+          TURN_MS * 5,
+        );
+        c.ws.on("message", (data) => {
+          const msg = JSON.parse(data.toString());
+          const k = msg.state?.lastActions?.find(
+            (x: any) => x.type === "player_kicked",
+          );
+          if (k) {
+            clearTimeout(timeout);
+            resolve(k);
+          }
+        });
+      });
+      assert(kicked.userId === a.id, "A est exclu");
+      assert(kicked.reason === "afk" && kicked.auto === true, "raison afk");
+      assert(game.players[0].disconnected, "A est retiré de la partie");
+    });
+  }),
 ];
 
 // ============================================================

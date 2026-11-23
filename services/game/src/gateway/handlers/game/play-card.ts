@@ -2,7 +2,8 @@ import { GatewayContext } from "../../types.js";
 import { GameStatus } from "shared";
 import {
   advanceToNextPlayer,
-  drawCardsForPlayer,
+  drawAndRecord,
+  recordAction,
 } from "../../../engine/game-state.js";
 import { continueTurn } from "./bot-turn.js";
 
@@ -67,7 +68,13 @@ export async function handlePlayCard(
         updatedState.id,
         setTimeout(() => {
           ctx.bluffTimers.delete(updatedState.id);
-          drawCardsForPlayer(updatedState, targetId, 4);
+          // Pas de reponse a temps : le +4 est accepte d'office
+          recordAction(updatedState, {
+            type: "wild_draw4_accepted",
+            userId: targetId,
+            auto: true,
+          });
+          drawAndRecord(updatedState, targetId, 4, "wild_draw4", true);
           updatedState.lastWildDraw4 = undefined;
           advanceToNextPlayer(updatedState);
           ctx.broadCastStateToRoom(updatedState.id, updatedState);
