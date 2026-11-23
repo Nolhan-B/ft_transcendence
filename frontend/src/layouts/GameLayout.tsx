@@ -1,4 +1,5 @@
 import { Outlet } from "react-router-dom";
+import { CityBackground } from "../components/layout/CityBackground";
 import { Header } from "../components/Header/Header";
 import { DebugHeader } from "../components/DebugHeader/DebugHeader";
 import { SideButton } from "../components/SideButton/SideButton";
@@ -8,7 +9,9 @@ import { SideButton } from "../components/SideButton/SideButton";
 // every pixel of height.
 export function GameLayout() {
   return (
-    <div className="flex min-h-dvh flex-col bg-base-100 text-base-content">
+    <div className="isolate flex min-h-dvh flex-col text-base-content">
+      {/* Neon city behind every page */}
+      <CityBackground />
       {/* Dev-only: `VITE_DEBUG_HEADER=false` hides it, prod build strips it */}
       {import.meta.env.DEV && import.meta.env.VITE_DEBUG_HEADER !== "false" && (
         <DebugHeader />
