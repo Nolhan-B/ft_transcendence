@@ -1,7 +1,7 @@
 import { PrismaClient } from "shared";
 import type { LeaderboardEntry } from "shared";
 
-// Uniquement des champs publics
+// Public fields only
 const ENTRY_SELECT = {
   id: true,
   username: true,
@@ -9,12 +9,21 @@ const ENTRY_SELECT = {
   elo: true,
 } as const;
 
+// Exclude E2E test accounts and any bot entries from leaderboard rankings
+const REAL_PLAYER_WHERE = {
+  AND: [
+    { NOT: { email: { endsWith: "@test.com" } } },
+    { NOT: { id: { startsWith: "bot_" } } },
+  ],
+};
+
 export async function getTopPlayers(
   prisma: PrismaClient,
   limit = 10,
 ): Promise<LeaderboardEntry[]> {
   const users = await prisma.user.findMany({
-    // createdAt départage l'ordre d'affichage des égalités, pour qu'il soit stable
+    where: REAL_PLAYER_WHERE,
+    // Break ELO ties deterministically using creation date, then ID
     orderBy: [{ elo: "desc" }, { createdAt: "asc" }, { id: "asc" }],
     take: limit,
     select: ENTRY_SELECT,
@@ -23,7 +32,7 @@ export async function getTopPlayers(
   const entries: LeaderboardEntry[] = [];
   for (let i = 0; i < users.length; i++) {
     const previous = entries[i - 1];
-    // À ELO égal, même rang que le joueur précédent
+    // Assign the same rank to players with equal ELO
     const rank =
       previous && previous.elo === users[i].elo ? previous.rank : i + 1;
     entries.push({ rank, ...users[i] });
@@ -41,6 +50,12 @@ export async function getPlayerRank(
   });
   if (!user) return null;
 
-  const better = await prisma.user.count({ where: { elo: { gt: user.elo } } });
+  // Count only real players with a strictly higher ELO
+  const better = await prisma.user.count({
+    where: {
+      ...REAL_PLAYER_WHERE,
+      elo: { gt: user.elo },
+    },
+  });
   return { rank: better + 1, ...user };
 }
