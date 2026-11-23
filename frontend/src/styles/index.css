@@ -31,8 +31,6 @@ body {
    Declared after "short" so that it wins over it. */
 @custom-variant tiny (@media (max-height: 480px));
 
-/* Decorative "light rays" depth effect, shared by the auth page and the home
-   hero. Tune the pivot with --rays-origin (e.g. [--rays-origin:50%_80%]). */
 /* Home hero: cards drifting in the background. Each card overrides the
    duration/delay with arbitrary values ([animation-duration:9s]...). */
 @keyframes hero-float {
@@ -90,6 +88,31 @@ body {
   background-size: 160px;
 }
 
+/* Crisp vector perspective grid for the Miami horizon floor */
+@utility miami-floor {
+  background-image:
+    linear-gradient(
+      to right,
+      color-mix(in oklab, var(--color-primary) 32%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      to bottom,
+      color-mix(in oklab, var(--color-secondary) 28%, transparent) 1px,
+      transparent 1px
+    );
+  background-size: 56px 38px;
+  transform: perspective(360px) rotateX(68deg);
+  transform-origin: center top;
+  mask-image: linear-gradient(to bottom, #000 0%, #000 45%, transparent 95%);
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    #000 0%,
+    #000 45%,
+    transparent 95%
+  );
+}
+
 @plugin "daisyui" {
   /* don't ship the 30 built-in themes: only the custom "uno" theme below */
   themes: false;
@@ -100,47 +123,56 @@ body {
   default: true;
   color-scheme: dark;
 
-  /* surfaces (Dark mode arcade chic) */
-  --color-base-100: #1e1e2e;
-  --color-base-200: #181825;
-  --color-base-300: #11111b;
-  --color-base-content: #cdd6f4;
+  /* surfaces: deep nocturnal purple / violet (Miami Vice night palette) */
+  --color-base-100: #1b1030;
+  --color-base-200: #130b24;
+  --color-base-300: #0b0617;
+  --color-base-content: #f3e8ff;
 
-  /* brand: the neon colors of the SNS logo, one per UNO color. They are
-     bright, so the text on them is dark */
-  --color-primary: #ff2a85; /* red: neon pink */
-  --color-primary-content: #11111b;
-  --color-secondary: #00f0ff; /* blue: neon cyan */
-  --color-secondary-content: #11111b;
-  --color-accent: #fcee0a; /* yellow: neon yellow */
-  --color-accent-content: #11111b;
-  --color-neutral: #313244;
-  --color-neutral-content: #cdd6f4;
+  /* brand: neon colors of the SNS logo, one per UNO color */
+  --color-primary: #ff2a85; /* red: neon pink / magenta */
+  --color-primary-content: #0b0617;
+  --color-secondary: #00f0ff; /* blue: electric cyan */
+  --color-secondary-content: #0b0617;
+  --color-accent: #ffd23f; /* yellow: sunset gold */
+  --color-accent-content: #0b0617;
+  --color-neutral: #2a1848;
+  --color-neutral-content: #f3e8ff;
 
   /* feedback, same neons */
   --color-info: #00f0ff;
-  --color-info-content: #11111b;
+  --color-info-content: #0b0617;
   --color-success: #39ff14; /* green: neon green */
-  --color-success-content: #11111b;
-  --color-warning: #fcee0a;
-  --color-warning-content: #11111b;
+  --color-success-content: #0b0617;
+  --color-warning: #ffd23f;
+  --color-warning-content: #0b0617;
   --color-error: #ff2a85;
-  --color-error-content: #11111b;
+  --color-error-content: #0b0617;
 
-  /* shape (Bordures marquées style Neo-Brutalism) */
+  /* shape */
   --radius-selector: 0.75rem;
   --radius-field: 0.75rem;
   --radius-box: 1rem;
   --border: 3px;
 }
 
-/* Third brand color of the SNS logo (between the pink and the cyan), for
-   gradients and glows: bg-tertiary, via-tertiary, text-tertiary... */
+/* Extra Miami Vice / Hotline Miami accent tokens */
 @theme {
   --color-tertiary: #a855f7;
+  --color-sunset: #ff6b4a;
 }
 
-/* Cyberpunk display font used for brand name and hero headline */
+/* Cyberpunk display font kept for existing navigation and UI labels */
 @utility font-cyber {
   font-family: "Orbitron", ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Miami Vice neon script font for the brand signature */
+@utility font-miami {
+  font-family: "Yellowtail", cursive;
+}
+
+/* Sharp aggressive Hotline Miami display font for headlines and CTAs */
+@utility font-hotline {
+  font-family: "Chakra Petch", ui-sans-serif, system-ui, sans-serif;
 }
