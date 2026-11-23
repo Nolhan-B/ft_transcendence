@@ -74,7 +74,7 @@ export function GameTable({
           data-anchor="draw"
           className={`${PILE} cursor-pointer transition-transform enabled:hover:-translate-y-1 disabled:cursor-not-allowed disabled:opacity-60`}
         >
-          <Card color="neutral" className={BORDER}>
+          <Card color="neutral" variant="neon" className={BORDER}>
             <CardBack />
           </Card>
         </button>
@@ -92,7 +92,11 @@ export function GameTable({
           aria-label={cardName(state.topCard)}
           data-anchor="discard"
         >
-          <Card color={themeColor(state.topCard.color)} className={BORDER}>
+          <Card
+            color={themeColor(state.topCard.color)}
+            variant="neon"
+            className={BORDER}
+          >
             <CardFace value={state.topCard.value} />
           </Card>
         </div>

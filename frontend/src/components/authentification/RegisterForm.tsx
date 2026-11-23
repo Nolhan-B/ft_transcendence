@@ -29,7 +29,7 @@ export function RegisterForm() {
         <ErrorAlert message={error ? error : (formError ?? "")} />
       )}
       <div className="flex flex-col gap-3">
-        <label className="floating-label">
+        <label className="floating-label w-full flex-col">
           <span>Username</span>
           <input
             type="text"
@@ -37,12 +37,12 @@ export function RegisterForm() {
             required
             minLength={3}
             maxLength={20}
-            className="input input-md validator flex-1"
+            className="input input-md validator w-full"
             onChange={(e) => setUsername(e.target.value)}
           />
           <p className="validator-hint">3 to 20 characters</p>
         </label>
-        <label className="floating-label">
+        <label className="floating-label w-full flex-col">
           <span>Email</span>
           <input
             type="email"
@@ -50,30 +50,30 @@ export function RegisterForm() {
             required
             maxLength={254}
             pattern="[^\s@]+@[^\s@]+\.[^\s@]+"
-            className="input input-md validator flex-1"
+            className="input input-md validator w-full"
             onChange={(e) => setEmail(e.target.value)}
           />
           <p className="validator-hint">Enter a valid email address</p>
         </label>
-        <label className="floating-label">
+        <label className="floating-label w-full flex-col">
           <span>Password</span>
           <input
             type="password"
             placeholder="Password"
             required
             minLength={8}
-            className="input input-md validator flex-1"
+            className="input input-md validator w-full"
             onChange={(e) => setPassword(e.target.value)}
           />
           <p className="validator-hint">At least 8 characters</p>
         </label>
-        <label className="floating-label">
+        <label className="floating-label w-full flex-col">
           <span>Password confirmation</span>
           <input
             type="password"
             placeholder="Password confirmation"
             required
-            className="input input-md validator flex-1"
+            className="input input-md validator w-full"
             onChange={(e) => setPasswordConfirmation(e.target.value)}
           />
           <p className="validator-hint">Confirm your password</p>

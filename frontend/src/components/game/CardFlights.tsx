@@ -82,12 +82,13 @@ function FlyingCard({
       {flight.card ? (
         <Card
           color={themeColor(flight.card.color)}
-          className="w-full border-4!"
+          variant="neon"
+          className="w-full"
         >
           <CardFace value={flight.card.value} />
         </Card>
       ) : (
-        <Card color="neutral" className="w-full border-4!">
+        <Card color="neutral" variant="neon" className="w-full">
           <CardBack />
         </Card>
       )}

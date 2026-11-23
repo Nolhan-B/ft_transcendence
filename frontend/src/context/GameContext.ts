@@ -8,6 +8,16 @@ import type {
 } from "shared";
 import type { Status } from "../hooks/ws/useWebSocket";
 
+// Last UNO announced by the server: a player said UNO, or was caught
+// without saying it (and drew 2 cards). "id" changes with every event.
+export interface UnoEvent {
+  id: number;
+  kind: "called" | "caught";
+  userId: string;
+  // "caught": the player who caught them
+  byUserId?: string;
+}
+
 export interface GameContextValue {
   status: Status;
   room: RoomInfo | null;
@@ -18,6 +28,9 @@ export interface GameContextValue {
   turnStartedAt: number | null;
   // Set when the server announces the end of the game
   winnerId: string | null;
+  // When each player last said UNO (Date.now()), to know who is protected
+  unoCalls: Record<string, number>;
+  unoEvent: UnoEvent | null;
   // true while waiting for a ranked opponent
   inQueue: boolean;
   error: string | null;
