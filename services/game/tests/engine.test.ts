@@ -1686,5 +1686,60 @@ test("7-0: avec plusieurs cartes, le 7 échange toujours les mains", () => {
   assert(state.players[1].hand.length === 1, "B récupère le bleu 1 de A");
 });
 
+// ============================================================
+// STACKING + BLUFF
+// ============================================================
+
+function setupStackingBluff(): InternalGameState {
+  const state = createGame(
+    [
+      { id: "1", username: "A" },
+      { id: "2", username: "B" },
+      { id: "3", username: "C" },
+    ],
+    GameMode.CLASSIC,
+    {
+      stacking: "all",
+      sevenZeroRule: false,
+      jumpIn: false,
+      bluffChallenge: true,
+      unoCallout: false,
+    },
+  );
+  state.topCard = { id: "top", color: "red", value: "5" };
+  state.currentColor = "red";
+  return state;
+}
+
+test("stacking+bluff: un +4 posé sur un +2 s'ajoute à la pile, sans bluff", () => {
+  const state = setupStackingBluff();
+  state.players[0].hand.push({ id: "d2", color: "red", value: "draw2" });
+  state.players[1].hand.push({ id: "w4", color: "wild", value: "wild_draw4" });
+
+  playCard(state, "1", "d2");
+  assert(state.pendingDrawCount === 2, "la pile doit valoir 2");
+  playCard(state, "2", "w4", "blue");
+
+  assert(state.lastWildDraw4 === undefined, "pas de fenêtre de bluff");
+  assert(state.pendingDrawCount === 6, "la pile doit valoir 6");
+  assert(state.players[2].isCurrentTurn, "c'est à C de répondre à la pile");
+
+  const cHand = state.players[2].hand.length;
+  drawCard(state, "3");
+  assert(state.players[2].hand.length === cHand + 6, "C pioche toute la pile");
+  assert(state.pendingDrawCount === 0, "la pile est vidée");
+});
+
+test("stacking+bluff: un +4 hors pile ouvre toujours la fenêtre de bluff", () => {
+  const state = setupStackingBluff();
+  state.players[0].hand.push({ id: "w4", color: "wild", value: "wild_draw4" });
+
+  playCard(state, "1", "w4", "blue");
+
+  assert(!!state.lastWildDraw4, "la fenêtre de bluff doit être ouverte");
+  assert(state.pendingDrawCount === 0, "pas de pile en cours");
+  assert(state.players[1].isCurrentTurn, "c'est à B de répondre au +4");
+});
+
 console.log(`\n=== ${passed} passed, ${failed} failed ===`);
 if (failed > 0) process.exit(1);

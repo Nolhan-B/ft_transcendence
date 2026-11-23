@@ -194,7 +194,13 @@ export function playCard(
       const previousColor = state.currentColor;
       state.currentColor = chosenColor as CardColor;
 
-      if (state.settings.bluffChallenge) {
+      if (state.pendingDrawCount > 0) {
+        // +4 pose sur une pile en cours : il s'ajoute a la pile. Pas de bluff
+        // possible, le coup est autorise par le stacking et non par la couleur
+        // (sinon la pile restait en attente apres l'accept du +4)
+        state.pendingDrawCount += effect.count;
+        advanceToNextPlayer(state);
+      } else if (state.settings.bluffChallenge) {
         // Stocker l'info pour un eventuel challenge, ne pas faire piocher
         state.lastWildDraw4 = {
           playerId: player.userId,
