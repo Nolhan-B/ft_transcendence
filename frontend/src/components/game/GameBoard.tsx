@@ -8,7 +8,6 @@ import { Hand } from "../cards/Hand";
 import { toHandCard } from "./handCards";
 import { sortHand } from "./cards";
 import { GameTable } from "./GameTable";
-import floorImage from "../../assets/images/game-floor.jpg";
 import { CardFlights } from "./CardFlights";
 import { TurnAnnouncement } from "./TurnAnnouncement";
 import { UnoAnnouncement } from "./UnoAnnouncement";
@@ -121,14 +120,8 @@ export function GameBoard({ state, myId }: Props) {
   }
 
   return (
-    // Frame of the game: a tiled parquet floor, darkened on the edges
-    <div
-      className="relative flex flex-1 flex-col justify-around gap-6 rounded-box border-4 border-base-content/20 bg-base-200 p-4 shadow-[inset_0_0_120px_var(--color-base-300)] compact:gap-3 compact:p-2 snug:gap-2 snug:p-1 short:gap-2 tiny:gap-1 tiny:border-2 tiny:p-1"
-      style={{
-        backgroundImage: `url(${floorImage})`,
-        backgroundSize: "480px",
-      }}
-    >
+    // Frame of the game: 80% opaque, the neon city shows a little through it
+    <div className="relative flex flex-1 flex-col justify-around gap-6 rounded-box border-4 border-base-content/20 bg-base-200/80 p-4 shadow-[inset_0_0_120px_var(--color-base-300)] compact:gap-3 compact:p-2 snug:gap-2 snug:p-1 short:gap-2 tiny:gap-1 tiny:border-2 tiny:p-1">
       {/* Opponents around the board: left, top and right */}
       <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] grid-rows-[auto_auto] items-center gap-4 compact:gap-2 snug:gap-1 tiny:gap-1">
         <>
