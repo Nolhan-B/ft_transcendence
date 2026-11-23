@@ -1,4 +1,5 @@
 import { Outlet } from "react-router-dom";
+import { BackToGame } from "../components/game/BackToGame";
 import { CityBackground } from "../components/layout/CityBackground";
 import { Header } from "../components/Header/Header";
 import { DebugHeader } from "../components/DebugHeader/DebugHeader";
@@ -23,6 +24,8 @@ export function GameLayout() {
       <main className="container mx-auto flex flex-1 flex-col px-4 py-4 compact:py-2 snug:py-1 short:px-2 tiny:py-1">
         <Outlet />
       </main>
+      {/* Spectating: the way back to my own game, if I play one */}
+      <BackToGame />
       {/* On a small landscape phone the button covers the right seat */}
       <div className="tiny:hidden">
         <SideButton />

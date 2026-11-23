@@ -1,4 +1,5 @@
 import { Outlet } from "react-router-dom";
+import { BackToGame } from "../components/game/BackToGame";
 import { CityBackground } from "../components/layout/CityBackground";
 import { Header } from "../components/Header/Header";
 import { Footer } from "../components/Footer/Footer";
@@ -24,6 +25,7 @@ export function MainLayout() {
       </main>
       <Footer />
       {user ? <SideButton /> : <></>}
+      {user && <BackToGame />}
     </div>
   );
 }

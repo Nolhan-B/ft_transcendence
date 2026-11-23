@@ -38,12 +38,26 @@ export function RoomPage() {
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
       <MainTitle title={room.name} />
 
-      <div className="flex flex-wrap items-center gap-3">
-        <span className="badge badge-outline capitalize">{room.mode}</span>
-        {room.hasPassword && <span className="badge badge-ghost">Private</span>}
-        <span className="text-sm opacity-70">
-          Room code <kbd className="kbd kbd-sm">{room.code}</kbd>
-        </span>
+      {/* Mode and code of the room: the code is what friends need to join */}
+      <div className="flex flex-wrap items-center justify-between gap-4 rounded-box border-2 border-base-content/10 bg-base-200/80 p-4 backdrop-blur-sm">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="badge badge-lg badge-secondary font-bold uppercase tracking-wider">
+            {room.mode}
+          </span>
+          {room.hasPassword && (
+            <span className="badge badge-lg badge-accent font-bold uppercase tracking-wider">
+              Private
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-sm font-semibold uppercase tracking-wider">
+            Room code
+          </span>
+          <kbd className="kbd kbd-lg font-mono text-2xl font-black tracking-[0.25em] text-secondary">
+            {room.code}
+          </kbd>
+        </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
