@@ -878,6 +878,34 @@ const tests = [
     });
   }),
 
+  test("bot: un humain qui joue juste avant la fin de son chrono ne bloque pas le bot", async () => {
+    await withServer(async (server) => {
+      const { humans, gameId, game, bot } = await setupGameWithBot(server, 1);
+      const [a] = humans;
+      game.players[0].hand = [
+        { id: "r9", color: "red", value: "9" },
+        { id: "keep", color: "blue", value: "2" },
+      ];
+      const botHand = bot.hand.length;
+
+      // A joue 200 ms avant l'expiration de son chrono : c'est au bot
+      await sleep(TURN_MS - 200);
+      send(a.ws, { type: "play_card", gameId, cardId: "r9" });
+      await waitForMessage(a.ws, "game_updated");
+
+      const played = await waitUntil(
+        () => !bot.hand.some((c) => c.id === "bot_r3"),
+        2500,
+      );
+      assert(played, "Le bot doit avoir joué son rouge 3");
+      assert(
+        bot.hand.length === botHand - 1,
+        `Le bot doit avoir joué, pas pioché (main ${botHand} -> ${bot.hand.length})`,
+      );
+      assert(!bot.disconnected, "Le bot ne doit pas être compté AFK");
+    });
+  }),
+
   // ---------------- Partie de room jamais rejointe ----------------
 
   test("room: une partie lancée mais jamais rejointe est supprimée", async () => {

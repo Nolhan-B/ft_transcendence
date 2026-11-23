@@ -3,7 +3,7 @@ import {
   advanceToNextPlayer,
   drawCardsForPlayer,
 } from "../../../engine/game-state.js";
-import { scheduleBotTurnIfNeeded } from "./bot-turn.js";
+import { continueTurn } from "./bot-turn.js";
 
 export function handleAcceptWildDraw4(
   ctx: GatewayContext,
@@ -34,10 +34,5 @@ export function handleAcceptWildDraw4(
   advanceToNextPlayer(game);
   ctx.broadCastStateToRoom(game.id, game);
 
-  scheduleBotTurnIfNeeded(ctx, game, game.id);
-
-  const nextPlayer = game.players.find((p) => p.isCurrentTurn);
-  if (!nextPlayer?.userId.startsWith("bot_")) {
-    ctx.startTurnTimer(game.id);
-  }
+  continueTurn(ctx, game);
 }
