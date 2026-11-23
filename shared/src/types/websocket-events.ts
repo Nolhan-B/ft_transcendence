@@ -133,6 +133,9 @@ export interface PlayerLeftEvent {
 export interface GameEndedEvent {
   type: "game_ended";
   winnerId: string;
+  // Classement final, du premier au dernier : en classic le gagnant seul,
+  // en ranked l'ordre d'arrivee. Les joueurs exclus n'y figurent pas
+  ranking: string[];
 }
 
 export interface ErrorEvent {

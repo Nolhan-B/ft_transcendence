@@ -1417,6 +1417,94 @@ const tests = [
       assert(game.players[0].hand.length === 2, "A ne pioche pas de pénalité");
     });
   }),
+  // ---------------- Diffusion a l'exclusion et en fin de partie ----------------
+
+  test("fin: un abandon hors de son tour est diffusé tout de suite", async () => {
+    await withServer(async (server) => {
+      const { players } = await setupGame(server, 3);
+      const [, b, c] = players;
+      // B part pendant le tour de A et ne revient pas (delai : 5 s)
+      b.ws.close();
+      const kicked = await new Promise<any>((resolve, reject) => {
+        const timeout = setTimeout(
+          () => reject(new Error("B n'apparaît jamais exclu")),
+          8000,
+        );
+        c.ws.on("message", (data) => {
+          const msg = JSON.parse(data.toString());
+          const pb = msg.state?.players.find((p: any) => p.userId === b.id);
+          if (msg.type === "game_updated" && pb?.disconnected) {
+            clearTimeout(timeout);
+            resolve(msg.state);
+          }
+        });
+      });
+      assert(
+        !kicked.players.find((p: any) => p.userId === b.id).isCurrentTurn,
+        "le test porte sur un abandon hors de son tour",
+      );
+      // Diffuse par l'exclusion elle-meme, pas par le coup suivant
+      assert(
+        kicked.lastActions.length === 1 &&
+          kicked.lastActions[0].type === "player_kicked" &&
+          kicked.lastActions[0].reason === "abandoned",
+        `seule l'exclusion attendue, reçu ${JSON.stringify(kicked.lastActions)}`,
+      );
+    });
+  }),
+
+  test("fin: après un abandon, l'état final arrive avant game_ended avec le classement", async () => {
+    await withServer(async (server) => {
+      const ids = ["alice", "bob", "charlie"].map((n) => uniqueUserId(n));
+      const gameId = server.gameManager.createGame(
+        ids.map((id) => ({ id, username: id })),
+        GameMode.RANKED,
+      )!;
+      const game = server.gameManager.getGame(gameId)!;
+      const [a, b, c] = await Promise.all(
+        ids.map((id) => connectUser(server, id)),
+      );
+      for (const ws of [a, b, c]) {
+        send(ws, { type: "join_game", gameId });
+        await waitForMessage(ws, "game_updated");
+      }
+      game.topCard = { id: "top", color: "red", value: "5" };
+      game.currentColor = "red";
+      game.players[0].hand = [{ id: "last", color: "red", value: "3" }];
+      send(a, { type: "play_card", gameId, cardId: "last" });
+      await waitForMessage(c, "game_updated");
+
+      // B part : C reste seul, la partie finit sans coup joue
+      const received: any[] = [];
+      c.on("message", (data) => received.push(JSON.parse(data.toString())));
+      const ended = waitForMessage(c, "game_ended", 8000);
+      b.close();
+      const endMsg = await ended;
+
+      const finalIndex = received.findIndex(
+        (m) => m.type === "game_updated" && m.state.status === "finished",
+      );
+      const endIndex = received.findIndex((m) => m.type === "game_ended");
+      assert(finalIndex !== -1, "l'état final doit être diffusé");
+      assert(finalIndex < endIndex, "l'état final arrive avant game_ended");
+      const finalState = received[finalIndex].state;
+      assert(
+        finalState.ranking.join() === [ids[0], ids[2]].join(),
+        `classement final A puis C, reçu ${JSON.stringify(finalState.ranking)}`,
+      );
+      assert(finalState.winnerId === ids[0], "gagnant A dans l'état final");
+      assert(
+        finalState.lastActions.some(
+          (x: any) => x.type === "player_finished" && x.userId === ids[2],
+        ),
+        "C est noté comme classé",
+      );
+      assert(
+        endMsg.ranking.join() === [ids[0], ids[2]].join(),
+        "game_ended porte le classement",
+      );
+    });
+  }),
 ];
 
 // ============================================================

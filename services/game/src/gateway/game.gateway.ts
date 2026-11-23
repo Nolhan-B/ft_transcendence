@@ -152,6 +152,7 @@ export default async function gameGateway(fastify: FastifyInstance) {
 
   // Champs calcules au moment de l'envoi (chronos, sockets)
   function liveState(game: InternalGameState): LiveState {
+    if (game.status === GameStatus.FINISHED) return NO_LIVE_STATE;
     const current = game.players.find((p) => p.isCurrentTurn);
     const deadline = turnDeadlines.get(game.id);
     const bluff = game.lastWildDraw4;
@@ -352,6 +353,9 @@ export default async function gameGateway(fastify: FastifyInstance) {
     gameId: string,
     game: InternalGameState,
   ): Promise<void> {
+    // Fin par un coup (derniere carte) : l'etat final a deja ete diffuse par le
+    // handler. Fin par abandon ou AFK : pas encore, on le fait plus bas
+    const finalStateSent = game.status === GameStatus.FINISHED;
     game.status = GameStatus.FINISHED;
     if (turnTimers.has(gameId)) {
       clearTimeout(turnTimers.get(gameId));
@@ -387,9 +391,15 @@ export default async function gameGateway(fastify: FastifyInstance) {
       }
       game.winnerId = game.ranking[0] ?? null;
     }
+    game.lastWildDraw4 = undefined;
+    // Etat final (classement complet, gagnant, player_finished) avant game_ended
+    if (!finalStateSent || game.pendingActions.length > 0) {
+      broadCastStateToRoom(gameId, game);
+    }
     broadCastToRoom(gameId, {
       type: "game_ended",
       winnerId: game.winnerId ?? "",
+      ranking: game.ranking,
     });
     // Une erreur de base de donnees ne doit ni faire planter le service
     // (endGame est souvent appele depuis un setTimeout), ni laisser la partie en memoire
@@ -694,8 +704,10 @@ export default async function gameGateway(fastify: FastifyInstance) {
               advanceToNextPlayer(game);
               game.drawPileCount = game.drawPile.length;
               continueTurn(ctx, game);
-              broadCastStateToRoom(gameId, game);
             }
+            // Toujours diffuser : hors de son tour, les autres clients le voyaient
+            // encore en jeu jusqu'au coup suivant
+            broadCastStateToRoom(gameId, game);
           }, RECONNECT_GRACE_MS),
         );
       }
