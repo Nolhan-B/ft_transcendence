@@ -106,29 +106,41 @@ body {
   --color-base-300: #11111b;
   --color-base-content: #cdd6f4;
 
-  /* brand (Couleurs UNO vives) */
-  --color-primary: #ff5555; /* Rouge UNO */
-  --color-primary-content: #ffffff;
-  --color-secondary: #5555ff; /* Bleu UNO */
-  --color-secondary-content: #ffffff;
-  --color-accent: #ffaa00; /* Jaune UNO */
-  --color-accent-content: #1e1e2e;
+  /* brand: the neon colors of the SNS logo, one per UNO color. They are
+     bright, so the text on them is dark */
+  --color-primary: #ff2a85; /* red: neon pink */
+  --color-primary-content: #11111b;
+  --color-secondary: #00f0ff; /* blue: neon cyan */
+  --color-secondary-content: #11111b;
+  --color-accent: #fcee0a; /* yellow: neon yellow */
+  --color-accent-content: #11111b;
   --color-neutral: #313244;
   --color-neutral-content: #cdd6f4;
 
-  /* feedback */
-  --color-info: #5555ff; /* Bleu */
-  --color-info-content: #ffffff;
-  --color-success: #55aa55; /* Vert UNO */
-  --color-success-content: #1e1e2e;
-  --color-warning: #ffaa00; /* Jaune */
-  --color-warning-content: #1e1e2e;
-  --color-error: #ff5555; /* Rouge */
-  --color-error-content: #1e1e2e;
+  /* feedback, same neons */
+  --color-info: #00f0ff;
+  --color-info-content: #11111b;
+  --color-success: #39ff14; /* green: neon green */
+  --color-success-content: #11111b;
+  --color-warning: #fcee0a;
+  --color-warning-content: #11111b;
+  --color-error: #ff2a85;
+  --color-error-content: #11111b;
 
   /* shape (Bordures marquées style Neo-Brutalism) */
   --radius-selector: 0.75rem;
   --radius-field: 0.75rem;
   --radius-box: 1rem;
   --border: 3px;
+}
+
+/* Third brand color of the SNS logo (between the pink and the cyan), for
+   gradients and glows: bg-tertiary, via-tertiary, text-tertiary... */
+@theme {
+  --color-tertiary: #a855f7;
+}
+
+/* Cyberpunk display font used for brand name and hero headline */
+@utility font-cyber {
+  font-family: "Orbitron", ui-sans-serif, system-ui, sans-serif;
 }

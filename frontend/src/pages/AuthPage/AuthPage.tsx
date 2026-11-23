@@ -6,6 +6,8 @@ import { useAuth } from "../../hooks/auth/useAuth";
 import { Hand } from "../../components/cards/Hand";
 import type { HandCard } from "../../components/cards/Hand";
 import { RegisterForm } from "../../components/authentification/RegisterForm";
+import snsLogo from "../../assets/images/sns-logo.svg?url";
+import { WEBSITE_DESCRIPTION, WEBSITE_NAME } from "../../constants";
 
 type Mode = "login" | "register";
 
@@ -35,9 +37,8 @@ export function AuthPage() {
   );
   const { twoFactorPending } = useAuth();
 
-  // A starting UNO hand: 7 cards alternating sign-in / sign-up. Every card
-  // is usable, the front one shows the form. Content only on the front card,
-  // so the hidden forms are never focusable.
+  // A starting hand: 7 neon cards alternating sign-in / sign-up. Content is
+  // wrapped with neutral text color and padding to sit cleanly inside the neon tube.
   const cards: HandCard[] = Array.from({ length: HAND_SIZE }, (_, i) => {
     const mode = modeOf(i);
     return {
@@ -45,39 +46,105 @@ export function AuthPage() {
       color: mode === "login" ? "primary" : "secondary",
       label: mode === "login" ? "Switch to Sign-in" : "Switch to Sign-up",
       content:
-        i !== selected ? undefined : mode === "login" ? (
-          twoFactorPending ? (
-            <TwoFactorForm />
-          ) : (
-            <LoginForm />
-          )
-        ) : (
-          // <p className="text-center">Sign-up form coming soon</p>
-          <RegisterForm />
+        i !== selected ? undefined : (
+          <div className="px-[7cqw] py-[6cqw] text-base-content">
+            {mode === "login" ? (
+              twoFactorPending ? (
+                <TwoFactorForm />
+              ) : (
+                <LoginForm />
+              )
+            ) : (
+              <RegisterForm />
+            )}
+          </div>
         ),
     };
   });
 
   return (
-    <div className="flex flex-1">
-      {/* Left half: empty for now (darkest theme surface) */}
-      <section className="hidden md:block md:w-1/2 bg-base-300" />
+    // Deep dark canvas with a subtle masked cyber grid instead of conic rays
+    <div className="relative flex flex-1 overflow-hidden bg-base-300">
+      {/* Subtle perspective-free cyber grid faded out toward the viewport edges */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0"
+        style={{
+          backgroundImage:
+            "linear-gradient(to right, color-mix(in oklab, var(--color-secondary) 6%, transparent) 1px, transparent 1px), linear-gradient(to bottom, color-mix(in oklab, var(--color-secondary) 6%, transparent) 1px, transparent 1px)",
+          backgroundSize: "48px 48px",
+          maskImage:
+            "radial-gradient(ellipse 85% 80% at 50% 50%, #000 35%, transparent 100%)",
+          WebkitMaskImage:
+            "radial-gradient(ellipse 85% 80% at 50% 50%, #000 35%, transparent 100%)",
+        }}
+      />
 
-      {/* Right half: hand of cards (lighter theme surface) */}
-      <section className="relative flex w-full md:w-1/2 items-center justify-center overflow-hidden bg-base-100 px-4">
-        {/* Rays coming out of the hand's pivot point (decorative) */}
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 bg-[repeating-conic-gradient(from_0deg_at_50%_80%,color-mix(in_oklab,var(--color-base-content)_6%,transparent)_0deg_6deg,transparent_6deg_12deg)]"
-        />
+      {/* Ambient corner glows to add depth behind both columns */}
+      <div
+        aria-hidden="true"
+        className="hero-glow pointer-events-none absolute -left-32 top-1/3 size-[28rem] rounded-full bg-secondary/12 blur-3xl"
+      />
+      <div
+        aria-hidden="true"
+        className="hero-glow pointer-events-none absolute -right-24 bottom-1/4 size-[26rem] rounded-full bg-primary/14 blur-3xl [animation-delay:2s]"
+      />
 
-        <Link to="/home" className="btn btn-accent absolute right-4 top-4 z-20">
-          Go to website
-        </Link>
+      {/* Top-right navigation shortcut */}
+      <Link
+        to="/home"
+        className="btn btn-outline btn-sm font-cyber absolute right-4 top-4 z-20 border-secondary/50 text-secondary hover:border-secondary hover:bg-secondary/15"
+      >
+        Go to website
+      </Link>
 
-        {/* Visible switch, in sync with the front card. Pinned in a corner and
-            above the cards (z-20): the fan swings out of its box and would
-            otherwise cover it. */}
+      {/* Left half: large focal SNS emblem and headline */}
+      <section className="relative z-10 hidden md:flex md:w-1/2 md:flex-col md:items-center md:justify-center md:px-10">
+        <div className="relative flex w-full max-w-xl flex-col items-center gap-7 text-center">
+          {/* Focused neon backlight directly behind the logo */}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute top-1/3 left-1/2 -z-10 h-64 w-96 -translate-x-1/2 -translate-y-1/2 rounded-full bg-gradient-to-r from-secondary/25 via-tertiary/25 to-primary/25 blur-3xl"
+          />
+
+          <img
+            src={snsLogo}
+            alt="SNS"
+            className="h-auto w-[360px] max-w-[90%] drop-shadow-[0_0_24px_color-mix(in_oklab,var(--color-secondary)_35%,transparent)] lg:w-[460px] xl:w-[520px]"
+          />
+
+          <div>
+            <p className="font-cyber mb-3 text-2xl font-extrabold uppercase tracking-[0.3em] text-secondary drop-shadow-[0_0_10px_color-mix(in_oklab,var(--color-secondary)_50%,transparent)] lg:text-3xl">
+              {WEBSITE_NAME}
+            </p>
+            <h1 className="font-cyber mb-4 bg-gradient-to-r from-secondary via-tertiary to-primary bg-clip-text text-4xl font-black uppercase tracking-tight text-transparent drop-shadow-[0_0_14px_color-mix(in_oklab,var(--color-tertiary)_30%,transparent)] lg:text-5xl">
+              Play. Bluff. Win.
+            </h1>
+            <p className="mx-auto max-w-md text-sm text-base-content/70 lg:text-base">
+              {WEBSITE_DESCRIPTION}
+            </p>
+          </div>
+
+          <ul className="mt-1 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-base-content/65 lg:text-sm">
+            <li className="flex items-center gap-2">
+              <span className="size-2 rounded-full bg-secondary" />
+              Real-time multiplayer
+            </li>
+            <li className="flex items-center gap-2">
+              <span className="size-2 rounded-full bg-tertiary" />
+              Ranked Elo
+            </li>
+            <li className="flex items-center gap-2">
+              <span className="size-2 rounded-full bg-primary" />
+              Friends & chat
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      {/* Right half: interactive neon card fan */}
+      <section className="relative z-10 flex w-full flex-col items-center justify-center px-4 md:w-1/2">
+        {/* Visible switch synced with the front card */}
         <div className="join absolute left-4 top-4 z-20">
           {MODES.map(({ mode, label, activeClass }) => (
             <button
@@ -85,8 +152,10 @@ export function AuthPage() {
               type="button"
               aria-pressed={modeOf(selected) === mode}
               onClick={() => setSelected(cardOf(mode))}
-              className={`btn join-item ${
-                modeOf(selected) === mode ? activeClass : ""
+              className={`btn btn-sm font-cyber join-item uppercase tracking-wider ${
+                modeOf(selected) === mode
+                  ? activeClass
+                  : "border-base-300 bg-base-200/80 text-base-content/70 hover:text-base-content"
               }`}
             >
               {label}
@@ -99,12 +168,14 @@ export function AuthPage() {
           selectedId={`card-${selected}`}
           step={5}
           fan="left"
+          variant="neon"
           // No "w-full" from the "sm" breakpoint: from 768px the section is only
           // half of the screen, the fan would overflow it
           className="w-2/3 max-w-[max(14rem,min(24rem,calc((100dvh_-_9rem)*56/87)))]"
           onSelect={(id) => setSelected(Number(id.slice(5)))}
         />
-        <nav className="absolute inset-x-0 bottom-4 z-20 flex justify-center pointer-events-none gap-6 text-sm">
+
+        <nav className="pointer-events-none absolute inset-x-0 bottom-4 z-20 flex justify-center gap-6 text-sm text-base-content/60">
           <Link to="/terms" className="link link-hover pointer-events-auto">
             Terms of Service
           </Link>

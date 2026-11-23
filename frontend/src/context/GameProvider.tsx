@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import type {
   CardColor,
@@ -18,6 +18,29 @@ import type { GameContextValue, UnoEvent } from "./GameContext";
 const ALWAYS_FATAL = ["Unauthorized", "Invalid token"];
 const MAX_REFUSALS = 3;
 
+// The game in progress, kept in the browser: after a reload the player can
+// go back to it (the server does not say which game we are in)
+const STORED_GAME = "sns.currentGame";
+// Answers to join_game for a game that no longer accepts us
+const GONE = ["Game not found", "You are not part of this game"];
+
+function storedGame(): string | null {
+  try {
+    return localStorage.getItem(STORED_GAME);
+  } catch {
+    return null;
+  }
+}
+
+function storeGame(id: string | null) {
+  try {
+    if (id) localStorage.setItem(STORED_GAME, id);
+    else localStorage.removeItem(STORED_GAME);
+  } catch {
+    // Storage blocked (private mode...): only the reload case is lost
+  }
+}
+
 export function GameProvider({ children }: { children: ReactNode }) {
   const [room, setRoom] = useState<RoomInfo | null>(null);
   const [gameId, setGameId] = useState<string | null>(null);
@@ -32,6 +55,11 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
   // Consecutive "Already connected" answers (reset once the server accepts us)
   const refusals = useRef(0);
+  // Game joined on the current socket: joining twice would register the
+  // socket twice on the server, and every event would arrive twice
+  const joinedOn = useRef<string | null>(null);
+  // Stored game we are trying to join back after a reload
+  const restoring = useRef<string | null>(null);
 
   const { status, send } = useWebSocket({
     path: "/api/game/ws",
@@ -48,6 +76,14 @@ export function GameProvider({ children }: { children: ReactNode }) {
       // Not part of ServerEvent: sent by the server once it accepts the socket
       if ((message as { type?: string }).type === "connected") {
         refusals.current = 0;
+        // Back from a reload: join the stored game again, so that we stay in
+        // it (unless the game page already did)
+        const stored = storedGame();
+        if (stored && joinedOn.current === null) {
+          restoring.current = stored;
+          joinedOn.current = stored;
+          send({ type: "join_game", gameId: stored });
+        }
         return;
       }
       const event = message as ServerEvent;
@@ -57,6 +93,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
           break;
         case "game_started":
           setGameId(event.gameId);
+          storeGame(event.gameId);
           // New game: forget the previous one
           setGameState(null);
           setWinnerId(null);
@@ -66,6 +103,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
           setRoom(null);
           break;
         case "game_updated":
+          if (restoring.current === event.state.id) {
+            restoring.current = null;
+            setGameId(event.state.id);
+          }
           setGameState(event.state);
           setTurnStartedAt(Date.now());
           break;
@@ -86,6 +127,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
           });
           break;
         case "game_ended":
+          storeGame(null);
           setWinnerId(event.winnerId);
           break;
         case "queue_joined":
@@ -97,12 +139,20 @@ export function GameProvider({ children }: { children: ReactNode }) {
         case "match_found":
           setInQueue(false);
           setGameId(event.gameId);
+          storeGame(event.gameId);
           setGameState(null);
           setWinnerId(null);
           setUnoCalls({});
           setUnoEvent(null);
           break;
         case "error":
+          // The stored game is over: forget it without bothering the user
+          if (restoring.current && GONE.includes(event.message)) {
+            restoring.current = null;
+            joinedOn.current = null;
+            storeGame(null);
+            break;
+          }
           if (event.message === "Already connected") {
             refusals.current++;
             // Still retrying: stay silent
@@ -117,6 +167,11 @@ export function GameProvider({ children }: { children: ReactNode }) {
       }
     },
   });
+
+  // A new socket has joined nothing yet
+  useEffect(() => {
+    if (status !== "open") joinedOn.current = null;
+  }, [status]);
 
   const createRoom = useCallback(
     (payload: CreateRoomPayload) => {
@@ -179,6 +234,9 @@ export function GameProvider({ children }: { children: ReactNode }) {
     (id: string) => {
       // Opened from the URL (reload, link): the actions need the game id too
       setGameId(id);
+      storeGame(id);
+      if (joinedOn.current === id) return;
+      joinedOn.current = id;
       send({ type: "join_game", gameId: id });
     },
     [send],
@@ -217,6 +275,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
   const clearGame = useCallback(() => {
     setGameId(null);
+    storeGame(null);
     setGameState(null);
     setWinnerId(null);
     setTurnStartedAt(null);

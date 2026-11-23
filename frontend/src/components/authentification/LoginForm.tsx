@@ -43,7 +43,7 @@ export function LoginForm() {
           <p className="validator-hint">Enter your password</p>
         </label>
       </div>
-      <div className="flex flex-col gap-3 @xs:flex-row">
+      <div className="flex flex-col gap-3">
         <button
           type="submit"
           disabled={loading}

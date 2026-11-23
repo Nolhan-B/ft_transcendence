@@ -16,7 +16,7 @@ export function FloatingMessageBox() {
         <input
           type="radio"
           name="my_tabs_6"
-          className="tab"
+          className="tab font-cyber text-xs font-bold uppercase tracking-wider"
           aria-label="Friends messages"
           defaultChecked
         />
@@ -32,7 +32,7 @@ export function FloatingMessageBox() {
         <input
           type="radio"
           name="my_tabs_6"
-          className="tab"
+          className="tab font-cyber text-xs font-bold uppercase tracking-wider"
           aria-label="Game chat"
         />
         <div className="tab-content h-[26rem] max-h-[calc(100vh-8rem)] bg-base-100 border-base-300 p-6">

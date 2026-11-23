@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { CreateRoomForm } from "../../components/game/CreateRoomForm";
+import { JoinByCodeForm } from "../../components/game/JoinByCodeForm";
 import { RankedCard } from "../../components/game/RankedCard";
 import { RoomList } from "../../components/game/RoomList";
 import { MainTitle } from "../../components/texts/MainTitle";
@@ -27,6 +28,7 @@ export function PlayPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="flex flex-col gap-6">
           <RankedCard />
+          <JoinByCodeForm />
           <CreateRoomForm />
         </div>
         <RoomList />
