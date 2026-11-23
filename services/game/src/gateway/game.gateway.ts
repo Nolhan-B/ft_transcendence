@@ -11,6 +11,7 @@ import {
   filterStateForSpectator,
   NO_LIVE_STATE,
   type LiveState,
+  unoKey,
 } from "./utils.js";
 import {
   handleJoinGame,
@@ -164,6 +165,15 @@ export default async function gameGateway(fastify: FastifyInstance) {
     return {
       ...NO_LIVE_STATE,
       turnTimeLeftMs: timed ? Math.max(0, deadline - Date.now()) : null,
+      // A 1 carte, sans avoir dit UNO, fenetre encore ouverte
+      unoVulnerable: game.players
+        .filter(
+          (p) =>
+            !p.disconnected &&
+            p.hand.length === 1 &&
+            unoTimers.has(unoKey(game.id, p.userId)),
+        )
+        .map((p) => p.userId),
       // Version publique : sans hadMatchingColor, qui doit rester secret
       pendingWildDraw4:
         bluff && current
@@ -356,6 +366,12 @@ export default async function gameGateway(fastify: FastifyInstance) {
     }
     for (const key of afkCounts.keys()) {
       if (key.startsWith(`${gameId}:`)) afkCounts.delete(key);
+    }
+    for (const [key, timer] of unoTimers) {
+      if (key.startsWith(`${gameId}:`)) {
+        clearTimeout(timer);
+        unoTimers.delete(key);
+      }
     }
     if (bluffTimers.has(gameId)) {
       clearTimeout(bluffTimers.get(gameId));

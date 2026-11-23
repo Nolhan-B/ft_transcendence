@@ -47,6 +47,12 @@ export function pickSettings(s: GameSettings): GameSettings {
   };
 }
 
+// Cle des fenetres UNO : par partie ET par joueur (un userId seul pouvait
+// melanger deux parties, ex : fenetre pas encore expiree d'une partie finie)
+export function unoKey(gameId: string, userId: string): string {
+  return `${gameId}:${userId}`;
+}
+
 export function sendError(socket: WebSocket, message: string): void {
   socket.send(JSON.stringify({ type: "error", message }));
 }

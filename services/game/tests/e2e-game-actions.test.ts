@@ -14,6 +14,8 @@ process.env.TURN_TIMEOUT_MS = String(TURN_MS);
 process.env.RECONNECT_GRACE_MS = "5000";
 const JOIN_TIMEOUT_MS = 1000;
 process.env.GAME_JOIN_TIMEOUT_MS = String(JOIN_TIMEOUT_MS);
+const UNO_WINDOW_MS = 1500;
+process.env.UNO_WINDOW_MS = String(UNO_WINDOW_MS);
 
 let gameGateway: any;
 
@@ -1326,6 +1328,93 @@ const tests = [
         pending.timeLeftMs < 5000 - 600,
         `le délai ne doit pas repartir à zéro, reçu ${pending.timeLeftMs}`,
       );
+    });
+  }),
+  // ---------------- unoVulnerable ----------------
+
+  test("uno: l'état liste le joueur attrapable", async () => {
+    await withServer(async (server) => {
+      const { players, gameId, game } = await setupGame(server);
+      const [a, , c] = players;
+      game.topCard = { id: "top", color: "red", value: "5" };
+      game.currentColor = "red";
+      game.players[0].hand = [
+        { id: "r3", color: "red", value: "3" },
+        { id: "last", color: "blue", value: "1" },
+      ];
+      const forC = waitForMessage(c.ws, "game_updated");
+      send(a.ws, { type: "play_card", gameId, cardId: "r3" });
+      const state = (await forC).state;
+      assert(
+        state.unoVulnerable.length === 1 && state.unoVulnerable[0] === a.id,
+        `A doit être attrapable, reçu ${JSON.stringify(state.unoVulnerable)}`,
+      );
+    });
+  }),
+
+  test("uno: dire UNO retire le joueur de unoVulnerable", async () => {
+    await withServer(async (server) => {
+      const { players, gameId } = await setupUno(server);
+      const [a, , c] = players;
+      const forC = waitForMessage(c.ws, "game_updated");
+      send(a.ws, { type: "call_uno", gameId });
+      const state = (await forC).state;
+      assert(state.unoVulnerable.length === 0, "A n'est plus attrapable");
+    });
+  }),
+
+  test("uno: à la fin de la fenêtre, l'état est diffusé sans le joueur", async () => {
+    await withServer(async (server) => {
+      const { players, gameId } = await setupUno(server);
+      const [a, b, c] = players;
+      // B pioche a 1 s : le chrono AFK de C ne tombera qu'a ~2,5 s. Entre les
+      // deux, seule la fermeture de la fenetre UNO (1,5 s) diffuse un etat
+      await sleep(1000);
+      const drawn = waitForMessage(c.ws, "game_updated");
+      send(b.ws, { type: "draw_card", gameId });
+      const afterDraw = (await drawn).state;
+      assert(
+        afterDraw.unoVulnerable.includes(a.id),
+        "la fenêtre est encore ouverte après la pioche de B",
+      );
+
+      const closed = await new Promise<any>((resolve, reject) => {
+        const timeout = setTimeout(
+          () => reject(new Error("Pas d'état diffusé à la fin de la fenêtre")),
+          900,
+        );
+        c.ws.on("message", (data) => {
+          const msg = JSON.parse(data.toString());
+          if (
+            msg.type === "game_updated" &&
+            !msg.state.unoVulnerable.includes(a.id)
+          ) {
+            clearTimeout(timeout);
+            resolve(msg.state);
+          }
+        });
+      });
+      const handA = closed.players.find((p: any) => p.userId === a.id).hand;
+      assert(
+        handA.length === 1,
+        "A a toujours 1 carte, seule la fenêtre a fermé",
+      );
+    });
+  }),
+
+  test("uno: un joueur qui a pioché depuis n'est plus attrapable", async () => {
+    await withServer(async (server) => {
+      const { players, gameId, game } = await setupUno(server);
+      const [a, b] = players;
+      // A repasse a 2 cartes (pioche, penalite...) pendant la fenetre
+      game.players[0].hand.push({ id: "extra", color: "green", value: "2" });
+      send(b.ws, { type: "catch_uno", gameId, targetUserId: a.id });
+      const err = await waitForMessage(b.ws, "error");
+      assert(
+        err.message === "Player already called UNO or not in UNO state",
+        `Message inattendu : ${err.message}`,
+      );
+      assert(game.players[0].hand.length === 2, "A ne pioche pas de pénalité");
     });
   }),
 ];

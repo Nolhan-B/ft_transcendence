@@ -6,9 +6,12 @@ import {
   recordAction,
 } from "../../../engine/game-state.js";
 import { continueTurn } from "./bot-turn.js";
+import { unoKey } from "../../utils.js";
 
 // Delai pour accepter ou contester un +4 avant qu'il soit accepte d'office
 const BLUFF_TIMEOUT_MS = Number(process.env.BLUFF_TIMEOUT_MS) || 5000;
+// Delai pendant lequel un joueur a 1 carte qui n'a pas dit UNO peut etre attrape
+const UNO_WINDOW_MS = Number(process.env.UNO_WINDOW_MS) || 5000;
 
 export async function handlePlayCard(
   ctx: GatewayContext,
@@ -53,11 +56,18 @@ export async function handlePlayCard(
       (p) => p.userId === ctx.userId,
     )?.hand;
     if (playerHand && playerHand.length === 1) {
+      const key = unoKey(updatedState.id, ctx.userId);
+      clearTimeout(ctx.unoTimers.get(key));
       ctx.unoTimers.set(
-        ctx.userId,
+        key,
         setTimeout(() => {
-          ctx.unoTimers.delete(ctx.userId);
-        }, 5000),
+          ctx.unoTimers.delete(key);
+          // Fenetre fermee : on previent les clients (bouton "attraper" a masquer)
+          const game = ctx.manager.getGame(updatedState.id);
+          if (game?.status === GameStatus.IN_PROGRESS) {
+            ctx.broadCastStateToRoom(game.id, game);
+          }
+        }, UNO_WINDOW_MS),
       );
     }
   }

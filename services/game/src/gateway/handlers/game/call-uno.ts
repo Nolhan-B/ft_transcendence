@@ -1,6 +1,7 @@
 import { GatewayContext } from "../../types.js";
 import { GameStatus } from "shared";
 import { recordAction } from "../../../engine/game-state.js";
+import { unoKey } from "../../utils.js";
 
 export function handleCallUno(
   ctx: GatewayContext,
@@ -19,13 +20,14 @@ export function handleCallUno(
   }
 
   // UNO ne compte que si le joueur est vraiment dans la fenêtre pour le dire
-  if (!ctx.unoTimers.has(ctx.userId)) {
+  const key = unoKey(game.id, ctx.userId);
+  if (!ctx.unoTimers.has(key)) {
     ctx.sendError(ctx.socket, "Nothing to call");
     return;
   }
 
-  clearTimeout(ctx.unoTimers.get(ctx.userId));
-  ctx.unoTimers.delete(ctx.userId);
+  clearTimeout(ctx.unoTimers.get(key));
+  ctx.unoTimers.delete(key);
 
   recordAction(game, { type: "uno_called", userId: ctx.userId });
   ctx.broadCastToRoom(msg.gameId, { type: "uno_called", userId: ctx.userId });
