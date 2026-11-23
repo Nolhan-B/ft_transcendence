@@ -13,7 +13,7 @@ interface Props {
   onNavigate?: () => void;
 }
 
-// <li> items, to put in a daisyUI "menu" (the navbar center or a dropdown)
+// <li> items with cyberpunk display typography for navbar or dropdown menus
 export function NavLinks({ onNavigate }: Props) {
   const { user } = useAuth();
 
@@ -25,10 +25,10 @@ export function NavLinks({ onNavigate }: Props) {
             to={to}
             onClick={onNavigate}
             className={({ isActive }) =>
-              `font-semibold ${
+              `font-cyber text-xs font-bold uppercase tracking-wider sm:text-sm ${
                 isActive
-                  ? "menu-active border-b-2 border-accent bg-neutral text-neutral-content"
-                  : "hover:bg-base-300"
+                  ? "menu-active border-b-2 border-[#00f0ff] bg-neutral text-[#00f0ff]"
+                  : "hover:bg-base-300 hover:text-[#00f0ff]"
               }`
             }
           >

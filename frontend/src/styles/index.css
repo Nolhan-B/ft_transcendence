@@ -132,3 +132,8 @@ body {
   --radius-box: 1rem;
   --border: 3px;
 }
+
+/* Cyberpunk display font used for brand name and hero headline */
+@utility font-cyber {
+  font-family: "Orbitron", ui-sans-serif, system-ui, sans-serif;
+}

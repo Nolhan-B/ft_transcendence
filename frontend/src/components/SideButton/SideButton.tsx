@@ -41,7 +41,7 @@ export function SideButton() {
         onClick={() => setOpen(true)}
         aria-label="Open menu"
         aria-expanded={open}
-        className="btn btn-secondary fixed right-0 top-1/2 z-20 h-auto -translate-y-1/2 rounded-r-none px-2 py-4 [writing-mode:vertical-rl]"
+        className="btn btn-secondary font-cyber fixed right-0 top-1/2 z-20 h-auto -translate-y-1/2 rounded-r-none px-2 py-4 text-xs font-bold uppercase tracking-wider [writing-mode:vertical-rl]"
       >
         <div className="flex gap-1 items-center">
           {showNotification ? (
@@ -81,7 +81,7 @@ export function SideButton() {
                 <button
                   type="button"
                   onClick={() => setCurrentOpenedFriendChat(null)}
-                  className="btn btn-ghost btn-sm mb-2 self-start"
+                  className="btn btn-ghost font-cyber btn-sm mb-2 self-start text-xs font-bold uppercase tracking-wider"
                 >
                   ← Friends
                 </button>
@@ -95,7 +95,9 @@ export function SideButton() {
             open ? "translate-x-0" : "translate-x-full"
           } ${chatReplacesDrawer ? "invisible" : ""}`}
         >
-          <p className="mb-3 shrink-0 text-sm opacity-60">Friends</p>
+          <p className="font-cyber mb-3 shrink-0 text-xs font-bold uppercase tracking-wider opacity-70">
+            Friends
+          </p>
           <div className="flex min-h-0 flex-1 flex-col">
             <FriendManager
               setCurrentOpenedFriendChat={setCurrentOpenedFriendChat}

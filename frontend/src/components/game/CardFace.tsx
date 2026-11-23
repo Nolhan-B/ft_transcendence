@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import type { CardValue } from "shared";
+import snsLogo from "../../assets/images/sns-logo.svg?url";
 
 // Neon glow of the text and icons, in the color of the card (currentColor).
 // Sized with the card width (container query units).
@@ -105,13 +106,14 @@ export function CardFace({ value }: { value: CardValue }) {
   );
 }
 
-// Back of a card: the name of the game, glowing in red, slightly tilted
+// Back of a card: tilted SNS neon emblem scaled to the card width
 export function CardBack() {
   return (
-    <span
-      className={`block -rotate-12 text-center text-[22cqw] leading-none font-black tracking-wider text-primary ${TEXT_GLOW}`}
-    >
-      UNO
-    </span>
+    <img
+      src={snsLogo}
+      alt="SNS"
+      draggable={false}
+      className="mx-auto w-[74cqw] -rotate-12 select-none drop-shadow-[0_0_3cqw_rgba(0,240,255,0.45)]"
+    />
   );
 }
