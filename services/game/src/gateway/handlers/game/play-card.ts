@@ -2,9 +2,16 @@ import { GatewayContext } from "../../types.js";
 import { GameStatus } from "shared";
 import {
   advanceToNextPlayer,
-  drawCardsForPlayer,
+  drawAndRecord,
+  recordAction,
 } from "../../../engine/game-state.js";
 import { continueTurn } from "./bot-turn.js";
+import { unoKey } from "../../utils.js";
+
+// Delai pour accepter ou contester un +4 avant qu'il soit accepte d'office
+const BLUFF_TIMEOUT_MS = Number(process.env.BLUFF_TIMEOUT_MS) || 5000;
+// Delai pendant lequel un joueur a 1 carte qui n'a pas dit UNO peut etre attrape
+const UNO_WINDOW_MS = Number(process.env.UNO_WINDOW_MS) || 5000;
 
 export async function handlePlayCard(
   ctx: GatewayContext,
@@ -44,18 +51,23 @@ export async function handlePlayCard(
     time: new Date().toISOString(),
   });
 
-  ctx.broadCastStateToRoom(updatedState.id, updatedState);
-
   if (updatedState.settings.unoCallout) {
     const playerHand = updatedState.players.find(
       (p) => p.userId === ctx.userId,
     )?.hand;
     if (playerHand && playerHand.length === 1) {
+      const key = unoKey(updatedState.id, ctx.userId);
+      clearTimeout(ctx.unoTimers.get(key));
       ctx.unoTimers.set(
-        ctx.userId,
+        key,
         setTimeout(() => {
-          ctx.unoTimers.delete(ctx.userId);
-        }, 5000),
+          ctx.unoTimers.delete(key);
+          // Fenetre fermee : on previent les clients (bouton "attraper" a masquer)
+          const game = ctx.manager.getGame(updatedState.id);
+          if (game?.status === GameStatus.IN_PROGRESS) {
+            ctx.broadCastStateToRoom(game.id, game);
+          }
+        }, UNO_WINDOW_MS),
       );
     }
   }
@@ -63,28 +75,37 @@ export async function handlePlayCard(
   if (updatedState.lastWildDraw4 && updatedState.settings.bluffChallenge) {
     const targetId = updatedState.players.find((p) => p.isCurrentTurn)?.userId;
     if (targetId) {
+      updatedState.lastWildDraw4.expiresAt = Date.now() + BLUFF_TIMEOUT_MS;
       ctx.bluffTimers.set(
         updatedState.id,
         setTimeout(() => {
           ctx.bluffTimers.delete(updatedState.id);
-          drawCardsForPlayer(updatedState, targetId, 4);
+          // Pas de reponse a temps : le +4 est accepte d'office
+          recordAction(updatedState, {
+            type: "wild_draw4_accepted",
+            userId: targetId,
+            auto: true,
+          });
+          drawAndRecord(updatedState, targetId, 4, "wild_draw4", true);
           updatedState.lastWildDraw4 = undefined;
           advanceToNextPlayer(updatedState);
-          ctx.broadCastStateToRoom(updatedState.id, updatedState);
           // Sans ca, un bot suivant ne joue jamais et l'humain suivant
           // herite du reste du chrono de la victime
           continueTurn(ctx, updatedState);
-        }, 5000),
+          ctx.broadCastStateToRoom(updatedState.id, updatedState);
+        }, BLUFF_TIMEOUT_MS),
       );
     }
   }
 
   ctx.afkCounts.set(`${game.id}:${ctx.userId}`, 0);
 
+  // Effets d'abord (chrono, bot), envoi ensuite : l'etat diffuse contient
+  // ainsi le chrono du joueur suivant. Ne fait rien si la partie est finie
+  continueTurn(ctx, updatedState);
+  ctx.broadCastStateToRoom(updatedState.id, updatedState);
+
   if (updatedState.status === GameStatus.FINISHED) {
     await ctx.endGame(updatedState.id, updatedState);
-    return;
   }
-
-  continueTurn(ctx, updatedState);
 }

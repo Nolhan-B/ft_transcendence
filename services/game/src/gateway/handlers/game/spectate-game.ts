@@ -32,7 +32,7 @@ export function handleSpectateGame(
   ctx.socket.send(
     JSON.stringify({
       type: "spectate_started",
-      state: filterStateForSpectator(game),
+      state: filterStateForSpectator(game, ctx.liveState(game)),
     }),
   );
 }

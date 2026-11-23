@@ -9,6 +9,9 @@ import {
   filterStateForPlayer,
   toRoomInfo,
   filterStateForSpectator,
+  NO_LIVE_STATE,
+  type LiveState,
+  unoKey,
 } from "./utils.js";
 import {
   handleJoinGame,
@@ -32,7 +35,11 @@ import {
 } from "./handlers/room/index.js";
 import { handleChatMessage } from "./handlers/chat/index.js";
 import type { GatewayContext } from "./types.js";
-import { advanceToNextPlayer } from "../engine/game-state.js";
+import {
+  advanceToNextPlayer,
+  finishPlayer,
+  recordAction,
+} from "../engine/game-state.js";
 import {
   continueTurn,
   scheduleBotTurnIfNeeded,
@@ -97,6 +104,8 @@ const moveLogs: Map<
 const unoTimers: Map<string, NodeJS.Timeout> = new Map();
 const bluffTimers: Map<string, NodeJS.Timeout> = new Map();
 const turnTimers: Map<string, NodeJS.Timeout> = new Map();
+// Heure de fin du chrono en cours, par partie (pour envoyer le temps restant)
+const turnDeadlines: Map<string, number> = new Map();
 const afkCounts: Map<string, number> = new Map();
 
 const spectators: Map<
@@ -141,14 +150,72 @@ export default async function gameGateway(fastify: FastifyInstance) {
     }
   }
 
+  // Champs calcules au moment de l'envoi (chronos, sockets)
+  function liveState(game: InternalGameState): LiveState {
+    if (game.status === GameStatus.FINISHED) return NO_LIVE_STATE;
+    const current = game.players.find((p) => p.isCurrentTurn);
+    const deadline = turnDeadlines.get(game.id);
+    const bluff = game.lastWildDraw4;
+    // Pas de chrono affiche pour un bot (il joue apres un court delai), ni
+    // pendant un +4 en attente : c'est alors le delai du bluff qui compte
+    const timed =
+      current !== undefined &&
+      !current.userId.startsWith("bot_") &&
+      deadline !== undefined &&
+      !bluff;
+    return {
+      ...NO_LIVE_STATE,
+      turnTimeLeftMs: timed ? Math.max(0, deadline - Date.now()) : null,
+      // Socket ferme, delai de reconnexion en cours (pas encore exclus)
+      reconnecting: game.players
+        .filter(
+          (p) =>
+            !p.disconnected && disconnectTimers.has(`${game.id}:${p.userId}`),
+        )
+        .map((p) => p.userId),
+      // A 1 carte, sans avoir dit UNO, fenetre encore ouverte
+      unoVulnerable: game.players
+        .filter(
+          (p) =>
+            !p.disconnected &&
+            p.hand.length === 1 &&
+            unoTimers.has(unoKey(game.id, p.userId)),
+        )
+        .map((p) => p.userId),
+      // Version publique : sans hadMatchingColor, qui doit rester secret
+      pendingWildDraw4:
+        bluff && current
+          ? {
+              playerId: bluff.playerId,
+              targetId: current.userId,
+              timeLeftMs:
+                bluff.expiresAt !== undefined
+                  ? Math.max(0, bluff.expiresAt - Date.now())
+                  : 0,
+            }
+          : null,
+    };
+  }
+
   function broadCastStateToRoom(
     gameId: string,
     state: InternalGameState,
   ): void {
+    // Les actions notees depuis le dernier envoi deviennent lastActions. Si rien
+    // de neuf, lastActions reste le dernier lot (memes seq : le client l'ignore)
+    if (state.pendingActions.length > 0) {
+      state.lastActions = state.pendingActions;
+      state.pendingActions = [];
+    }
+    const live = liveState(state);
     const room = rooms.get(gameId);
     if (room) {
       for (const client of room) {
-        const playerGameState = filterStateForPlayer(state, client.userId);
+        const playerGameState = filterStateForPlayer(
+          state,
+          client.userId,
+          live,
+        );
         client.socket.send(
           JSON.stringify({ type: "game_updated", state: playerGameState }),
         );
@@ -159,7 +226,7 @@ export default async function gameGateway(fastify: FastifyInstance) {
     if (watchers) {
       const data = JSON.stringify({
         type: "game_updated",
-        state: filterStateForSpectator(state),
+        state: filterStateForSpectator(state, live),
       });
       for (const client of watchers) {
         if (client.socket.readyState === WebSocket.OPEN) {
@@ -192,6 +259,7 @@ export default async function gameGateway(fastify: FastifyInstance) {
 
     const timer = setTimeout(async () => {
       turnTimers.delete(gameId);
+      turnDeadlines.delete(gameId);
       const game = manager.getGame(gameId);
       if (!game || game.status === GameStatus.FINISHED) return;
       const room = rooms.get(gameId);
@@ -219,6 +287,12 @@ export default async function gameGateway(fastify: FastifyInstance) {
 
       if (count >= MAX_AFK_COUNT) {
         currentPlayer.disconnected = true;
+        recordAction(game, {
+          type: "player_kicked",
+          userId: currentPlayer.userId,
+          reason: "afk",
+          auto: true,
+        });
         const activePlayers = game.players.filter((p) => !p.disconnected);
         if (activePlayers.length <= 1) {
           await endGame(gameId, game);
@@ -227,20 +301,22 @@ export default async function gameGateway(fastify: FastifyInstance) {
         broadCastToRoom(gameId, {
           type: "player_left",
           userId: currentPlayer.userId,
+          reason: "afk",
         });
         advanceToNextPlayer(game);
         game.drawPileCount = game.drawPile.length;
-        broadCastStateToRoom(gameId, game);
       } else {
-        manager.drawCard(gameId, currentPlayer.userId);
-        broadCastStateToRoom(gameId, game);
+        manager.drawCard(gameId, currentPlayer.userId, true);
       }
 
-      // Le suivant peut etre un bot : il doit jouer, pas attendre le chrono
+      // Le suivant peut etre un bot : il doit jouer, pas attendre le chrono.
+      // Avant l'envoi, pour que l'etat contienne le nouveau chrono
       continueTurn(ctx, game);
+      broadCastStateToRoom(gameId, game);
     }, TURN_TIMEOUT_MS);
 
     turnTimers.set(gameId, timer);
+    turnDeadlines.set(gameId, Date.now() + TURN_TIMEOUT_MS);
   }
 
   async function updateElo(game: InternalGameState): Promise<void> {
@@ -285,11 +361,15 @@ export default async function gameGateway(fastify: FastifyInstance) {
     gameId: string,
     game: InternalGameState,
   ): Promise<void> {
+    // Fin par un coup (derniere carte) : l'etat final a deja ete diffuse par le
+    // handler. Fin par abandon ou AFK : pas encore, on le fait plus bas
+    const finalStateSent = game.status === GameStatus.FINISHED;
     game.status = GameStatus.FINISHED;
     if (turnTimers.has(gameId)) {
       clearTimeout(turnTimers.get(gameId));
       turnTimers.delete(gameId);
     }
+    turnDeadlines.delete(gameId);
     for (const [key, timer] of disconnectTimers) {
       if (key.startsWith(`${gameId}:`)) {
         clearTimeout(timer);
@@ -298,6 +378,12 @@ export default async function gameGateway(fastify: FastifyInstance) {
     }
     for (const key of afkCounts.keys()) {
       if (key.startsWith(`${gameId}:`)) afkCounts.delete(key);
+    }
+    for (const [key, timer] of unoTimers) {
+      if (key.startsWith(`${gameId}:`)) {
+        clearTimeout(timer);
+        unoTimers.delete(key);
+      }
     }
     if (bluffTimers.has(gameId)) {
       clearTimeout(bluffTimers.get(gameId));
@@ -309,13 +395,19 @@ export default async function gameGateway(fastify: FastifyInstance) {
       // juste apres ceux qui ont deja fini (en ranked, un joueur a pu finir avant)
       const last = activePlayers.length === 1 ? activePlayers[0] : null;
       if (last && !game.ranking.includes(last.userId)) {
-        game.ranking.push(last.userId);
+        finishPlayer(game, last.userId);
       }
       game.winnerId = game.ranking[0] ?? null;
+    }
+    game.lastWildDraw4 = undefined;
+    // Etat final (classement complet, gagnant, player_finished) avant game_ended
+    if (!finalStateSent || game.pendingActions.length > 0) {
+      broadCastStateToRoom(gameId, game);
     }
     broadCastToRoom(gameId, {
       type: "game_ended",
       winnerId: game.winnerId ?? "",
+      ranking: game.ranking,
     });
     // Une erreur de base de donnees ne doit ni faire planter le service
     // (endGame est souvent appele depuis un setTimeout), ni laisser la partie en memoire
@@ -457,6 +549,7 @@ export default async function gameGateway(fastify: FastifyInstance) {
       broadcastToRoomSockets,
       sendError,
       startTurnTimer: (gameId) => startTurnTimer(gameId, ctx),
+      liveState,
       endGame,
       cancelGameIfNeverJoined,
       toRoomInfo,
@@ -573,7 +666,11 @@ export default async function gameGateway(fastify: FastifyInstance) {
         if (!found) continue;
         if ([...room].some((c) => c.userId === userId)) continue; // deja revenu
 
-        broadCastToRoom(gameId, { type: "player_left", userId });
+        broadCastToRoom(gameId, {
+          type: "player_left",
+          userId,
+          reason: "disconnected",
+        });
 
         const key = `${gameId}:${userId}`;
         if (disconnectTimers.has(key)) clearTimeout(disconnectTimers.get(key));
@@ -594,7 +691,20 @@ export default async function gameGateway(fastify: FastifyInstance) {
               return;
 
             const player = game.players.find((p) => p.userId === userId);
-            if (player) player.disconnected = true;
+            if (player) {
+              player.disconnected = true;
+              recordAction(game, {
+                type: "player_kicked",
+                userId,
+                reason: "abandoned",
+                auto: true,
+              });
+              broadCastToRoom(gameId, {
+                type: "player_left",
+                userId,
+                reason: "abandoned",
+              });
+            }
 
             const activePlayers = game.players.filter((p) => !p.disconnected);
             if (
@@ -610,11 +720,16 @@ export default async function gameGateway(fastify: FastifyInstance) {
             if (player?.isCurrentTurn) {
               advanceToNextPlayer(game);
               game.drawPileCount = game.drawPile.length;
-              broadCastStateToRoom(gameId, game);
               continueTurn(ctx, game);
             }
+            // Toujours diffuser : hors de son tour, les autres clients le voyaient
+            // encore en jeu jusqu'au coup suivant
+            broadCastStateToRoom(gameId, game);
           }, RECONNECT_GRACE_MS),
         );
+        // Apres la pose du timer : l'etat le liste dans reconnecting
+        const game = manager.getGame(gameId);
+        if (game) broadCastStateToRoom(gameId, game);
       }
 
       for (const [roomCode, sockets] of roomSockets) {

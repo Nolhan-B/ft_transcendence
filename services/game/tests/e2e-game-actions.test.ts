@@ -14,6 +14,8 @@ process.env.TURN_TIMEOUT_MS = String(TURN_MS);
 process.env.RECONNECT_GRACE_MS = "5000";
 const JOIN_TIMEOUT_MS = 1000;
 process.env.GAME_JOIN_TIMEOUT_MS = String(JOIN_TIMEOUT_MS);
+const UNO_WINDOW_MS = 1500;
+process.env.UNO_WINDOW_MS = String(UNO_WINDOW_MS);
 
 let gameGateway: any;
 
@@ -1012,6 +1014,570 @@ const tests = [
       };
       assert(gain(ids[0]) > gain(ids[2]), "A doit gagner plus d'ELO que C");
       assert(gain(ids[2]) > gain(ids[1]), "C doit gagner plus d'ELO que B");
+    });
+  }),
+  // ---------------- lastActions ----------------
+
+  test("actions: la carte piochée n'est visible que par celui qui pioche", async () => {
+    await withServer(async (server) => {
+      const { players, gameId } = await setupGame(server, 2);
+      const [a, b] = players;
+      const forA = waitForMessage(a.ws, "game_updated");
+      const forB = waitForMessage(b.ws, "game_updated");
+      send(a.ws, { type: "draw_card", gameId });
+      const [mA, mB] = await Promise.all([forA, forB]);
+
+      const drawnA = mA.state.lastActions[0];
+      const drawnB = mB.state.lastActions[0];
+      assert(drawnA.type === "cards_drawn", "A reçoit l'action de pioche");
+      assert(drawnA.cards?.length === 1, "A voit la carte piochée");
+      assert(drawnB.count === 1, "B sait que A a pioché 1 carte");
+      assert(drawnB.cards === undefined, "B ne voit pas la carte de A");
+      assert(drawnA.seq === drawnB.seq, "même action, même seq");
+    });
+  }),
+
+  test("actions: call_uno diffuse l'état avec uno_called", async () => {
+    await withServer(async (server) => {
+      const { players, gameId } = await setupUno(server);
+      const [a, , c] = players;
+      const forC = waitForMessage(c.ws, "game_updated");
+      send(a.ws, { type: "call_uno", gameId });
+      const m = await forC;
+      const [called] = m.state.lastActions;
+      assert(
+        called.type === "uno_called" && called.userId === a.id,
+        `uno_called attendu, reçu ${JSON.stringify(m.state.lastActions)}`,
+      );
+    });
+  }),
+
+  test("actions: catch_uno note l'attrape puis la pénalité", async () => {
+    await withServer(async (server) => {
+      const { players, gameId } = await setupUno(server);
+      const [a, b, c] = players;
+      const forC = waitForMessage(c.ws, "game_updated");
+      send(b.ws, { type: "catch_uno", gameId, targetUserId: a.id });
+      const m = await forC;
+      const [caught, penalty] = m.state.lastActions;
+      assert(
+        caught.type === "uno_caught" &&
+          caught.userId === b.id &&
+          caught.targetUserId === a.id,
+        "B a attrapé A",
+      );
+      assert(
+        penalty.type === "cards_drawn" &&
+          penalty.userId === a.id &&
+          penalty.count === 2 &&
+          penalty.reason === "uno_penalty",
+        "A pioche 2 cartes de pénalité",
+      );
+    });
+  }),
+
+  test("actions: la pioche forcée par le chrono est notée auto", async () => {
+    await withServer(async (server) => {
+      const { players, game } = await setupGame(server, 2);
+      const [a, b] = players;
+      const forB = waitForMessage(b.ws, "game_updated", TURN_MS + 2000);
+      const m = await forB;
+      const [afk] = m.state.lastActions;
+      assert(
+        afk.type === "cards_drawn" &&
+          afk.userId === a.id &&
+          afk.reason === "afk" &&
+          afk.auto === true,
+        `pioche AFK attendue, reçu ${JSON.stringify(m.state.lastActions)}`,
+      );
+      assert(game.players[1].isCurrentTurn, "la main passe à B");
+    });
+  }),
+
+  test("actions: à la reconnexion, lastActions revient avec les mêmes seq", async () => {
+    await withServer(async (server) => {
+      const { players, gameId } = await setupGame(server, 2);
+      const [a, b] = players;
+      const forB = waitForMessage(b.ws, "game_updated");
+      send(a.ws, { type: "draw_card", gameId });
+      const before = (await forB).state.lastActions;
+
+      b.ws.close();
+      await sleep(100);
+      const ws2 = await connectUser(server, b.id);
+      send(ws2, { type: "join_game", gameId });
+      const after = (await waitForMessage(ws2, "game_updated")).state
+        .lastActions;
+
+      assert(
+        after.length === before.length &&
+          after.every((x: any, i: number) => x.seq === before[i].seq),
+        "le client peut ignorer les actions déjà affichées",
+      );
+    });
+  }),
+  test("actions: un +4 contesté note le challenge puis la pénalité", async () => {
+    await withServer(async (server) => {
+      const { players, gameId } = await setupBluff(server);
+      const [a, b, c] = players;
+      const forC = waitForMessage(c.ws, "game_updated");
+      send(b.ws, { type: "challenge_bluff", gameId });
+      const m = await forC;
+      const [challenge, penalty] = m.state.lastActions;
+      assert(
+        challenge.type === "bluff_challenged" &&
+          challenge.userId === b.id &&
+          challenge.targetUserId === a.id,
+        "B conteste le +4 de A",
+      );
+      const loser = challenge.wasBluff ? a.id : b.id;
+      assert(
+        penalty.type === "cards_drawn" &&
+          penalty.userId === loser &&
+          penalty.reason === "bluff_penalty" &&
+          penalty.count === (challenge.wasBluff ? 4 : 6),
+        "le perdant du challenge pioche la pénalité",
+      );
+    });
+  }),
+
+  test("actions: un joueur exclu pour AFK est noté player_kicked", async () => {
+    await withServer(async (server) => {
+      const { players, game } = await setupGame(server, 3);
+      const [a, , c] = players;
+      const left = waitForMessage(c.ws, "player_left", TURN_MS * 5);
+      // A, B et C ne jouent pas : au 2e timeout de A, il est exclu
+      const kicked = await new Promise<any>((resolve, reject) => {
+        const timeout = setTimeout(
+          () => reject(new Error("Pas de player_kicked")),
+          TURN_MS * 5,
+        );
+        c.ws.on("message", (data) => {
+          const msg = JSON.parse(data.toString());
+          const k = msg.state?.lastActions?.find(
+            (x: any) => x.type === "player_kicked",
+          );
+          if (k) {
+            clearTimeout(timeout);
+            resolve(k);
+          }
+        });
+      });
+      assert(kicked.userId === a.id, "A est exclu");
+      assert(kicked.reason === "afk" && kicked.auto === true, "raison afk");
+      assert(game.players[0].disconnected, "A est retiré de la partie");
+      const leftMsg = await left;
+      assert(
+        leftMsg.userId === a.id && leftMsg.reason === "afk",
+        `player_left afk attendu, reçu ${JSON.stringify(leftMsg)}`,
+      );
+    });
+  }),
+  // ---------------- turnTimeLeftMs ----------------
+
+  test("chrono: le nouvel état contient le chrono complet du joueur suivant", async () => {
+    await withServer(async (server) => {
+      const { players, gameId } = await setupGame(server, 2);
+      const [a, b] = players;
+      // A entame son chrono : s'il etait renvoye, B recevrait ~TURN_MS - 500
+      await sleep(500);
+      const forB = waitForMessage(b.ws, "game_updated");
+      send(a.ws, { type: "draw_card", gameId });
+      const left = (await forB).state.turnTimeLeftMs;
+      assert(
+        typeof left === "number" && left > TURN_MS - 200 && left <= TURN_MS,
+        `chrono complet attendu (~${TURN_MS}), reçu ${left}`,
+      );
+    });
+  }),
+
+  test("chrono: à la reconnexion, le temps restant est celui du chrono en cours", async () => {
+    await withServer(async (server) => {
+      const { players, gameId } = await setupGame(server, 2);
+      const [a] = players;
+      await sleep(600);
+      a.ws.close();
+      await sleep(100);
+      const ws2 = await connectUser(server, a.id);
+      send(ws2, { type: "join_game", gameId });
+      const left = (await waitForMessage(ws2, "game_updated")).state
+        .turnTimeLeftMs;
+      assert(
+        typeof left === "number" && left < TURN_MS - 500 && left > 0,
+        `le chrono ne doit pas repartir à zéro, reçu ${left}`,
+      );
+    });
+  }),
+
+  test("chrono: un catch_uno ne remet pas le chrono à zéro", async () => {
+    await withServer(async (server) => {
+      const { players, gameId } = await setupUno(server);
+      const [a, b, c] = players;
+      await sleep(500);
+      const forC = waitForMessage(c.ws, "game_updated");
+      send(b.ws, { type: "catch_uno", gameId, targetUserId: a.id });
+      const left = (await forC).state.turnTimeLeftMs;
+      assert(
+        typeof left === "number" && left < TURN_MS - 400,
+        `le chrono de B continue, reçu ${left}`,
+      );
+    });
+  }),
+
+  test("chrono: pas de chrono envoyé pendant le tour d'un bot", async () => {
+    await withServer(async (server) => {
+      const { humans, gameId, game } = await setupGameWithBot(server, 1);
+      const [a] = humans;
+      game.players[0].hand = [
+        { id: "r9", color: "red", value: "9" },
+        { id: "keep", color: "blue", value: "2" },
+      ];
+      const forA = waitForMessage(a.ws, "game_updated");
+      send(a.ws, { type: "play_card", gameId, cardId: "r9" });
+      const state = (await forA).state;
+      assert(
+        state.players[1].isCurrentTurn,
+        "c'est au tour du bot après le coup de A",
+      );
+      assert(
+        state.turnTimeLeftMs === null,
+        `null attendu, reçu ${state.turnTimeLeftMs}`,
+      );
+    });
+  }),
+
+  test("chrono: un spectateur reçoit le temps restant", async () => {
+    await withServer(async (server) => {
+      const { gameId } = await setupGame(server, 2);
+      const watcher = await connectUser(server, uniqueUserId("watcher"));
+      send(watcher, { type: "spectate_game", gameId });
+      const left = (await waitForMessage(watcher, "spectate_started")).state
+        .turnTimeLeftMs;
+      assert(
+        typeof left === "number" && left > 0 && left <= TURN_MS,
+        `temps restant attendu, reçu ${left}`,
+      );
+    });
+  }),
+  // ---------------- pendingWildDraw4 ----------------
+
+  test("bluff: l'état indique le +4 en attente, sans révéler le bluff", async () => {
+    await withServer(async (server) => {
+      const { players, gameId, game } = await setupGame(server);
+      const [a, b, c] = players;
+      game.topCard = { id: "top", color: "red", value: "5" };
+      game.currentColor = "red";
+      game.players[0].hand = [
+        { id: "wd", color: "wild", value: "wild_draw4" },
+        { id: "r1", color: "red", value: "1" }, // A bluffe : il a du rouge
+      ];
+      const rawForB = new Promise<string>((resolve) =>
+        b.ws.once("message", (data) => resolve(data.toString())),
+      );
+      const forC = waitForMessage(c.ws, "game_updated");
+      send(a.ws, {
+        type: "play_card",
+        gameId,
+        cardId: "wd",
+        chosenColor: "green",
+      });
+      const raw = await rawForB;
+      const state = (await forC).state;
+
+      const pending = state.pendingWildDraw4;
+      assert(pending !== null, "le +4 doit être en attente");
+      assert(pending.playerId === a.id, "posé par A");
+      assert(pending.targetId === b.id, "B doit répondre");
+      assert(
+        pending.timeLeftMs > 0 && pending.timeLeftMs <= 5000,
+        `délai de réponse attendu, reçu ${pending.timeLeftMs}`,
+      );
+      assert(
+        state.turnTimeLeftMs === null,
+        "pas de chrono de tour pendant le +4 en attente",
+      );
+      assert(
+        !raw.includes("hadMatchingColor"),
+        "l'info du bluff ne doit jamais être envoyée",
+      );
+    });
+  }),
+
+  test("bluff: pendingWildDraw4 repasse à null après la réponse", async () => {
+    await withServer(async (server) => {
+      const { players, gameId } = await setupBluff(server);
+      const [, b, c] = players;
+      const forC = waitForMessage(c.ws, "game_updated");
+      send(b.ws, { type: "accept_wild_draw4", gameId });
+      const state = (await forC).state;
+      assert(state.pendingWildDraw4 === null, "plus de +4 en attente");
+      assert(
+        typeof state.turnTimeLeftMs === "number",
+        "le chrono du tour revient",
+      );
+    });
+  }),
+
+  test("bluff: à la reconnexion, le délai de réponse continue", async () => {
+    await withServer(async (server) => {
+      const { players, gameId } = await setupBluff(server);
+      const [, b] = players;
+      await sleep(700);
+      b.ws.close();
+      await sleep(100);
+      const ws2 = await connectUser(server, b.id);
+      send(ws2, { type: "join_game", gameId });
+      const pending = (await waitForMessage(ws2, "game_updated")).state
+        .pendingWildDraw4;
+      assert(pending?.targetId === b.id, "B doit toujours répondre");
+      assert(
+        pending.timeLeftMs < 5000 - 600,
+        `le délai ne doit pas repartir à zéro, reçu ${pending.timeLeftMs}`,
+      );
+    });
+  }),
+  // ---------------- unoVulnerable ----------------
+
+  test("uno: l'état liste le joueur attrapable", async () => {
+    await withServer(async (server) => {
+      const { players, gameId, game } = await setupGame(server);
+      const [a, , c] = players;
+      game.topCard = { id: "top", color: "red", value: "5" };
+      game.currentColor = "red";
+      game.players[0].hand = [
+        { id: "r3", color: "red", value: "3" },
+        { id: "last", color: "blue", value: "1" },
+      ];
+      const forC = waitForMessage(c.ws, "game_updated");
+      send(a.ws, { type: "play_card", gameId, cardId: "r3" });
+      const state = (await forC).state;
+      assert(
+        state.unoVulnerable.length === 1 && state.unoVulnerable[0] === a.id,
+        `A doit être attrapable, reçu ${JSON.stringify(state.unoVulnerable)}`,
+      );
+    });
+  }),
+
+  test("uno: dire UNO retire le joueur de unoVulnerable", async () => {
+    await withServer(async (server) => {
+      const { players, gameId } = await setupUno(server);
+      const [a, , c] = players;
+      const forC = waitForMessage(c.ws, "game_updated");
+      send(a.ws, { type: "call_uno", gameId });
+      const state = (await forC).state;
+      assert(state.unoVulnerable.length === 0, "A n'est plus attrapable");
+    });
+  }),
+
+  test("uno: à la fin de la fenêtre, l'état est diffusé sans le joueur", async () => {
+    await withServer(async (server) => {
+      const { players, gameId } = await setupUno(server);
+      const [a, b, c] = players;
+      // B pioche a 1 s : le chrono AFK de C ne tombera qu'a ~2,5 s. Entre les
+      // deux, seule la fermeture de la fenetre UNO (1,5 s) diffuse un etat
+      await sleep(1000);
+      const drawn = waitForMessage(c.ws, "game_updated");
+      send(b.ws, { type: "draw_card", gameId });
+      const afterDraw = (await drawn).state;
+      assert(
+        afterDraw.unoVulnerable.includes(a.id),
+        "la fenêtre est encore ouverte après la pioche de B",
+      );
+
+      const closed = await new Promise<any>((resolve, reject) => {
+        const timeout = setTimeout(
+          () => reject(new Error("Pas d'état diffusé à la fin de la fenêtre")),
+          900,
+        );
+        c.ws.on("message", (data) => {
+          const msg = JSON.parse(data.toString());
+          if (
+            msg.type === "game_updated" &&
+            !msg.state.unoVulnerable.includes(a.id)
+          ) {
+            clearTimeout(timeout);
+            resolve(msg.state);
+          }
+        });
+      });
+      const handA = closed.players.find((p: any) => p.userId === a.id).hand;
+      assert(
+        handA.length === 1,
+        "A a toujours 1 carte, seule la fenêtre a fermé",
+      );
+    });
+  }),
+
+  test("uno: un joueur qui a pioché depuis n'est plus attrapable", async () => {
+    await withServer(async (server) => {
+      const { players, gameId, game } = await setupUno(server);
+      const [a, b] = players;
+      // A repasse a 2 cartes (pioche, penalite...) pendant la fenetre
+      game.players[0].hand.push({ id: "extra", color: "green", value: "2" });
+      send(b.ws, { type: "catch_uno", gameId, targetUserId: a.id });
+      const err = await waitForMessage(b.ws, "error");
+      assert(
+        err.message === "Player already called UNO or not in UNO state",
+        `Message inattendu : ${err.message}`,
+      );
+      assert(game.players[0].hand.length === 2, "A ne pioche pas de pénalité");
+    });
+  }),
+  // ---------------- Diffusion a l'exclusion et en fin de partie ----------------
+
+  test("fin: un abandon hors de son tour est diffusé tout de suite", async () => {
+    await withServer(async (server) => {
+      const { players } = await setupGame(server, 3);
+      const [, b, c] = players;
+      // B part pendant le tour de A et ne revient pas (delai : 5 s)
+      b.ws.close();
+      const kicked = await new Promise<any>((resolve, reject) => {
+        const timeout = setTimeout(
+          () => reject(new Error("B n'apparaît jamais exclu")),
+          8000,
+        );
+        c.ws.on("message", (data) => {
+          const msg = JSON.parse(data.toString());
+          const pb = msg.state?.players.find((p: any) => p.userId === b.id);
+          if (msg.type === "game_updated" && pb?.disconnected) {
+            clearTimeout(timeout);
+            resolve(msg.state);
+          }
+        });
+      });
+      assert(
+        !kicked.players.find((p: any) => p.userId === b.id).isCurrentTurn,
+        "le test porte sur un abandon hors de son tour",
+      );
+      // Diffuse par l'exclusion elle-meme, pas par le coup suivant
+      assert(
+        kicked.lastActions.length === 1 &&
+          kicked.lastActions[0].type === "player_kicked" &&
+          kicked.lastActions[0].reason === "abandoned",
+        `seule l'exclusion attendue, reçu ${JSON.stringify(kicked.lastActions)}`,
+      );
+    });
+  }),
+
+  test("fin: après un abandon, l'état final arrive avant game_ended avec le classement", async () => {
+    await withServer(async (server) => {
+      const ids = ["alice", "bob", "charlie"].map((n) => uniqueUserId(n));
+      const gameId = server.gameManager.createGame(
+        ids.map((id) => ({ id, username: id })),
+        GameMode.RANKED,
+      )!;
+      const game = server.gameManager.getGame(gameId)!;
+      const [a, b, c] = await Promise.all(
+        ids.map((id) => connectUser(server, id)),
+      );
+      for (const ws of [a, b, c]) {
+        send(ws, { type: "join_game", gameId });
+        await waitForMessage(ws, "game_updated");
+      }
+      game.topCard = { id: "top", color: "red", value: "5" };
+      game.currentColor = "red";
+      game.players[0].hand = [{ id: "last", color: "red", value: "3" }];
+      send(a, { type: "play_card", gameId, cardId: "last" });
+      await waitForMessage(c, "game_updated");
+
+      // B part : C reste seul, la partie finit sans coup joue
+      const received: any[] = [];
+      c.on("message", (data) => received.push(JSON.parse(data.toString())));
+      const ended = waitForMessage(c, "game_ended", 8000);
+      b.close();
+      const endMsg = await ended;
+
+      const finalIndex = received.findIndex(
+        (m) => m.type === "game_updated" && m.state.status === "finished",
+      );
+      const endIndex = received.findIndex((m) => m.type === "game_ended");
+      assert(finalIndex !== -1, "l'état final doit être diffusé");
+      assert(finalIndex < endIndex, "l'état final arrive avant game_ended");
+      const finalState = received[finalIndex].state;
+      assert(
+        finalState.ranking.join() === [ids[0], ids[2]].join(),
+        `classement final A puis C, reçu ${JSON.stringify(finalState.ranking)}`,
+      );
+      assert(finalState.winnerId === ids[0], "gagnant A dans l'état final");
+      assert(
+        finalState.lastActions.some(
+          (x: any) => x.type === "player_finished" && x.userId === ids[2],
+        ),
+        "C est noté comme classé",
+      );
+      assert(
+        endMsg.ranking.join() === [ids[0], ids[2]].join(),
+        "game_ended porte le classement",
+      );
+    });
+  }),
+  // ---------------- reconnecting / player_left ----------------
+
+  test("reconnexion: une coupure met le joueur dans reconnecting, son retour l'en sort", async () => {
+    await withServer(async (server) => {
+      const { players, gameId } = await setupGame(server, 3);
+      const [, b, c] = players;
+
+      const left = waitForMessage(c.ws, "player_left");
+      const cut = waitForMessage(c.ws, "game_updated");
+      b.ws.close();
+      const leftMsg = await left;
+      assert(
+        leftMsg.userId === b.id && leftMsg.reason === "disconnected",
+        `player_left disconnected attendu, reçu ${JSON.stringify(leftMsg)}`,
+      );
+      const during = (await cut).state;
+      assert(
+        during.reconnecting.length === 1 && during.reconnecting[0] === b.id,
+        `B doit être en reconnexion, reçu ${JSON.stringify(during.reconnecting)}`,
+      );
+      assert(
+        !during.players.find((p: any) => p.userId === b.id).disconnected,
+        "B n'est pas encore exclu",
+      );
+
+      const back = waitForMessage(c.ws, "game_updated");
+      const ws2 = await connectUser(server, b.id);
+      send(ws2, { type: "join_game", gameId });
+      await waitForMessage(ws2, "game_updated");
+      const after = (await back).state;
+      assert(after.reconnecting.length === 0, "B n'est plus en reconnexion");
+    });
+  }),
+
+  test("reconnexion: sans retour, player_left passe à abandoned", async () => {
+    await withServer(async (server) => {
+      const { players } = await setupGame(server, 3);
+      const [, b, c] = players;
+      const abandoned = new Promise<any>((resolve, reject) => {
+        const timeout = setTimeout(
+          () => reject(new Error("Pas de player_left abandoned")),
+          8000,
+        );
+        c.ws.on("message", (data) => {
+          const msg = JSON.parse(data.toString());
+          if (msg.type === "player_left" && msg.reason === "abandoned") {
+            clearTimeout(timeout);
+            resolve(msg);
+          }
+        });
+      });
+      const kickedState = new Promise<any>((resolve) => {
+        c.ws.on("message", (data) => {
+          const msg = JSON.parse(data.toString());
+          const pb = msg.state?.players.find((p: any) => p.userId === b.id);
+          if (msg.type === "game_updated" && pb?.disconnected)
+            resolve(msg.state);
+        });
+      });
+      b.ws.close();
+      const msg = await abandoned;
+      assert(msg.userId === b.id, "B a abandonné");
+      const state = await kickedState;
+      assert(
+        !state.reconnecting.includes(b.id),
+        "un joueur exclu n'est plus en reconnexion",
+      );
     });
   }),
 ];

@@ -2,7 +2,8 @@ import { GatewayContext } from "../../types.js";
 import type { ServerEvent } from "shared";
 import {
   advanceToNextPlayer,
-  drawCardsForPlayer,
+  drawAndRecord,
+  recordAction,
 } from "../../../engine/game-state.js";
 import { continueTurn } from "./bot-turn.js";
 
@@ -32,10 +33,16 @@ export async function handleChallengeBluff(
 
   const { playerId: blufferId, hadMatchingColor } = game.lastWildDraw4;
 
+  recordAction(game, {
+    type: "bluff_challenged",
+    userId: ctx.userId,
+    targetUserId: blufferId,
+    wasBluff: hadMatchingColor,
+  });
   if (hadMatchingColor) {
-    drawCardsForPlayer(game, blufferId, 4);
+    drawAndRecord(game, blufferId, 4, "bluff_penalty");
   } else {
-    drawCardsForPlayer(game, ctx.userId, 6);
+    drawAndRecord(game, ctx.userId, 6, "bluff_penalty");
     advanceToNextPlayer(game);
   }
 
@@ -48,7 +55,6 @@ export async function handleChallengeBluff(
   } as ServerEvent);
 
   game.lastWildDraw4 = undefined;
-  ctx.broadCastStateToRoom(game.id, game);
-
   continueTurn(ctx, game);
+  ctx.broadCastStateToRoom(game.id, game);
 }

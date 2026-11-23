@@ -8,7 +8,7 @@ import {
   type GameState,
   type StackingRule,
 } from "shared";
-import { InternalGameState } from "../engine/game-state.js";
+import { InternalGameState, LiveStateFields } from "../engine/game-state.js";
 import { Room } from "../managers/room.manager.js";
 import type { RoomInfo } from "shared";
 
@@ -47,15 +47,39 @@ export function pickSettings(s: GameSettings): GameSettings {
   };
 }
 
+// Cle des fenetres UNO : par partie ET par joueur (un userId seul pouvait
+// melanger deux parties, ex : fenetre pas encore expiree d'une partie finie)
+export function unoKey(gameId: string, userId: string): string {
+  return `${gameId}:${userId}`;
+}
+
 export function sendError(socket: WebSocket, message: string): void {
   socket.send(JSON.stringify({ type: "error", message }));
 }
 
+// Champs calcules au moment de l'envoi par le gateway (chronos, sockets)
+export type LiveState = Pick<GameState, LiveStateFields>;
+
+export const NO_LIVE_STATE: LiveState = {
+  turnTimeLeftMs: null,
+  pendingWildDraw4: null,
+  unoVulnerable: [],
+  reconnecting: [],
+};
+
 export function filterStateForPlayer(
   game: InternalGameState,
   userId: string,
+  live: LiveState = NO_LIVE_STATE,
 ): GameState {
   return {
+    ...live,
+    // Les cartes piochees ne sont visibles que par celui qui les pioche
+    lastActions: game.lastActions.map((action) =>
+      action.type === "cards_drawn" && action.userId !== userId
+        ? { ...action, cards: undefined }
+        : action,
+    ),
     id: game.id,
     mode: game.mode,
     status: game.status,
@@ -82,8 +106,11 @@ export function filterStateForPlayer(
   };
 }
 
-export function filterStateForSpectator(game: InternalGameState): GameState {
-  return filterStateForPlayer(game, "");
+export function filterStateForSpectator(
+  game: InternalGameState,
+  live: LiveState = NO_LIVE_STATE,
+): GameState {
+  return filterStateForPlayer(game, "", live);
 }
 
 export function toRoomInfo(room: Room): RoomInfo {

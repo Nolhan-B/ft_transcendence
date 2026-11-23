@@ -1,7 +1,8 @@
 import { GatewayContext } from "../../types.js";
 import {
   advanceToNextPlayer,
-  drawCardsForPlayer,
+  drawAndRecord,
+  recordAction,
 } from "../../../engine/game-state.js";
 import { continueTurn } from "./bot-turn.js";
 
@@ -29,10 +30,10 @@ export function handleAcceptWildDraw4(
     ctx.bluffTimers.delete(game.id);
   }
 
-  drawCardsForPlayer(game, ctx.userId, 4);
+  recordAction(game, { type: "wild_draw4_accepted", userId: ctx.userId });
+  drawAndRecord(game, ctx.userId, 4, "wild_draw4");
   game.lastWildDraw4 = undefined;
   advanceToNextPlayer(game);
-  ctx.broadCastStateToRoom(game.id, game);
-
   continueTurn(ctx, game);
+  ctx.broadCastStateToRoom(game.id, game);
 }

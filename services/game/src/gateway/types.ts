@@ -5,6 +5,7 @@ import { Room, RoomManager } from "../managers/room.manager.js";
 import { InternalGameState } from "../engine/game-state.js";
 import { RoomInfo, ServerEvent } from "shared";
 import { QueueManager } from "../managers/queue.manager.js";
+import type { LiveState } from "./utils.js";
 
 export interface GatewayContext {
   fastify: FastifyInstance;
@@ -47,6 +48,7 @@ export interface GatewayContext {
   toRoomInfo: (room: Room) => RoomInfo;
   sendError: (socket: WebSocket, message: string) => void;
   startTurnTimer: (gameId: string) => void;
+  liveState: (game: InternalGameState) => LiveState;
   endGame: (gameId: string, game: InternalGameState) => Promise<void>;
   cancelGameIfNeverJoined: (gameId: string) => void;
 }
