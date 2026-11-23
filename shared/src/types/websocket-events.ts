@@ -211,7 +211,6 @@ export type ServerEvent =
   | UnoCaughtEvent
   | UnoCalledEvent
   | BluffResultEvent
-  | BluffResultEvent
   | SpectateStartedEvent
   | QueueJoinedEvent
   | QueueLeftEvent

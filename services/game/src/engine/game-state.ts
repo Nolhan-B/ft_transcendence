@@ -6,12 +6,21 @@ import {
   CardColor,
 } from "shared";
 import { createDeck, dealCards, shuffleDeck } from "./deck.js";
-import type { Card, Player } from "shared";
+import type { Card, GameAction, Player } from "shared";
 import { v4 as uuid } from "uuid";
 import { getCardEffect, isValidPlay } from "./rules.js";
 
-export interface InternalGameState extends GameState {
+// Champs de GameState calcules par le gateway au moment de l'envoi (timers,
+// sockets) : ils ne sont pas stockes dans l'etat interne
+export type LiveStateFields =
+  "turnTimeLeftMs" | "pendingWildDraw4" | "unoVulnerable" | "reconnecting";
+
+export interface InternalGameState extends Omit<GameState, LiveStateFields> {
   drawPile: Card[];
+  // Actions pas encore diffusees : elles deviennent lastActions au prochain envoi
+  pendingActions: GameAction[];
+  // Dernier numero d'action attribue dans la partie
+  actionSeq: number;
   // Interne : sert a enregistrer la vraie duree de la partie (Match.startedAt)
   startedAt: Date;
   lastWildDraw4?: {
@@ -72,6 +81,9 @@ export function createGame(
     ranking: [],
     winnerId: null,
     startedAt: new Date(),
+    lastActions: [],
+    pendingActions: [],
+    actionSeq: 0,
   };
 }
 
