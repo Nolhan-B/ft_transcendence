@@ -2,12 +2,19 @@ import { WebSocket } from "ws";
 import {
   CardColor,
   CardValue,
+  GameMode,
   type ClientMessage,
   type GameState,
 } from "shared";
 import { InternalGameState } from "../engine/game-state.js";
 import { Room } from "../managers/room.manager.js";
 import type { RoomInfo } from "shared";
+
+// Bornes d'une partie : au-dela de 15 joueurs le paquet (108 cartes) ne suffit
+// plus a distribuer 7 cartes chacun, et createGame plante
+export const MIN_PLAYERS = 2;
+export const MAX_PLAYERS = 4;
+export const ROOM_NAME_MAX_LENGTH = 50;
 
 export function sendError(socket: WebSocket, message: string): void {
   socket.send(JSON.stringify({ type: "error", message }));
@@ -90,12 +97,28 @@ export function validateMessage(raw: unknown): ClientMessage | null {
     case "call_uno":
       if (typeof msg.gameId !== "string") return null;
       break;
-    case "create_room":
-      if (typeof msg.mode !== "string" || typeof msg.maxPlayers !== "number")
+    case "create_room": {
+      if (!Object.values(GameMode).includes(msg.mode as GameMode)) return null;
+      const maxPlayers = msg.maxPlayers;
+      if (
+        typeof maxPlayers !== "number" ||
+        !Number.isInteger(maxPlayers) ||
+        maxPlayers < MIN_PLAYERS ||
+        maxPlayers > MAX_PLAYERS
+      )
         return null;
       if (typeof msg.name !== "string") return null;
+      const name = msg.name.trim();
+      if (name.length === 0 || name.length > ROOM_NAME_MAX_LENGTH) return null;
+      if (msg.password !== undefined && typeof msg.password !== "string")
+        return null;
       break;
+    }
     case "join_room":
+      if (typeof msg.roomCode !== "string") return null;
+      if (msg.password !== undefined && typeof msg.password !== "string")
+        return null;
+      break;
     case "leave_room":
     case "start_game":
       if (typeof msg.roomCode !== "string") return null;

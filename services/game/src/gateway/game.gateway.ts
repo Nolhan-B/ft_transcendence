@@ -294,24 +294,31 @@ export default async function gameGateway(fastify: FastifyInstance) {
       type: "game_ended",
       winnerId: game.winnerId ?? "",
     });
-    if (game.mode === GameMode.RANKED) {
-      await updateElo(game);
+    // Une erreur de base de donnees ne doit ni faire planter le service
+    // (endGame est souvent appele depuis un setTimeout), ni laisser la partie en memoire
+    try {
+      if (game.mode === GameMode.RANKED) {
+        await updateElo(game);
+      }
+      await fastify.prisma.match.create({
+        data: {
+          mode: game.mode,
+          players: game.players.map((p) => p.userId),
+          ranking: game.ranking,
+          winnerId: game.winnerId ?? "",
+          chatLog: chatLogs.get(gameId) ?? [],
+          moveLog: moveLogs.get(gameId) ?? [],
+        },
+      });
+    } catch (err) {
+      fastify.log.error({ err, gameId }, "Failed to save game result");
+    } finally {
+      chatLogs.delete(gameId);
+      moveLogs.delete(gameId);
+      rooms.delete(gameId);
+      spectators.delete(gameId);
+      manager.removeGame(gameId);
     }
-    await fastify.prisma.match.create({
-      data: {
-        mode: game.mode,
-        players: game.players.map((p) => p.userId),
-        ranking: game.ranking,
-        winnerId: game.winnerId ?? "",
-        chatLog: chatLogs.get(gameId) ?? [],
-        moveLog: moveLogs.get(gameId) ?? [],
-      },
-    });
-    chatLogs.delete(gameId);
-    moveLogs.delete(gameId);
-    rooms.delete(gameId);
-    spectators.delete(gameId);
-    manager.removeGame(gameId);
   }
 
   function runMatchmaking(): void {
@@ -434,64 +441,74 @@ export default async function gameGateway(fastify: FastifyInstance) {
         return;
       }
 
-      switch (message.type) {
-        case "join_game":
-          await handleJoinGame(ctx, message);
-          break;
-        case "play_card":
-          await handlePlayCard(ctx, message);
-          break;
-        case "draw_card":
-          await handleDrawCard(ctx, message);
-          break;
-        case "call_uno":
-          handleCallUno(ctx, message);
-          break;
-        case "catch_uno":
-          handleCatchUno(ctx, message);
-          break;
-        case "challenge_bluff":
-          await handleChallengeBluff(ctx, message);
-          break;
-        case "accept_wild_draw4":
-          handleAcceptWildDraw4(ctx, message);
-          break;
-        case "chat_message":
-          handleChatMessage(ctx, message);
-          break;
-        case "create_room":
-          await handleCreateRoom(ctx, message);
-          break;
-        case "join_room":
-          await handleJoinRoom(ctx, message);
-          break;
-        case "leave_room":
-          handleLeaveRoom(ctx, message);
-          break;
-        case "update_room":
-          handleUpdateRoom(ctx, message);
-          break;
-        case "start_game":
-          handleStartGame(ctx, message);
-          break;
-        case "add_bot":
-          handleAddBot(ctx, message);
-          break;
-        case "remove_bot":
-          handleRemoveBot(ctx, message);
-          break;
-        case "spectate_game":
-          handleSpectateGame(ctx, message);
-          break;
-        case "leave_spectate":
-          handleLeaveSpectate(ctx, message);
-          break;
-        case "join_queue":
-          await handleJoinQueue(ctx);
-          break;
-        case "leave_queue":
-          handleLeaveQueue(ctx);
-          break;
+      // Un handler qui plante (erreur Prisma, bug) ne doit pas tuer le service :
+      // sans ce catch, la promesse rejetee arrete tout le processus Node
+      try {
+        switch (message.type) {
+          case "join_game":
+            await handleJoinGame(ctx, message);
+            break;
+          case "play_card":
+            await handlePlayCard(ctx, message);
+            break;
+          case "draw_card":
+            await handleDrawCard(ctx, message);
+            break;
+          case "call_uno":
+            handleCallUno(ctx, message);
+            break;
+          case "catch_uno":
+            handleCatchUno(ctx, message);
+            break;
+          case "challenge_bluff":
+            await handleChallengeBluff(ctx, message);
+            break;
+          case "accept_wild_draw4":
+            handleAcceptWildDraw4(ctx, message);
+            break;
+          case "chat_message":
+            handleChatMessage(ctx, message);
+            break;
+          case "create_room":
+            await handleCreateRoom(ctx, message);
+            break;
+          case "join_room":
+            await handleJoinRoom(ctx, message);
+            break;
+          case "leave_room":
+            handleLeaveRoom(ctx, message);
+            break;
+          case "update_room":
+            handleUpdateRoom(ctx, message);
+            break;
+          case "start_game":
+            handleStartGame(ctx, message);
+            break;
+          case "add_bot":
+            handleAddBot(ctx, message);
+            break;
+          case "remove_bot":
+            handleRemoveBot(ctx, message);
+            break;
+          case "spectate_game":
+            handleSpectateGame(ctx, message);
+            break;
+          case "leave_spectate":
+            handleLeaveSpectate(ctx, message);
+            break;
+          case "join_queue":
+            await handleJoinQueue(ctx);
+            break;
+          case "leave_queue":
+            handleLeaveQueue(ctx);
+            break;
+        }
+      } catch (err) {
+        fastify.log.error(
+          { err, userId, type: message.type },
+          "WebSocket handler failed",
+        );
+        sendError(socket, "Internal server error");
       }
     };
 

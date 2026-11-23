@@ -26,7 +26,7 @@ export async function handleCreateRoom(
     user.username,
     msg.mode,
     msg.maxPlayers,
-    msg.name,
+    msg.name.trim(),
     msg.password,
   );
   if (!ctx.roomSockets.has(roomCode)) ctx.roomSockets.set(roomCode, new Set());

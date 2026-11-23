@@ -555,6 +555,41 @@ await test("last player leaves, room is deleted", async () => {
   aliceClient.ws.close();
 });
 
+await test("create_room via WebSocket rejects invalid payloads", async () => {
+  const client = await createClient(aliceToken);
+  await client.waitFor("connected");
+
+  const invalid = [
+    { mode: "classic", maxPlayers: 50, name: "Too many" }, // 16+ joueurs faisait planter createGame
+    { mode: "classic", maxPlayers: 1, name: "Too few" },
+    { mode: "classic", maxPlayers: 2.5, name: "Not integer" },
+    { mode: "classic", maxPlayers: 4, name: "   " },
+    { mode: "classic", maxPlayers: 4, name: "x".repeat(51) },
+    { mode: "nope", maxPlayers: 4, name: "Bad mode" },
+    { mode: "classic", maxPlayers: 4, name: "Bad pwd", password: 42 },
+  ];
+  for (const payload of invalid) {
+    client.send({ type: "create_room", ...payload });
+    const error = await client.waitFor("error");
+    assert(
+      error.message === "Invalid message format",
+      `Should reject ${JSON.stringify(payload)}`,
+    );
+  }
+
+  // Le service est toujours debout et accepte un payload valide
+  client.send({
+    type: "create_room",
+    mode: "classic",
+    maxPlayers: 4,
+    name: "  Trimmed  ",
+  });
+  const updated = await client.waitFor("room_updated");
+  assert(updated.room.name === "Trimmed", "Room name should be trimmed");
+  log("Invalid create_room payloads rejected");
+  client.ws.close();
+});
+
 await test("join non-existent room returns error", async () => {
   const client = await createClient(aliceToken);
   await client.waitFor("connected");

@@ -5,6 +5,11 @@ import {
   GameMode,
   JwtPayload,
 } from "shared";
+import {
+  MAX_PLAYERS,
+  MIN_PLAYERS,
+  ROOM_NAME_MAX_LENGTH,
+} from "../gateway/utils.js";
 
 export default async function gameRoutes(fastify: FastifyInstance) {
   fastify.post(
@@ -78,9 +83,17 @@ export default async function gameRoutes(fastify: FastifyInstance) {
           type: "object",
           required: ["name", "mode", "maxPlayers"],
           properties: {
-            name: { type: "string", minLength: 1, maxLength: 50 },
+            name: {
+              type: "string",
+              minLength: 1,
+              maxLength: ROOM_NAME_MAX_LENGTH,
+            },
             mode: { type: "string", minLength: 1 },
-            maxPlayers: { type: "integer", minimum: 2, maximum: 4 },
+            maxPlayers: {
+              type: "integer",
+              minimum: MIN_PLAYERS,
+              maximum: MAX_PLAYERS,
+            },
             password: { type: "string" },
           },
         },
@@ -108,10 +121,10 @@ export default async function gameRoutes(fastify: FastifyInstance) {
         });
       }
 
-      if (maxPlayers < 2 || maxPlayers > 4) {
-        return reply
-          .code(400)
-          .send({ error: "Max players must be between 2 and 4" });
+      if (maxPlayers < MIN_PLAYERS || maxPlayers > MAX_PLAYERS) {
+        return reply.code(400).send({
+          error: `Max players must be between ${MIN_PLAYERS} and ${MAX_PLAYERS}`,
+        });
       }
 
       const roomCode = fastify.roomManager.createRoom(
