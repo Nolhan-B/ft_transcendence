@@ -43,7 +43,7 @@ export function scheduleBotTurnIfNeeded(
   const botId = currentPlayer.userId;
 
   const playBotTurn = async () => {
-    // On relit l'etat à jour : il a pu changer pendant le delai de reflexion
+    // On relit l'etat a jour : il a pu changer pendant le delai de reflexion
     const game = ctx.manager.getGame(gameId);
     if (!game || game.status !== GameStatus.IN_PROGRESS) return;
 
@@ -118,7 +118,7 @@ export function scheduleBotTurnIfNeeded(
         }
         return;
       }
-      // Coup refusé : on pioche à la place
+      // Coup refuse : on pioche a la place
       failed = false;
     }
 

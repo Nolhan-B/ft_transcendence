@@ -270,7 +270,7 @@ async function waitUntil(cond: () => boolean, timeoutMs: number) {
   return true;
 }
 
-// Partie entre `nbHumans` humains (A commence) puis un bot en dernier siège
+// Partie entre `nbHumans` humains (A commence) puis un bot en dernier siege
 async function setupGameWithBot(server: Server, nbHumans: number) {
   const humans: Human[] = [];
   for (let i = 0; i < nbHumans; i++) {
@@ -306,7 +306,7 @@ async function setupGameWithBot(server: Server, nbHumans: number) {
   const game = server.gameManager.getGame(gameId)!;
   const bot = game.players[nbHumans];
   assert(bot.userId.startsWith("bot_"), "Le dernier siège doit être un bot");
-  // Main du bot déterministe : seul le rouge 3 est jouable sur un rouge 5
+  // Main du bot deterministe : seul le rouge 3 est jouable sur un rouge 5
   game.topCard = { id: "top", color: "red", value: "5" };
   game.currentColor = "red";
   bot.hand = [
@@ -854,7 +854,7 @@ const tests = [
       assert(b.isCurrentTurn, "B est la victime du +4");
       const bHand = b.hand.length;
 
-      // B ne répond pas : au bout de 5 s il pioche 4, puis c'est au bot
+      // B ne repond pas : au bout de 5 s il pioche 4, puis c'est au bot
       const played = await waitUntil(
         () => !bot.hand.some((c) => c.id === "bot_r3"),
         5000 + 2500,
