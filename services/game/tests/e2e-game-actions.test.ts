@@ -1145,6 +1145,7 @@ const tests = [
     await withServer(async (server) => {
       const { players, game } = await setupGame(server, 3);
       const [a, , c] = players;
+      const left = waitForMessage(c.ws, "player_left", TURN_MS * 5);
       // A, B et C ne jouent pas : au 2e timeout de A, il est exclu
       const kicked = await new Promise<any>((resolve, reject) => {
         const timeout = setTimeout(
@@ -1165,6 +1166,11 @@ const tests = [
       assert(kicked.userId === a.id, "A est exclu");
       assert(kicked.reason === "afk" && kicked.auto === true, "raison afk");
       assert(game.players[0].disconnected, "A est retiré de la partie");
+      const leftMsg = await left;
+      assert(
+        leftMsg.userId === a.id && leftMsg.reason === "afk",
+        `player_left afk attendu, reçu ${JSON.stringify(leftMsg)}`,
+      );
     });
   }),
   // ---------------- turnTimeLeftMs ----------------
@@ -1502,6 +1508,75 @@ const tests = [
       assert(
         endMsg.ranking.join() === [ids[0], ids[2]].join(),
         "game_ended porte le classement",
+      );
+    });
+  }),
+  // ---------------- reconnecting / player_left ----------------
+
+  test("reconnexion: une coupure met le joueur dans reconnecting, son retour l'en sort", async () => {
+    await withServer(async (server) => {
+      const { players, gameId } = await setupGame(server, 3);
+      const [, b, c] = players;
+
+      const left = waitForMessage(c.ws, "player_left");
+      const cut = waitForMessage(c.ws, "game_updated");
+      b.ws.close();
+      const leftMsg = await left;
+      assert(
+        leftMsg.userId === b.id && leftMsg.reason === "disconnected",
+        `player_left disconnected attendu, reçu ${JSON.stringify(leftMsg)}`,
+      );
+      const during = (await cut).state;
+      assert(
+        during.reconnecting.length === 1 && during.reconnecting[0] === b.id,
+        `B doit être en reconnexion, reçu ${JSON.stringify(during.reconnecting)}`,
+      );
+      assert(
+        !during.players.find((p: any) => p.userId === b.id).disconnected,
+        "B n'est pas encore exclu",
+      );
+
+      const back = waitForMessage(c.ws, "game_updated");
+      const ws2 = await connectUser(server, b.id);
+      send(ws2, { type: "join_game", gameId });
+      await waitForMessage(ws2, "game_updated");
+      const after = (await back).state;
+      assert(after.reconnecting.length === 0, "B n'est plus en reconnexion");
+    });
+  }),
+
+  test("reconnexion: sans retour, player_left passe à abandoned", async () => {
+    await withServer(async (server) => {
+      const { players } = await setupGame(server, 3);
+      const [, b, c] = players;
+      const abandoned = new Promise<any>((resolve, reject) => {
+        const timeout = setTimeout(
+          () => reject(new Error("Pas de player_left abandoned")),
+          8000,
+        );
+        c.ws.on("message", (data) => {
+          const msg = JSON.parse(data.toString());
+          if (msg.type === "player_left" && msg.reason === "abandoned") {
+            clearTimeout(timeout);
+            resolve(msg);
+          }
+        });
+      });
+      const kickedState = new Promise<any>((resolve) => {
+        c.ws.on("message", (data) => {
+          const msg = JSON.parse(data.toString());
+          const pb = msg.state?.players.find((p: any) => p.userId === b.id);
+          if (msg.type === "game_updated" && pb?.disconnected)
+            resolve(msg.state);
+        });
+      });
+      b.ws.close();
+      const msg = await abandoned;
+      assert(msg.userId === b.id, "B a abandonné");
+      const state = await kickedState;
+      assert(
+        !state.reconnecting.includes(b.id),
+        "un joueur exclu n'est plus en reconnexion",
       );
     });
   }),

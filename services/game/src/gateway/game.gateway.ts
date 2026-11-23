@@ -166,6 +166,13 @@ export default async function gameGateway(fastify: FastifyInstance) {
     return {
       ...NO_LIVE_STATE,
       turnTimeLeftMs: timed ? Math.max(0, deadline - Date.now()) : null,
+      // Socket ferme, delai de reconnexion en cours (pas encore exclus)
+      reconnecting: game.players
+        .filter(
+          (p) =>
+            !p.disconnected && disconnectTimers.has(`${game.id}:${p.userId}`),
+        )
+        .map((p) => p.userId),
       // A 1 carte, sans avoir dit UNO, fenetre encore ouverte
       unoVulnerable: game.players
         .filter(
@@ -294,6 +301,7 @@ export default async function gameGateway(fastify: FastifyInstance) {
         broadCastToRoom(gameId, {
           type: "player_left",
           userId: currentPlayer.userId,
+          reason: "afk",
         });
         advanceToNextPlayer(game);
         game.drawPileCount = game.drawPile.length;
@@ -658,7 +666,11 @@ export default async function gameGateway(fastify: FastifyInstance) {
         if (!found) continue;
         if ([...room].some((c) => c.userId === userId)) continue; // deja revenu
 
-        broadCastToRoom(gameId, { type: "player_left", userId });
+        broadCastToRoom(gameId, {
+          type: "player_left",
+          userId,
+          reason: "disconnected",
+        });
 
         const key = `${gameId}:${userId}`;
         if (disconnectTimers.has(key)) clearTimeout(disconnectTimers.get(key));
@@ -687,6 +699,11 @@ export default async function gameGateway(fastify: FastifyInstance) {
                 reason: "abandoned",
                 auto: true,
               });
+              broadCastToRoom(gameId, {
+                type: "player_left",
+                userId,
+                reason: "abandoned",
+              });
             }
 
             const activePlayers = game.players.filter((p) => !p.disconnected);
@@ -710,6 +727,9 @@ export default async function gameGateway(fastify: FastifyInstance) {
             broadCastStateToRoom(gameId, game);
           }, RECONNECT_GRACE_MS),
         );
+        // Apres la pose du timer : l'etat le liste dans reconnecting
+        const game = manager.getGame(gameId);
+        if (game) broadCastStateToRoom(gameId, game);
       }
 
       for (const [roomCode, sockets] of roomSockets) {

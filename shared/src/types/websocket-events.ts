@@ -1,4 +1,10 @@
-import type { CardColor, GameState, GameMode, GameSettings } from "./game.js";
+import type {
+  CardColor,
+  GameState,
+  GameMode,
+  GameSettings,
+  KickReason,
+} from "./game.js";
 
 // ============================================================
 // ROOM - Client -> Server
@@ -125,9 +131,14 @@ export interface PlayerJoinedEvent {
   userId: string;
 }
 
+// disconnected : socket ferme, le joueur peut encore revenir (voir
+// GameState.reconnecting). afk / abandoned : il est exclu de la partie
+export type PlayerLeftReason = "disconnected" | KickReason;
+
 export interface PlayerLeftEvent {
   type: "player_left";
   userId: string;
+  reason: PlayerLeftReason;
 }
 
 export interface GameEndedEvent {

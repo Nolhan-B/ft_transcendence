@@ -42,6 +42,13 @@ export async function handleJoinGame(
     ctx.startTurnTimer(msg.gameId);
   }
 
+  // Retour apres une coupure : tout le monde doit le voir sortir de
+  // reconnecting, l'etat part donc a toute la salle (lui compris)
+  if (pending) {
+    ctx.broadCastStateToRoom(game.id, game);
+    return;
+  }
+
   // Apres le demarrage du chrono : l'etat envoye contient le temps restant
   // (a la reconnexion, celui du chrono deja en cours, pas 20 s)
   const playerGameState = filterStateForPlayer(
