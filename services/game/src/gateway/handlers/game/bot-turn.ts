@@ -14,6 +14,22 @@ import { handleAcceptWildDraw4 } from "./accept-wild-draw4.js";
 import { handlePlayCard } from "./play-card.js";
 import { handleCallUno } from "./call-uno.js";
 
+// A appeler apres tout changement de tour declenche par le serveur (timer AFK,
+// timer de bluff, deconnexion) : fait jouer le bot, ou lance le chrono de l'humain
+export function continueTurn(
+  ctx: GatewayContext,
+  game: InternalGameState,
+): void {
+  if (game.status !== GameStatus.IN_PROGRESS) return;
+  const next = game.players.find((p) => p.isCurrentTurn);
+  if (!next) return;
+  if (next.userId.startsWith("bot_")) {
+    scheduleBotTurnIfNeeded(ctx, game, game.id);
+  } else {
+    ctx.startTurnTimer(game.id);
+  }
+}
+
 export function scheduleBotTurnIfNeeded(
   ctx: GatewayContext,
   gameState: InternalGameState,

@@ -4,7 +4,7 @@ import {
   advanceToNextPlayer,
   drawCardsForPlayer,
 } from "../../../engine/game-state.js";
-import { scheduleBotTurnIfNeeded } from "./bot-turn.js";
+import { continueTurn, scheduleBotTurnIfNeeded } from "./bot-turn.js";
 
 export async function handlePlayCard(
   ctx: GatewayContext,
@@ -71,6 +71,9 @@ export async function handlePlayCard(
           updatedState.lastWildDraw4 = undefined;
           advanceToNextPlayer(updatedState);
           ctx.broadCastStateToRoom(updatedState.id, updatedState);
+          // Sans ca, un bot suivant ne joue jamais et l'humain suivant
+          // herite du reste du chrono de la victime
+          continueTurn(ctx, updatedState);
         }, 5000),
       );
     }

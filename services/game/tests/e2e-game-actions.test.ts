@@ -261,6 +261,61 @@ async function setupUno(server: Server) {
   return ctx;
 }
 
+async function waitUntil(cond: () => boolean, timeoutMs: number) {
+  const start = Date.now();
+  while (!cond()) {
+    if (Date.now() - start > timeoutMs) return false;
+    await sleep(50);
+  }
+  return true;
+}
+
+// Partie entre `nbHumans` humains (A commence) puis un bot en dernier siège
+async function setupGameWithBot(server: Server, nbHumans: number) {
+  const humans: Human[] = [];
+  for (let i = 0; i < nbHumans; i++) {
+    const id = uniqueUserId(["alice", "bob"][i]);
+    humans.push({ id, ws: await connectUser(server, id) });
+  }
+  const [a, ...others] = humans;
+
+  send(a.ws, {
+    type: "create_room",
+    mode: GameMode.CLASSIC,
+    maxPlayers: nbHumans + 1,
+    name: "bot-timer",
+  });
+  const roomCode = (await waitForMessage(a.ws, "room_updated")).room.code;
+  send(a.ws, { type: "update_room", roomCode, settings: SETTINGS });
+  await waitForMessage(a.ws, "room_updated");
+  for (const p of others) {
+    send(p.ws, { type: "join_room", roomCode });
+    await waitForMessage(p.ws, "room_updated");
+  }
+  send(a.ws, { type: "add_bot", roomCode });
+  await waitForMessage(a.ws, "room_updated");
+
+  const started = humans.map((p) => waitForMessage(p.ws, "game_started"));
+  send(a.ws, { type: "start_game", roomCode });
+  const gameId = (await Promise.all(started))[0].gameId;
+  for (const p of humans) {
+    send(p.ws, { type: "join_game", gameId });
+    await waitForMessage(p.ws, "game_updated");
+  }
+
+  const game = server.gameManager.getGame(gameId)!;
+  const bot = game.players[nbHumans];
+  assert(bot.userId.startsWith("bot_"), "Le dernier siège doit être un bot");
+  // Main du bot déterministe : seul le rouge 3 est jouable sur un rouge 5
+  game.topCard = { id: "top", color: "red", value: "5" };
+  game.currentColor = "red";
+  bot.hand = [
+    { id: "bot_r3", color: "red", value: "3" },
+    { id: "bot_b1", color: "blue", value: "1" },
+  ];
+  return { humans, gameId, game, bot };
+}
+
 // ============================================================
 // TESTS
 // ============================================================
@@ -758,6 +813,55 @@ const tests = [
         err.message === "Invalid message format",
         `Message inattendu : ${err.message}`,
       );
+    });
+  }),
+
+  // ---------------- Timers serveur → tour du bot ----------------
+
+  test("bot: après le timeout AFK d'un humain, le bot suivant joue", async () => {
+    await withServer(async (server) => {
+      const { game, bot } = await setupGameWithBot(server, 1);
+      assert(game.players[0].isCurrentTurn, "Ce doit être au tour de A");
+
+      // A ne joue pas : le timer le fait piocher et passe la main au bot
+      await sleep(TURN_MS + 100);
+      const played = await waitUntil(
+        () => !bot.hand.some((c) => c.id === "bot_r3"),
+        2500,
+      );
+      assert(played, "Le bot doit avoir joué son rouge 3");
+      assert(!bot.disconnected, "Le bot ne doit pas être compté AFK");
+      assert(game.players[0].isCurrentTurn, "La main doit revenir à A");
+    });
+  }),
+
+  test("bot: après l'expiration du timer de bluff, le bot suivant joue", async () => {
+    await withServer(async (server) => {
+      const { humans, gameId, game, bot } = await setupGameWithBot(server, 2);
+      const [a] = humans;
+      const b = game.players[1];
+      game.players[0].hand = [
+        { id: "wd", color: "wild", value: "wild_draw4" },
+        { id: "keep", color: "blue", value: "1" },
+      ];
+      send(a.ws, {
+        type: "play_card",
+        gameId,
+        cardId: "wd",
+        chosenColor: "red",
+      });
+      await waitForMessage(a.ws, "game_updated");
+      assert(b.isCurrentTurn, "B est la victime du +4");
+      const bHand = b.hand.length;
+
+      // B ne répond pas : au bout de 5 s il pioche 4, puis c'est au bot
+      const played = await waitUntil(
+        () => !bot.hand.some((c) => c.id === "bot_r3"),
+        5000 + 2500,
+      );
+      assert(b.hand.length >= bHand + 4, "B doit avoir pioché les 4 cartes");
+      assert(played, "Le bot doit avoir joué après le timer de bluff");
+      assert(!b.disconnected, "B ne doit pas être compté AFK pendant le bluff");
     });
   }),
 ];

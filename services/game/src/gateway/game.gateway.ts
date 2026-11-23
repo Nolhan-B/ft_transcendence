@@ -33,7 +33,10 @@ import {
 import { handleChatMessage } from "./handlers/chat/index.js";
 import type { GatewayContext } from "./types.js";
 import { advanceToNextPlayer } from "../engine/game-state.js";
-import { scheduleBotTurnIfNeeded } from "./handlers/game/bot-turn.js";
+import {
+  continueTurn,
+  scheduleBotTurnIfNeeded,
+} from "./handlers/game/bot-turn.js";
 import { handleJoinQueue } from "./handlers/matchmaking/join-queue.js";
 import { handleLeaveQueue } from "./handlers/matchmaking/leave-queue.js";
 import { findMatch } from "../engine/matchmaking.js";
@@ -178,7 +181,8 @@ export default async function gameGateway(fastify: FastifyInstance) {
     }
   }
 
-  function startTurnTimer(gameId: string): void {
+  // ctx sert a relancer le bot quand le timer lui passe la main
+  function startTurnTimer(gameId: string, ctx: GatewayContext): void {
     if (turnTimers.has(gameId)) {
       clearTimeout(turnTimers.get(gameId));
     }
@@ -195,6 +199,20 @@ export default async function gameGateway(fastify: FastifyInstance) {
       if (!room || room.size === 0) return;
       const currentPlayer = game.players.find((p) => p.isCurrentTurn);
       if (!currentPlayer) return;
+
+      // Un +4 attend une reponse : c'est le timer de bluff qui tranche
+      if (game.lastWildDraw4) {
+        startTurnTimer(gameId, ctx);
+        return;
+      }
+
+      // Chrono perime tombe sur le tour d'un bot : on ne le compte pas AFK,
+      // on le relance (filet de securite si son coup n'est jamais parti)
+      if (currentPlayer.userId.startsWith("bot_")) {
+        scheduleBotTurnIfNeeded(ctx, game, gameId);
+        startTurnTimer(gameId, ctx);
+        return;
+      }
 
       const afkKey = `${gameId}:${currentPlayer.userId}`;
       const count = (afkCounts.get(afkKey) ?? 0) + 1;
@@ -219,7 +237,8 @@ export default async function gameGateway(fastify: FastifyInstance) {
         broadCastStateToRoom(gameId, game);
       }
 
-      startTurnTimer(gameId);
+      // Le suivant peut etre un bot : il doit jouer, pas attendre le chrono
+      continueTurn(ctx, game);
     }, TURN_TIMEOUT_MS);
 
     turnTimers.set(gameId, timer);
@@ -421,7 +440,7 @@ export default async function gameGateway(fastify: FastifyInstance) {
       broadCastStateToRoom,
       broadcastToRoomSockets,
       sendError,
-      startTurnTimer,
+      startTurnTimer: (gameId) => startTurnTimer(gameId, ctx),
       endGame,
       toRoomInfo,
     };
@@ -575,9 +594,7 @@ export default async function gameGateway(fastify: FastifyInstance) {
               advanceToNextPlayer(game);
               game.drawPileCount = game.drawPile.length;
               broadCastStateToRoom(gameId, game);
-              scheduleBotTurnIfNeeded(ctx, game, gameId);
-              const next = game.players.find((p) => p.isCurrentTurn);
-              if (!next?.userId.startsWith("bot_")) startTurnTimer(gameId);
+              continueTurn(ctx, game);
             }
           }, RECONNECT_GRACE_MS),
         );
