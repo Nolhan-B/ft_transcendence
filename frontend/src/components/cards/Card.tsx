@@ -1,7 +1,9 @@
 import type { HTMLAttributes, ReactNode } from "react";
 
 // Only theme colors (see styles/index.css), so the card follows the theme.
-export type CardColor = "primary" | "secondary" | "accent" | "success";
+// "neutral": wild cards and card backs (see components/game/cards.ts)
+export type CardColor =
+  "primary" | "secondary" | "accent" | "success" | "neutral";
 
 // "classic": colored body, thick white border, dark central panel (auth page).
 // "neon": dark body, glowing tube of the card color around the panel (game).
@@ -12,6 +14,7 @@ const COLOR_CLASSES: Record<CardColor, string> = {
   secondary: "bg-secondary",
   accent: "bg-accent",
   success: "bg-success",
+  neutral: "bg-neutral",
 };
 
 // Neon look, per color: outer border and halo, then the inner tube.
@@ -78,7 +81,7 @@ export function Card({
 
   return (
     <div
-      className={`card @container aspect-56/87 min-h-0 overflow-hidden border-8 border-primary-content shadow-2xl ${COLOR_CLASSES[color]} ${className}`}
+      className={`card @container aspect-56/87 min-h-0 overflow-hidden border-8 border-base-content shadow-2xl ${COLOR_CLASSES[color]} ${className}`}
       {...rest}
     >
       <div className="card-body min-h-0 p-[4cqw]">

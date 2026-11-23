@@ -27,8 +27,8 @@ export function NavLinks({ onNavigate }: Props) {
             className={({ isActive }) =>
               `font-cyber text-xs font-bold uppercase tracking-wider sm:text-sm ${
                 isActive
-                  ? "menu-active border-b-2 border-[#00f0ff] bg-neutral text-[#00f0ff]"
-                  : "hover:bg-base-300 hover:text-[#00f0ff]"
+                  ? "menu-active border-b-2 border-secondary bg-neutral text-secondary"
+                  : "hover:bg-base-300 hover:text-secondary"
               }`
             }
           >

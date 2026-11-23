@@ -113,7 +113,7 @@ export function CardBack() {
       src={snsLogo}
       alt="SNS"
       draggable={false}
-      className="mx-auto w-[74cqw] -rotate-12 select-none drop-shadow-[0_0_3cqw_rgba(0,240,255,0.45)]"
+      className="mx-auto w-[74cqw] -rotate-12 select-none drop-shadow-[0_0_3cqw_color-mix(in_oklab,var(--color-secondary)_45%,transparent)]"
     />
   );
 }

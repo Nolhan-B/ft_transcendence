@@ -71,7 +71,7 @@ export function AuthPage() {
         className="pointer-events-none absolute inset-0"
         style={{
           backgroundImage:
-            "linear-gradient(to right, rgba(0, 240, 255, 0.06) 1px, transparent 1px), linear-gradient(to bottom, rgba(0, 240, 255, 0.06) 1px, transparent 1px)",
+            "linear-gradient(to right, color-mix(in oklab, var(--color-secondary) 6%, transparent) 1px, transparent 1px), linear-gradient(to bottom, color-mix(in oklab, var(--color-secondary) 6%, transparent) 1px, transparent 1px)",
           backgroundSize: "48px 48px",
           maskImage:
             "radial-gradient(ellipse 85% 80% at 50% 50%, #000 35%, transparent 100%)",
@@ -83,17 +83,17 @@ export function AuthPage() {
       {/* Ambient corner glows to add depth behind both columns */}
       <div
         aria-hidden="true"
-        className="hero-glow pointer-events-none absolute -left-32 top-1/3 size-[28rem] rounded-full bg-[#00f0ff]/12 blur-3xl"
+        className="hero-glow pointer-events-none absolute -left-32 top-1/3 size-[28rem] rounded-full bg-secondary/12 blur-3xl"
       />
       <div
         aria-hidden="true"
-        className="hero-glow pointer-events-none absolute -right-24 bottom-1/4 size-[26rem] rounded-full bg-[#ff2a85]/14 blur-3xl [animation-delay:2s]"
+        className="hero-glow pointer-events-none absolute -right-24 bottom-1/4 size-[26rem] rounded-full bg-primary/14 blur-3xl [animation-delay:2s]"
       />
 
       {/* Top-right navigation shortcut */}
       <Link
         to="/home"
-        className="btn btn-outline btn-sm font-cyber absolute right-4 top-4 z-20 border-[#00f0ff]/50 text-[#00f0ff] hover:border-[#00f0ff] hover:bg-[#00f0ff]/15"
+        className="btn btn-outline btn-sm font-cyber absolute right-4 top-4 z-20 border-secondary/50 text-secondary hover:border-secondary hover:bg-secondary/15"
       >
         Go to website
       </Link>
@@ -104,20 +104,20 @@ export function AuthPage() {
           {/* Focused neon backlight directly behind the logo */}
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute top-1/3 left-1/2 -z-10 h-64 w-96 -translate-x-1/2 -translate-y-1/2 rounded-full bg-gradient-to-r from-[#00f0ff]/25 via-[#a855f7]/25 to-[#ff2a85]/25 blur-3xl"
+            className="pointer-events-none absolute top-1/3 left-1/2 -z-10 h-64 w-96 -translate-x-1/2 -translate-y-1/2 rounded-full bg-gradient-to-r from-secondary/25 via-tertiary/25 to-primary/25 blur-3xl"
           />
 
           <img
             src={snsLogo}
             alt="SNS"
-            className="h-auto w-[360px] max-w-[90%] drop-shadow-[0_0_24px_rgba(0,240,255,0.35)] lg:w-[460px] xl:w-[520px]"
+            className="h-auto w-[360px] max-w-[90%] drop-shadow-[0_0_24px_color-mix(in_oklab,var(--color-secondary)_35%,transparent)] lg:w-[460px] xl:w-[520px]"
           />
 
           <div>
-            <p className="font-cyber mb-3 text-2xl font-extrabold uppercase tracking-[0.3em] text-[#00f0ff] drop-shadow-[0_0_10px_rgba(0,240,255,0.5)] lg:text-3xl">
+            <p className="font-cyber mb-3 text-2xl font-extrabold uppercase tracking-[0.3em] text-secondary drop-shadow-[0_0_10px_color-mix(in_oklab,var(--color-secondary)_50%,transparent)] lg:text-3xl">
               {WEBSITE_NAME}
             </p>
-            <h1 className="font-cyber mb-4 bg-gradient-to-r from-[#00f0ff] via-[#a855f7] to-[#ff2a85] bg-clip-text text-4xl font-black uppercase tracking-tight text-transparent drop-shadow-[0_0_14px_rgba(168,85,247,0.3)] lg:text-5xl">
+            <h1 className="font-cyber mb-4 bg-gradient-to-r from-secondary via-tertiary to-primary bg-clip-text text-4xl font-black uppercase tracking-tight text-transparent drop-shadow-[0_0_14px_color-mix(in_oklab,var(--color-tertiary)_30%,transparent)] lg:text-5xl">
               Play. Bluff. Win.
             </h1>
             <p className="mx-auto max-w-md text-sm text-base-content/70 lg:text-base">
@@ -127,15 +127,15 @@ export function AuthPage() {
 
           <ul className="mt-1 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-base-content/65 lg:text-sm">
             <li className="flex items-center gap-2">
-              <span className="size-2 rounded-full bg-[#00f0ff]" />
+              <span className="size-2 rounded-full bg-secondary" />
               Real-time multiplayer
             </li>
             <li className="flex items-center gap-2">
-              <span className="size-2 rounded-full bg-[#a855f7]" />
+              <span className="size-2 rounded-full bg-tertiary" />
               Ranked Elo
             </li>
             <li className="flex items-center gap-2">
-              <span className="size-2 rounded-full bg-[#ff2a85]" />
+              <span className="size-2 rounded-full bg-primary" />
               Friends & chat
             </li>
           </ul>

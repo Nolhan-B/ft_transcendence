@@ -12,9 +12,9 @@ export function SiteTitle() {
       <img
         src={snsLogo}
         alt="SNS"
-        className="h-8 w-auto drop-shadow-[0_0_8px_rgba(0,240,255,0.3)]"
+        className="h-8 w-auto drop-shadow-[0_0_8px_color-mix(in_oklab,var(--color-secondary)_30%,transparent)]"
       />
-      <span className="font-cyber hidden bg-gradient-to-r from-[#00f0ff] via-[#a855f7] to-[#ff2a85] bg-clip-text text-lg font-extrabold tracking-wider text-transparent sm:inline">
+      <span className="font-cyber hidden bg-gradient-to-r from-secondary via-tertiary to-primary bg-clip-text text-lg font-extrabold tracking-wider text-transparent sm:inline">
         {WEBSITE_NAME}
       </span>
     </Link>

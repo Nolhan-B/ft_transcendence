@@ -8,17 +8,17 @@ export function Footer() {
       {/* Subtle neon gradient divider along the top edge */}
       <div
         aria-hidden="true"
-        className="h-px w-full bg-gradient-to-r from-transparent via-[#a855f7]/60 to-transparent"
+        className="h-px w-full bg-gradient-to-r from-transparent via-tertiary/60 to-transparent"
       />
       <footer className="footer sm:footer-horizontal text-base-content p-10">
         <aside>
           <img
             src={snsLogo}
             alt="SNS"
-            className="mb-1 h-10 w-auto drop-shadow-[0_0_8px_rgba(0,240,255,0.3)]"
+            className="mb-1 h-10 w-auto drop-shadow-[0_0_8px_color-mix(in_oklab,var(--color-secondary)_30%,transparent)]"
           />
           <p className="text-base-content/75">
-            <span className="font-cyber bg-gradient-to-r from-[#00f0ff] via-[#a855f7] to-[#ff2a85] bg-clip-text font-extrabold tracking-wider text-transparent">
+            <span className="font-cyber bg-gradient-to-r from-secondary via-tertiary to-primary bg-clip-text font-extrabold tracking-wider text-transparent">
               {WEBSITE_NAME}
             </span>{" "}
             © 2026

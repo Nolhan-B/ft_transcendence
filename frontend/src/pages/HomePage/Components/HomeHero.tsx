@@ -71,7 +71,7 @@ export function HomeHero() {
         className="pointer-events-none absolute inset-0"
         style={{
           backgroundImage:
-            "linear-gradient(to right, rgba(0, 240, 255, 0.06) 1px, transparent 1px), linear-gradient(to bottom, rgba(0, 240, 255, 0.06) 1px, transparent 1px)",
+            "linear-gradient(to right, color-mix(in oklab, var(--color-secondary) 6%, transparent) 1px, transparent 1px), linear-gradient(to bottom, color-mix(in oklab, var(--color-secondary) 6%, transparent) 1px, transparent 1px)",
           backgroundSize: "48px 48px",
           maskImage:
             "radial-gradient(ellipse 85% 80% at 50% 50%, #000 35%, transparent 100%)",
@@ -83,15 +83,15 @@ export function HomeHero() {
       {/* Ambient neon glows matching the SNS logo palette */}
       <div
         aria-hidden="true"
-        className="hero-glow pointer-events-none absolute -left-24 top-1/4 size-96 rounded-full bg-[#00f0ff]/12 blur-3xl"
+        className="hero-glow pointer-events-none absolute -left-24 top-1/4 size-96 rounded-full bg-secondary/12 blur-3xl"
       />
       <div
         aria-hidden="true"
-        className="hero-glow pointer-events-none absolute -right-24 bottom-1/4 size-96 rounded-full bg-[#ff2a85]/14 blur-3xl [animation-delay:2s]"
+        className="hero-glow pointer-events-none absolute -right-24 bottom-1/4 size-96 rounded-full bg-primary/14 blur-3xl [animation-delay:2s]"
       />
       <div
         aria-hidden="true"
-        className="hero-glow pointer-events-none absolute left-1/2 top-0 size-72 -translate-x-1/2 rounded-full bg-[#a855f7]/14 blur-3xl [animation-delay:4s]"
+        className="hero-glow pointer-events-none absolute left-1/2 top-0 size-72 -translate-x-1/2 rounded-full bg-tertiary/14 blur-3xl [animation-delay:4s]"
       />
 
       {/* Floating cards using the real neon Card & CardFace components */}
@@ -119,14 +119,14 @@ export function HomeHero() {
         <img
           src={snsLogo}
           alt="SNS"
-          className="h-44 w-auto drop-shadow-[0_0_14px_rgba(0,240,255,0.28)] sm:h-56"
+          className="h-44 w-auto drop-shadow-[0_0_14px_color-mix(in_oklab,var(--color-secondary)_28%,transparent)] sm:h-56"
         />
 
         <div className="max-w-3xl">
-          <p className="font-cyber mb-4 text-lg font-extrabold uppercase tracking-[0.28em] text-[#00f0ff] drop-shadow-[0_0_8px_rgba(0,240,255,0.45)] sm:text-xl">
+          <p className="font-cyber mb-4 text-lg font-extrabold uppercase tracking-[0.28em] text-secondary drop-shadow-[0_0_8px_color-mix(in_oklab,var(--color-secondary)_45%,transparent)] sm:text-xl">
             {WEBSITE_NAME}
           </p>
-          <h1 className="font-cyber mb-5 bg-gradient-to-r from-[#00f0ff] via-[#a855f7] to-[#ff2a85] bg-clip-text text-4xl font-black uppercase tracking-tight leading-tight text-transparent drop-shadow-[0_0_12px_rgba(168,85,247,0.3)] sm:text-6xl">
+          <h1 className="font-cyber mb-5 bg-gradient-to-r from-secondary via-tertiary to-primary bg-clip-text text-4xl font-black uppercase tracking-tight leading-tight text-transparent drop-shadow-[0_0_12px_color-mix(in_oklab,var(--color-tertiary)_30%,transparent)] sm:text-6xl">
             Play. Bluff. Win.
           </h1>
           <p className="mx-auto max-w-xl text-base text-base-content/70 sm:text-lg">
@@ -136,22 +136,25 @@ export function HomeHero() {
 
         <div className="flex flex-wrap items-center justify-center gap-4">
           <StartPlayingButton>Play now</StartPlayingButton>
-          <Link to="/rules" className="btn btn-outline btn-lg font-cyber uppercase tracking-wider">
+          <Link
+            to="/rules"
+            className="btn btn-outline btn-lg font-cyber uppercase tracking-wider"
+          >
             How to play
           </Link>
         </div>
 
         <ul className="mt-4 flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-sm text-base-content/60">
           <li className="flex items-center gap-2">
-            <span className="size-2 rounded-full bg-[#00f0ff]" />
+            <span className="size-2 rounded-full bg-secondary" />
             Real-time multiplayer
           </li>
           <li className="flex items-center gap-2">
-            <span className="size-2 rounded-full bg-[#a855f7]" />
+            <span className="size-2 rounded-full bg-tertiary" />
             Ranked Elo
           </li>
           <li className="flex items-center gap-2">
-            <span className="size-2 rounded-full bg-[#ff2a85]" />
+            <span className="size-2 rounded-full bg-primary" />
             Friends &amp; chat
           </li>
         </ul>
