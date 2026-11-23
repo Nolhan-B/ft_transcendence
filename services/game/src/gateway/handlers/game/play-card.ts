@@ -7,6 +7,9 @@ import {
 } from "../../../engine/game-state.js";
 import { continueTurn } from "./bot-turn.js";
 
+// Delai pour accepter ou contester un +4 avant qu'il soit accepte d'office
+const BLUFF_TIMEOUT_MS = Number(process.env.BLUFF_TIMEOUT_MS) || 5000;
+
 export async function handlePlayCard(
   ctx: GatewayContext,
   msg: {
@@ -62,6 +65,7 @@ export async function handlePlayCard(
   if (updatedState.lastWildDraw4 && updatedState.settings.bluffChallenge) {
     const targetId = updatedState.players.find((p) => p.isCurrentTurn)?.userId;
     if (targetId) {
+      updatedState.lastWildDraw4.expiresAt = Date.now() + BLUFF_TIMEOUT_MS;
       ctx.bluffTimers.set(
         updatedState.id,
         setTimeout(() => {
@@ -79,7 +83,7 @@ export async function handlePlayCard(
           // herite du reste du chrono de la victime
           continueTurn(ctx, updatedState);
           ctx.broadCastStateToRoom(updatedState.id, updatedState);
-        }, 5000),
+        }, BLUFF_TIMEOUT_MS),
       );
     }
   }

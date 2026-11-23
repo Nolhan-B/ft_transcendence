@@ -27,6 +27,8 @@ export interface InternalGameState extends Omit<GameState, LiveStateFields> {
     playerId: string;
     hadMatchingColor: boolean;
     previousColor: CardColor;
+    // Heure limite pour repondre (posee par le gateway avec le timer de bluff)
+    expiresAt?: number;
   };
 }
 

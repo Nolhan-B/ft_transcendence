@@ -1251,6 +1251,83 @@ const tests = [
       );
     });
   }),
+  // ---------------- pendingWildDraw4 ----------------
+
+  test("bluff: l'état indique le +4 en attente, sans révéler le bluff", async () => {
+    await withServer(async (server) => {
+      const { players, gameId, game } = await setupGame(server);
+      const [a, b, c] = players;
+      game.topCard = { id: "top", color: "red", value: "5" };
+      game.currentColor = "red";
+      game.players[0].hand = [
+        { id: "wd", color: "wild", value: "wild_draw4" },
+        { id: "r1", color: "red", value: "1" }, // A bluffe : il a du rouge
+      ];
+      const rawForB = new Promise<string>((resolve) =>
+        b.ws.once("message", (data) => resolve(data.toString())),
+      );
+      const forC = waitForMessage(c.ws, "game_updated");
+      send(a.ws, {
+        type: "play_card",
+        gameId,
+        cardId: "wd",
+        chosenColor: "green",
+      });
+      const raw = await rawForB;
+      const state = (await forC).state;
+
+      const pending = state.pendingWildDraw4;
+      assert(pending !== null, "le +4 doit être en attente");
+      assert(pending.playerId === a.id, "posé par A");
+      assert(pending.targetId === b.id, "B doit répondre");
+      assert(
+        pending.timeLeftMs > 0 && pending.timeLeftMs <= 5000,
+        `délai de réponse attendu, reçu ${pending.timeLeftMs}`,
+      );
+      assert(
+        state.turnTimeLeftMs === null,
+        "pas de chrono de tour pendant le +4 en attente",
+      );
+      assert(
+        !raw.includes("hadMatchingColor"),
+        "l'info du bluff ne doit jamais être envoyée",
+      );
+    });
+  }),
+
+  test("bluff: pendingWildDraw4 repasse à null après la réponse", async () => {
+    await withServer(async (server) => {
+      const { players, gameId } = await setupBluff(server);
+      const [, b, c] = players;
+      const forC = waitForMessage(c.ws, "game_updated");
+      send(b.ws, { type: "accept_wild_draw4", gameId });
+      const state = (await forC).state;
+      assert(state.pendingWildDraw4 === null, "plus de +4 en attente");
+      assert(
+        typeof state.turnTimeLeftMs === "number",
+        "le chrono du tour revient",
+      );
+    });
+  }),
+
+  test("bluff: à la reconnexion, le délai de réponse continue", async () => {
+    await withServer(async (server) => {
+      const { players, gameId } = await setupBluff(server);
+      const [, b] = players;
+      await sleep(700);
+      b.ws.close();
+      await sleep(100);
+      const ws2 = await connectUser(server, b.id);
+      send(ws2, { type: "join_game", gameId });
+      const pending = (await waitForMessage(ws2, "game_updated")).state
+        .pendingWildDraw4;
+      assert(pending?.targetId === b.id, "B doit toujours répondre");
+      assert(
+        pending.timeLeftMs < 5000 - 600,
+        `le délai ne doit pas repartir à zéro, reçu ${pending.timeLeftMs}`,
+      );
+    });
+  }),
 ];
 
 // ============================================================

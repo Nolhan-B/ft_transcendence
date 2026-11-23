@@ -153,14 +153,29 @@ export default async function gameGateway(fastify: FastifyInstance) {
   function liveState(game: InternalGameState): LiveState {
     const current = game.players.find((p) => p.isCurrentTurn);
     const deadline = turnDeadlines.get(game.id);
-    // Pas de chrono affiche pour un bot : il joue apres un court delai
+    const bluff = game.lastWildDraw4;
+    // Pas de chrono affiche pour un bot (il joue apres un court delai), ni
+    // pendant un +4 en attente : c'est alors le delai du bluff qui compte
     const timed =
       current !== undefined &&
       !current.userId.startsWith("bot_") &&
-      deadline !== undefined;
+      deadline !== undefined &&
+      !bluff;
     return {
       ...NO_LIVE_STATE,
       turnTimeLeftMs: timed ? Math.max(0, deadline - Date.now()) : null,
+      // Version publique : sans hadMatchingColor, qui doit rester secret
+      pendingWildDraw4:
+        bluff && current
+          ? {
+              playerId: bluff.playerId,
+              targetId: current.userId,
+              timeLeftMs:
+                bluff.expiresAt !== undefined
+                  ? Math.max(0, bluff.expiresAt - Date.now())
+                  : 0,
+            }
+          : null,
     };
   }
 
