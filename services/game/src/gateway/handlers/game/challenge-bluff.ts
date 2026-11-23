@@ -55,7 +55,6 @@ export async function handleChallengeBluff(
   } as ServerEvent);
 
   game.lastWildDraw4 = undefined;
-  ctx.broadCastStateToRoom(game.id, game);
-
   continueTurn(ctx, game);
+  ctx.broadCastStateToRoom(game.id, game);
 }

@@ -33,14 +33,14 @@ export async function handleDrawCard(
     time: new Date().toISOString(),
   });
 
-  ctx.broadCastStateToRoom(updatedState.id, updatedState);
-
   ctx.afkCounts.set(`${game.id}:${ctx.userId}`, 0);
+
+  // Effets d'abord (chrono, bot), envoi ensuite : l'etat diffuse contient
+  // ainsi le chrono du joueur suivant. Ne fait rien si la partie est finie
+  continueTurn(ctx, updatedState);
+  ctx.broadCastStateToRoom(updatedState.id, updatedState);
 
   if (updatedState.status === GameStatus.FINISHED) {
     await ctx.endGame(updatedState.id, updatedState);
-    return;
   }
-
-  continueTurn(ctx, updatedState);
 }

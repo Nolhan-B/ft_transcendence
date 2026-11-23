@@ -34,7 +34,6 @@ export function handleAcceptWildDraw4(
   drawAndRecord(game, ctx.userId, 4, "wild_draw4");
   game.lastWildDraw4 = undefined;
   advanceToNextPlayer(game);
-  ctx.broadCastStateToRoom(game.id, game);
-
   continueTurn(ctx, game);
+  ctx.broadCastStateToRoom(game.id, game);
 }

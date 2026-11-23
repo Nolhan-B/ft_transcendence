@@ -1165,6 +1165,92 @@ const tests = [
       assert(game.players[0].disconnected, "A est retiré de la partie");
     });
   }),
+  // ---------------- turnTimeLeftMs ----------------
+
+  test("chrono: le nouvel état contient le chrono complet du joueur suivant", async () => {
+    await withServer(async (server) => {
+      const { players, gameId } = await setupGame(server, 2);
+      const [a, b] = players;
+      // A entame son chrono : s'il etait renvoye, B recevrait ~TURN_MS - 500
+      await sleep(500);
+      const forB = waitForMessage(b.ws, "game_updated");
+      send(a.ws, { type: "draw_card", gameId });
+      const left = (await forB).state.turnTimeLeftMs;
+      assert(
+        typeof left === "number" && left > TURN_MS - 200 && left <= TURN_MS,
+        `chrono complet attendu (~${TURN_MS}), reçu ${left}`,
+      );
+    });
+  }),
+
+  test("chrono: à la reconnexion, le temps restant est celui du chrono en cours", async () => {
+    await withServer(async (server) => {
+      const { players, gameId } = await setupGame(server, 2);
+      const [a] = players;
+      await sleep(600);
+      a.ws.close();
+      await sleep(100);
+      const ws2 = await connectUser(server, a.id);
+      send(ws2, { type: "join_game", gameId });
+      const left = (await waitForMessage(ws2, "game_updated")).state
+        .turnTimeLeftMs;
+      assert(
+        typeof left === "number" && left < TURN_MS - 500 && left > 0,
+        `le chrono ne doit pas repartir à zéro, reçu ${left}`,
+      );
+    });
+  }),
+
+  test("chrono: un catch_uno ne remet pas le chrono à zéro", async () => {
+    await withServer(async (server) => {
+      const { players, gameId } = await setupUno(server);
+      const [a, b, c] = players;
+      await sleep(500);
+      const forC = waitForMessage(c.ws, "game_updated");
+      send(b.ws, { type: "catch_uno", gameId, targetUserId: a.id });
+      const left = (await forC).state.turnTimeLeftMs;
+      assert(
+        typeof left === "number" && left < TURN_MS - 400,
+        `le chrono de B continue, reçu ${left}`,
+      );
+    });
+  }),
+
+  test("chrono: pas de chrono envoyé pendant le tour d'un bot", async () => {
+    await withServer(async (server) => {
+      const { humans, gameId, game } = await setupGameWithBot(server, 1);
+      const [a] = humans;
+      game.players[0].hand = [
+        { id: "r9", color: "red", value: "9" },
+        { id: "keep", color: "blue", value: "2" },
+      ];
+      const forA = waitForMessage(a.ws, "game_updated");
+      send(a.ws, { type: "play_card", gameId, cardId: "r9" });
+      const state = (await forA).state;
+      assert(
+        state.players[1].isCurrentTurn,
+        "c'est au tour du bot après le coup de A",
+      );
+      assert(
+        state.turnTimeLeftMs === null,
+        `null attendu, reçu ${state.turnTimeLeftMs}`,
+      );
+    });
+  }),
+
+  test("chrono: un spectateur reçoit le temps restant", async () => {
+    await withServer(async (server) => {
+      const { gameId } = await setupGame(server, 2);
+      const watcher = await connectUser(server, uniqueUserId("watcher"));
+      send(watcher, { type: "spectate_game", gameId });
+      const left = (await waitForMessage(watcher, "spectate_started")).state
+        .turnTimeLeftMs;
+      assert(
+        typeof left === "number" && left > 0 && left <= TURN_MS,
+        `temps restant attendu, reçu ${left}`,
+      );
+    });
+  }),
 ];
 
 // ============================================================

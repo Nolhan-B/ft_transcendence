@@ -45,8 +45,6 @@ export async function handlePlayCard(
     time: new Date().toISOString(),
   });
 
-  ctx.broadCastStateToRoom(updatedState.id, updatedState);
-
   if (updatedState.settings.unoCallout) {
     const playerHand = updatedState.players.find(
       (p) => p.userId === ctx.userId,
@@ -77,10 +75,10 @@ export async function handlePlayCard(
           drawAndRecord(updatedState, targetId, 4, "wild_draw4", true);
           updatedState.lastWildDraw4 = undefined;
           advanceToNextPlayer(updatedState);
-          ctx.broadCastStateToRoom(updatedState.id, updatedState);
           // Sans ca, un bot suivant ne joue jamais et l'humain suivant
           // herite du reste du chrono de la victime
           continueTurn(ctx, updatedState);
+          ctx.broadCastStateToRoom(updatedState.id, updatedState);
         }, 5000),
       );
     }
@@ -88,10 +86,12 @@ export async function handlePlayCard(
 
   ctx.afkCounts.set(`${game.id}:${ctx.userId}`, 0);
 
+  // Effets d'abord (chrono, bot), envoi ensuite : l'etat diffuse contient
+  // ainsi le chrono du joueur suivant. Ne fait rien si la partie est finie
+  continueTurn(ctx, updatedState);
+  ctx.broadCastStateToRoom(updatedState.id, updatedState);
+
   if (updatedState.status === GameStatus.FINISHED) {
     await ctx.endGame(updatedState.id, updatedState);
-    return;
   }
-
-  continueTurn(ctx, updatedState);
 }
