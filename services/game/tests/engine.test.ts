@@ -1604,5 +1604,87 @@ test("bluff: pas de jump-in sur un +4 en attente", () => {
   );
 });
 
+// ============================================================
+// REGLE 7-0 - DERNIERE CARTE
+// ============================================================
+
+function setupSevenZero(mode: GameMode): InternalGameState {
+  const state = createGame(
+    [
+      { id: "1", username: "A" },
+      { id: "2", username: "B" },
+      { id: "3", username: "C" },
+    ],
+    mode,
+    {
+      stacking: "none",
+      sevenZeroRule: true,
+      jumpIn: false,
+      bluffChallenge: false,
+      unoCallout: false,
+    },
+  );
+  state.topCard = { id: "top", color: "red", value: "5" };
+  state.currentColor = "red";
+  return state;
+}
+
+test("7-0: poser un 7 en dernière carte fait gagner, sans échange", () => {
+  const state = setupSevenZero(GameMode.CLASSIC);
+  state.players[0].hand = [{ id: "r7", color: "red", value: "7" }];
+  const bHand = state.players[1].hand.length;
+
+  playCard(state, "1", "r7", undefined, "2");
+
+  assert(state.status === GameStatus.FINISHED, "la partie doit être finie");
+  assert(state.winnerId === "1", "A doit gagner");
+  assert(state.players[0].hand.length === 0, "A n'a plus de carte");
+  assert(state.players[1].hand.length === bHand, "la main de B est intacte");
+});
+
+test("7-0: poser un 0 en dernière carte fait gagner, sans rotation", () => {
+  const state = setupSevenZero(GameMode.CLASSIC);
+  state.players[0].hand = [{ id: "r0", color: "red", value: "0" }];
+  const hands = state.players.map((p) => p.hand.length);
+
+  playCard(state, "1", "r0");
+
+  assert(state.status === GameStatus.FINISHED, "la partie doit être finie");
+  assert(state.winnerId === "1", "A doit gagner");
+  assert(
+    state.players.every((p, i) => i === 0 || p.hand.length === hands[i]),
+    "les mains des autres sont intactes",
+  );
+});
+
+test("7-0: en ranked, un 7 en dernière carte classe le joueur sans échange", () => {
+  const state = setupSevenZero(GameMode.RANKED);
+  state.players[0].hand = [{ id: "r7", color: "red", value: "7" }];
+  const bHand = state.players[1].hand.length;
+
+  playCard(state, "1", "r7", undefined, "2");
+
+  assert(state.ranking[0] === "1", "A doit être classé premier");
+  assert(state.players[1].hand.length === bHand, "la main de B est intacte");
+  assert(
+    state.status === GameStatus.IN_PROGRESS,
+    "la partie continue entre B et C",
+  );
+});
+
+test("7-0: avec plusieurs cartes, le 7 échange toujours les mains", () => {
+  const state = setupSevenZero(GameMode.CLASSIC);
+  state.players[0].hand = [
+    { id: "r7", color: "red", value: "7" },
+    { id: "b1", color: "blue", value: "1" },
+  ];
+  const bHand = state.players[1].hand.length;
+
+  playCard(state, "1", "r7", undefined, "2");
+
+  assert(state.players[0].hand.length === bHand, "A récupère la main de B");
+  assert(state.players[1].hand.length === 1, "B récupère le bleu 1 de A");
+});
+
 console.log(`\n=== ${passed} passed, ${failed} failed ===`);
 if (failed > 0) process.exit(1);

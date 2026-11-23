@@ -152,7 +152,11 @@ export function playCard(
 
   switch (effect.type) {
     case "none":
-      if (isSwap) {
+      // Derniere carte posee : le joueur a fini, pas d'echange ni de rotation
+      // (sinon il recupererait une main et l'autre joueur resterait a 0 carte)
+      if (player.hand.length === 0) {
+        // rien a faire, la victoire est geree plus bas
+      } else if (isSwap) {
         swapHands(state, player.userId, targetUserId!);
       } else if (state.settings.sevenZeroRule && playedCard.value === "0") {
         rotateHands(state);
