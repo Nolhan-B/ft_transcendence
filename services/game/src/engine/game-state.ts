@@ -12,6 +12,8 @@ import { getCardEffect, isValidPlay } from "./rules.js";
 
 export interface InternalGameState extends GameState {
   drawPile: Card[];
+  // Interne : sert a enregistrer la vraie duree de la partie (Match.startedAt)
+  startedAt: Date;
   lastWildDraw4?: {
     playerId: string;
     hadMatchingColor: boolean;
@@ -69,6 +71,7 @@ export function createGame(
     lastWildDraw4: undefined,
     ranking: [],
     winnerId: null,
+    startedAt: new Date(),
   };
 }
 
@@ -81,6 +84,10 @@ export function playCard(
 ): InternalGameState | null {
   // PHASE 1 : tout verifier, sans rien modifier
   if (state.status === GameStatus.FINISHED) return null;
+
+  // Un +4 attend une reponse (accept / challenge) : personne ne joue avant,
+  // sinon la cible esquive la penalite (et un jump-in ecraserait le +4 en attente)
+  if (state.lastWildDraw4) return null;
 
   const player: Player | undefined = getPlayer(state, playerId);
   if (!player || player.disconnected) return null;
@@ -148,7 +155,11 @@ export function playCard(
 
   switch (effect.type) {
     case "none":
-      if (isSwap) {
+      // Derniere carte posee : le joueur a fini, pas d'echange ni de rotation
+      // (sinon il recupererait une main et l'autre joueur resterait a 0 carte)
+      if (player.hand.length === 0) {
+        // rien a faire, la victoire est geree plus bas
+      } else if (isSwap) {
         swapHands(state, player.userId, targetUserId!);
       } else if (state.settings.sevenZeroRule && playedCard.value === "0") {
         rotateHands(state);
@@ -186,7 +197,13 @@ export function playCard(
       const previousColor = state.currentColor;
       state.currentColor = chosenColor as CardColor;
 
-      if (state.settings.bluffChallenge) {
+      if (state.pendingDrawCount > 0) {
+        // +4 pose sur une pile en cours : il s'ajoute a la pile. Pas de bluff
+        // possible, le coup est autorise par le stacking et non par la couleur
+        // (sinon la pile restait en attente apres l'accept du +4)
+        state.pendingDrawCount += effect.count;
+        advanceToNextPlayer(state);
+      } else if (state.settings.bluffChallenge) {
         // Stocker l'info pour un eventuel challenge, ne pas faire piocher
         state.lastWildDraw4 = {
           playerId: player.userId,
@@ -310,6 +327,8 @@ export function drawCard(
   const player = getPlayer(state, playerId);
   if (!player || player.disconnected) return null;
   if (!player.isCurrentTurn) return null;
+  // Face a un +4 contestable, il faut passer par accept_wild_draw4 ou challenge_bluff
+  if (state.lastWildDraw4) return null;
 
   const count = state.pendingDrawCount > 0 ? state.pendingDrawCount : 1;
   drawCardsForCurrentPlayer(state, count);

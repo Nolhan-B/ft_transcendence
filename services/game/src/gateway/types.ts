@@ -48,4 +48,5 @@ export interface GatewayContext {
   sendError: (socket: WebSocket, message: string) => void;
   startTurnTimer: (gameId: string) => void;
   endGame: (gameId: string, game: InternalGameState) => Promise<void>;
+  cancelGameIfNeverJoined: (gameId: string) => void;
 }

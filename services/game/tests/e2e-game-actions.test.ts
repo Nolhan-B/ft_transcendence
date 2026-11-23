@@ -12,6 +12,8 @@ import { QueueManager } from "../src/managers/queue.manager.js";
 const TURN_MS = 1500;
 process.env.TURN_TIMEOUT_MS = String(TURN_MS);
 process.env.RECONNECT_GRACE_MS = "5000";
+const JOIN_TIMEOUT_MS = 1000;
+process.env.GAME_JOIN_TIMEOUT_MS = String(JOIN_TIMEOUT_MS);
 
 let gameGateway: any;
 
@@ -47,19 +49,30 @@ async function buildServer() {
   const gameManager = new GameManager();
   const roomManager = new RoomManager();
   const sockets: WebSocket[] = [];
+  // Parties enregistrees par endGame, pour verifier gagnant et classement
+  const matches: any[] = [];
 
   fastify.register(cookie);
   fastify.register(jwt, { secret: JWT_SECRET });
 
   fastify.decorate("prisma", {
-    match: { create: async () => ({}) },
+    match: {
+      create: async ({ data }: any) => {
+        matches.push(data);
+        return {};
+      },
+    },
     user: {
       findUnique: async ({ where }: any) => ({
         id: where.id,
         username: `user_${where.id}`,
         elo: 1000,
       }),
+      findMany: async ({ where }: any) =>
+        where.id.in.map((id: string) => ({ id, elo: 1000 })),
+      update: async () => ({}),
     },
+    $transaction: async (ops: Promise<unknown>[]) => Promise.all(ops),
   } as any);
 
   fastify.decorate("gameManager", gameManager);
@@ -73,7 +86,7 @@ async function buildServer() {
   const address = fastify.server.address();
   const port = typeof address === "object" ? address!.port : 0;
 
-  return { fastify, port, gameManager, roomManager, sockets };
+  return { fastify, port, gameManager, roomManager, sockets, matches };
 }
 
 type Server = Awaited<ReturnType<typeof buildServer>>;
@@ -259,6 +272,61 @@ async function setupUno(server: Server) {
   await Promise.all(updates);
   assert(ctx.game.players[0].hand.length === 1, "A doit avoir 1 carte");
   return ctx;
+}
+
+async function waitUntil(cond: () => boolean, timeoutMs: number) {
+  const start = Date.now();
+  while (!cond()) {
+    if (Date.now() - start > timeoutMs) return false;
+    await sleep(50);
+  }
+  return true;
+}
+
+// Partie entre `nbHumans` humains (A commence) puis un bot en dernier siege
+async function setupGameWithBot(server: Server, nbHumans: number) {
+  const humans: Human[] = [];
+  for (let i = 0; i < nbHumans; i++) {
+    const id = uniqueUserId(["alice", "bob"][i]);
+    humans.push({ id, ws: await connectUser(server, id) });
+  }
+  const [a, ...others] = humans;
+
+  send(a.ws, {
+    type: "create_room",
+    mode: GameMode.CLASSIC,
+    maxPlayers: nbHumans + 1,
+    name: "bot-timer",
+  });
+  const roomCode = (await waitForMessage(a.ws, "room_updated")).room.code;
+  send(a.ws, { type: "update_room", roomCode, settings: SETTINGS });
+  await waitForMessage(a.ws, "room_updated");
+  for (const p of others) {
+    send(p.ws, { type: "join_room", roomCode });
+    await waitForMessage(p.ws, "room_updated");
+  }
+  send(a.ws, { type: "add_bot", roomCode });
+  await waitForMessage(a.ws, "room_updated");
+
+  const started = humans.map((p) => waitForMessage(p.ws, "game_started"));
+  send(a.ws, { type: "start_game", roomCode });
+  const gameId = (await Promise.all(started))[0].gameId;
+  for (const p of humans) {
+    send(p.ws, { type: "join_game", gameId });
+    await waitForMessage(p.ws, "game_updated");
+  }
+
+  const game = server.gameManager.getGame(gameId)!;
+  const bot = game.players[nbHumans];
+  assert(bot.userId.startsWith("bot_"), "Le dernier siège doit être un bot");
+  // Main du bot deterministe : seul le rouge 3 est jouable sur un rouge 5
+  game.topCard = { id: "top", color: "red", value: "5" };
+  game.currentColor = "red";
+  bot.hand = [
+    { id: "bot_r3", color: "red", value: "3" },
+    { id: "bot_b1", color: "blue", value: "1" },
+  ];
+  return { humans, gameId, game, bot };
 }
 
 // ============================================================
@@ -758,6 +826,192 @@ const tests = [
         err.message === "Invalid message format",
         `Message inattendu : ${err.message}`,
       );
+    });
+  }),
+
+  // ---------------- Timers serveur → tour du bot ----------------
+
+  test("bot: après le timeout AFK d'un humain, le bot suivant joue", async () => {
+    await withServer(async (server) => {
+      const { game, bot } = await setupGameWithBot(server, 1);
+      assert(game.players[0].isCurrentTurn, "Ce doit être au tour de A");
+
+      // A ne joue pas : le timer le fait piocher et passe la main au bot
+      await sleep(TURN_MS + 100);
+      const played = await waitUntil(
+        () => !bot.hand.some((c) => c.id === "bot_r3"),
+        2500,
+      );
+      assert(played, "Le bot doit avoir joué son rouge 3");
+      assert(!bot.disconnected, "Le bot ne doit pas être compté AFK");
+      assert(game.players[0].isCurrentTurn, "La main doit revenir à A");
+    });
+  }),
+
+  test("bot: après l'expiration du timer de bluff, le bot suivant joue", async () => {
+    await withServer(async (server) => {
+      const { humans, gameId, game, bot } = await setupGameWithBot(server, 2);
+      const [a] = humans;
+      const b = game.players[1];
+      game.players[0].hand = [
+        { id: "wd", color: "wild", value: "wild_draw4" },
+        { id: "keep", color: "blue", value: "1" },
+      ];
+      send(a.ws, {
+        type: "play_card",
+        gameId,
+        cardId: "wd",
+        chosenColor: "red",
+      });
+      await waitForMessage(a.ws, "game_updated");
+      assert(b.isCurrentTurn, "B est la victime du +4");
+      const bHand = b.hand.length;
+
+      // B ne repond pas : au bout de 5 s il pioche 4, puis c'est au bot
+      const played = await waitUntil(
+        () => !bot.hand.some((c) => c.id === "bot_r3"),
+        5000 + 2500,
+      );
+      assert(b.hand.length >= bHand + 4, "B doit avoir pioché les 4 cartes");
+      assert(played, "Le bot doit avoir joué après le timer de bluff");
+      assert(!b.disconnected, "B ne doit pas être compté AFK pendant le bluff");
+    });
+  }),
+
+  test("bot: un humain qui joue juste avant la fin de son chrono ne bloque pas le bot", async () => {
+    await withServer(async (server) => {
+      const { humans, gameId, game, bot } = await setupGameWithBot(server, 1);
+      const [a] = humans;
+      game.players[0].hand = [
+        { id: "r9", color: "red", value: "9" },
+        { id: "keep", color: "blue", value: "2" },
+      ];
+      const botHand = bot.hand.length;
+
+      // A joue 200 ms avant l'expiration de son chrono : c'est au bot
+      await sleep(TURN_MS - 200);
+      send(a.ws, { type: "play_card", gameId, cardId: "r9" });
+      await waitForMessage(a.ws, "game_updated");
+
+      const played = await waitUntil(
+        () => !bot.hand.some((c) => c.id === "bot_r3"),
+        2500,
+      );
+      assert(played, "Le bot doit avoir joué son rouge 3");
+      assert(
+        bot.hand.length === botHand - 1,
+        `Le bot doit avoir joué, pas pioché (main ${botHand} -> ${bot.hand.length})`,
+      );
+      assert(!bot.disconnected, "Le bot ne doit pas être compté AFK");
+    });
+  }),
+
+  // ---------------- Partie de room jamais rejointe ----------------
+
+  test("room: une partie lancée mais jamais rejointe est supprimée", async () => {
+    await withServer(async (server) => {
+      const a = { id: uniqueUserId("alice") } as Human;
+      const b = { id: uniqueUserId("bob") } as Human;
+      a.ws = await connectUser(server, a.id);
+      b.ws = await connectUser(server, b.id);
+
+      send(a.ws, {
+        type: "create_room",
+        mode: GameMode.CLASSIC,
+        maxPlayers: 2,
+        name: "ghost",
+      });
+      const roomCode = (await waitForMessage(a.ws, "room_updated")).room.code;
+      send(b.ws, { type: "join_room", roomCode });
+      await waitForMessage(b.ws, "room_updated");
+      const started = waitForMessage(a.ws, "game_started");
+      send(a.ws, { type: "start_game", roomCode });
+      const { gameId } = await started;
+
+      // Personne ne fait join_game (onglets fermes, navigation ailleurs...)
+      await sleep(JOIN_TIMEOUT_MS + 300);
+      assert(
+        server.gameManager.getGame(gameId) === undefined,
+        "La partie fantôme doit être supprimée",
+      );
+
+      // Les joueurs ne sont plus bloques : ils peuvent lancer une ranked
+      send(a.ws, { type: "join_queue" });
+      await waitForMessage(a.ws, "queue_joined");
+    });
+  }),
+
+  test("room: une partie rejointe puis quittée (refresh) n'est pas supprimée", async () => {
+    await withServer(async (server) => {
+      const { players, gameId } = await setupGame(server, 2);
+      for (const p of players) p.ws.close();
+
+      // Salle vide mais joueurs en delai de reconnexion : la partie reste
+      await sleep(JOIN_TIMEOUT_MS + 300);
+      assert(
+        server.gameManager.getGame(gameId) !== undefined,
+        "La partie doit attendre la reconnexion des joueurs",
+      );
+    });
+  }),
+
+  // ---------------- Fin de partie ranked par abandon ----------------
+
+  test("ranked: après des abandons, le gagnant reste celui qui a fini premier", async () => {
+    await withServer(async (server) => {
+      const ids = ["alice", "bob", "charlie"].map((n) => uniqueUserId(n));
+      const createdAt = Date.now();
+      const gameId = server.gameManager.createGame(
+        ids.map((id) => ({ id, username: id })),
+        GameMode.RANKED,
+      )!;
+      const game = server.gameManager.getGame(gameId)!;
+      const [a, b, c] = await Promise.all(
+        ids.map((id) => connectUser(server, id)),
+      );
+      for (const ws of [a, b, c]) {
+        send(ws, { type: "join_game", gameId });
+        await waitForMessage(ws, "game_updated");
+      }
+
+      // A pose sa derniere carte : classe 1er, la partie continue entre B et C
+      game.topCard = { id: "top", color: "red", value: "5" };
+      game.currentColor = "red";
+      game.players[0].hand = [{ id: "last", color: "red", value: "3" }];
+      send(a, { type: "play_card", gameId, cardId: "last" });
+      await waitForMessage(c, "game_updated");
+      assert(game.ranking[0] === ids[0], "A doit être classé premier");
+      assert(game.status === GameStatus.IN_PROGRESS, "La partie continue");
+
+      // B quitte : apres le delai de reconnexion, C reste seul
+      const ended = waitForMessage(c, "game_ended", 8000);
+      const elo = waitForMessage(c, "elo_updated", 8000);
+      b.close();
+      const endMsg = await ended;
+      const eloMsg = await elo;
+
+      assert(endMsg.winnerId === ids[0], "Le gagnant annoncé doit être A");
+      const match = server.matches[0];
+      assert(match?.winnerId === ids[0], "Le gagnant enregistré doit être A");
+      // La duree enregistree couvre toute la partie, de sa creation a sa fin
+      assert(
+        Math.abs(match.startedAt.getTime() - createdAt) < 500,
+        "startedAt doit être l'heure de création de la partie",
+      );
+      assert(
+        match.endedAt.getTime() - match.startedAt.getTime() >= 1000,
+        "La durée enregistrée ne doit pas être nulle",
+      );
+      assert(
+        match.ranking[0] === ids[0] && match.ranking[1] === ids[2],
+        `Classement attendu A puis C, reçu ${JSON.stringify(match.ranking)}`,
+      );
+      const gain = (id: string) => {
+        const ch = eloMsg.changes.find((x: any) => x.userId === id);
+        return ch.newElo - ch.oldElo;
+      };
+      assert(gain(ids[0]) > gain(ids[2]), "A doit gagner plus d'ELO que C");
+      assert(gain(ids[2]) > gain(ids[1]), "C doit gagner plus d'ELO que B");
     });
   }),
 ];

@@ -33,7 +33,10 @@ import {
 import { handleChatMessage } from "./handlers/chat/index.js";
 import type { GatewayContext } from "./types.js";
 import { advanceToNextPlayer } from "../engine/game-state.js";
-import { scheduleBotTurnIfNeeded } from "./handlers/game/bot-turn.js";
+import {
+  continueTurn,
+  scheduleBotTurnIfNeeded,
+} from "./handlers/game/bot-turn.js";
 import { handleJoinQueue } from "./handlers/matchmaking/join-queue.js";
 import { handleLeaveQueue } from "./handlers/matchmaking/leave-queue.js";
 import { findMatch } from "../engine/matchmaking.js";
@@ -105,8 +108,7 @@ const disconnectTimers: Map<string, NodeJS.Timeout> = new Map();
 const RECONNECT_GRACE_MS = Number(process.env.RECONNECT_GRACE_MS) || 30000;
 
 const MATCHMAKING_TICK_MS = Number(process.env.MATCHMAKING_TICK_MS) || 2000;
-const MATCH_JOIN_TIMEOUT_MS =
-  Number(process.env.MATCH_JOIN_TIMEOUT_MS) || 15000;
+const GAME_JOIN_TIMEOUT_MS = Number(process.env.GAME_JOIN_TIMEOUT_MS) || 15000;
 
 export default async function gameGateway(fastify: FastifyInstance) {
   const manager = fastify.gameManager;
@@ -178,7 +180,8 @@ export default async function gameGateway(fastify: FastifyInstance) {
     }
   }
 
-  function startTurnTimer(gameId: string): void {
+  // ctx sert a relancer le bot quand le timer lui passe la main
+  function startTurnTimer(gameId: string, ctx: GatewayContext): void {
     if (turnTimers.has(gameId)) {
       clearTimeout(turnTimers.get(gameId));
     }
@@ -195,6 +198,20 @@ export default async function gameGateway(fastify: FastifyInstance) {
       if (!room || room.size === 0) return;
       const currentPlayer = game.players.find((p) => p.isCurrentTurn);
       if (!currentPlayer) return;
+
+      // Un +4 attend une reponse : c'est le timer de bluff qui tranche
+      if (game.lastWildDraw4) {
+        startTurnTimer(gameId, ctx);
+        return;
+      }
+
+      // Chrono perime tombe sur le tour d'un bot : on ne le compte pas AFK,
+      // on le relance (filet de securite si son coup n'est jamais parti)
+      if (currentPlayer.userId.startsWith("bot_")) {
+        scheduleBotTurnIfNeeded(ctx, game, gameId);
+        startTurnTimer(gameId, ctx);
+        return;
+      }
 
       const afkKey = `${gameId}:${currentPlayer.userId}`;
       const count = (afkCounts.get(afkKey) ?? 0) + 1;
@@ -219,7 +236,8 @@ export default async function gameGateway(fastify: FastifyInstance) {
         broadCastStateToRoom(gameId, game);
       }
 
-      startTurnTimer(gameId);
+      // Le suivant peut etre un bot : il doit jouer, pas attendre le chrono
+      continueTurn(ctx, game);
     }, TURN_TIMEOUT_MS);
 
     turnTimers.set(gameId, timer);
@@ -287,31 +305,59 @@ export default async function gameGateway(fastify: FastifyInstance) {
     }
     if (!game.winnerId) {
       const activePlayers = game.players.filter((p) => !p.disconnected);
-      game.winnerId =
-        activePlayers.length === 1 ? activePlayers[0].userId : null;
+      // Partie finie par abandons : le dernier joueur encore en jeu se classe
+      // juste apres ceux qui ont deja fini (en ranked, un joueur a pu finir avant)
+      const last = activePlayers.length === 1 ? activePlayers[0] : null;
+      if (last && !game.ranking.includes(last.userId)) {
+        game.ranking.push(last.userId);
+      }
+      game.winnerId = game.ranking[0] ?? null;
     }
     broadCastToRoom(gameId, {
       type: "game_ended",
       winnerId: game.winnerId ?? "",
     });
-    if (game.mode === GameMode.RANKED) {
-      await updateElo(game);
+    // Une erreur de base de donnees ne doit ni faire planter le service
+    // (endGame est souvent appele depuis un setTimeout), ni laisser la partie en memoire
+    try {
+      if (game.mode === GameMode.RANKED) {
+        await updateElo(game);
+      }
+      await fastify.prisma.match.create({
+        data: {
+          mode: game.mode,
+          players: game.players.map((p) => p.userId),
+          ranking: game.ranking,
+          winnerId: game.winnerId ?? "",
+          chatLog: chatLogs.get(gameId) ?? [],
+          moveLog: moveLogs.get(gameId) ?? [],
+          // Sans ca, startedAt prenait la valeur par defaut now() a l'enregistrement,
+          // soit la meme que endedAt : la duree de la partie valait toujours 0
+          startedAt: game.startedAt,
+          endedAt: new Date(),
+        },
+      });
+    } catch (err) {
+      fastify.log.error({ err, gameId }, "Failed to save game result");
+    } finally {
+      chatLogs.delete(gameId);
+      moveLogs.delete(gameId);
+      rooms.delete(gameId);
+      spectators.delete(gameId);
+      manager.removeGame(gameId);
     }
-    await fastify.prisma.match.create({
-      data: {
-        mode: game.mode,
-        players: game.players.map((p) => p.userId),
-        ranking: game.ranking,
-        winnerId: game.winnerId ?? "",
-        chatLog: chatLogs.get(gameId) ?? [],
-        moveLog: moveLogs.get(gameId) ?? [],
-      },
-    });
-    chatLogs.delete(gameId);
-    moveLogs.delete(gameId);
-    rooms.delete(gameId);
-    spectators.delete(gameId);
-    manager.removeGame(gameId);
+  }
+
+  // Partie creee mais jamais rejointe (onglet ferme, joueur parti) : sans ce
+  // nettoyage elle reste en memoire et bloque ses joueurs ("Already in a game").
+  // On teste "personne n'a jamais rejoint" et pas "salle vide", pour ne pas
+  // supprimer une partie dont les joueurs sont en train de se reconnecter
+  function cancelGameIfNeverJoined(gameId: string): void {
+    setTimeout(() => {
+      if (manager.getGame(gameId) && !rooms.has(gameId)) {
+        manager.removeGame(gameId);
+      }
+    }, GAME_JOIN_TIMEOUT_MS);
   }
 
   function runMatchmaking(): void {
@@ -341,12 +387,8 @@ export default async function gameGateway(fastify: FastifyInstance) {
           if (socket?.readyState === WebSocket.OPEN) socket.send(event);
         }
 
-        // Si personne ne rejoint la partie, on l'annule sans toucher à l'ELO
-        setTimeout(() => {
-          const game = manager.getGame(gameId);
-          const room = rooms.get(gameId);
-          if (game && (!room || room.size === 0)) manager.removeGame(gameId);
-        }, MATCH_JOIN_TIMEOUT_MS);
+        // Si personne ne rejoint la partie, on l'annule sans toucher a l'ELO
+        cancelGameIfNeverJoined(gameId);
       }
 
       group = findMatch(queueManager.list(), now);
@@ -414,8 +456,9 @@ export default async function gameGateway(fastify: FastifyInstance) {
       broadCastStateToRoom,
       broadcastToRoomSockets,
       sendError,
-      startTurnTimer,
+      startTurnTimer: (gameId) => startTurnTimer(gameId, ctx),
       endGame,
+      cancelGameIfNeverJoined,
       toRoomInfo,
     };
 
@@ -434,64 +477,74 @@ export default async function gameGateway(fastify: FastifyInstance) {
         return;
       }
 
-      switch (message.type) {
-        case "join_game":
-          await handleJoinGame(ctx, message);
-          break;
-        case "play_card":
-          await handlePlayCard(ctx, message);
-          break;
-        case "draw_card":
-          await handleDrawCard(ctx, message);
-          break;
-        case "call_uno":
-          handleCallUno(ctx, message);
-          break;
-        case "catch_uno":
-          handleCatchUno(ctx, message);
-          break;
-        case "challenge_bluff":
-          await handleChallengeBluff(ctx, message);
-          break;
-        case "accept_wild_draw4":
-          handleAcceptWildDraw4(ctx, message);
-          break;
-        case "chat_message":
-          handleChatMessage(ctx, message);
-          break;
-        case "create_room":
-          await handleCreateRoom(ctx, message);
-          break;
-        case "join_room":
-          await handleJoinRoom(ctx, message);
-          break;
-        case "leave_room":
-          handleLeaveRoom(ctx, message);
-          break;
-        case "update_room":
-          handleUpdateRoom(ctx, message);
-          break;
-        case "start_game":
-          handleStartGame(ctx, message);
-          break;
-        case "add_bot":
-          handleAddBot(ctx, message);
-          break;
-        case "remove_bot":
-          handleRemoveBot(ctx, message);
-          break;
-        case "spectate_game":
-          handleSpectateGame(ctx, message);
-          break;
-        case "leave_spectate":
-          handleLeaveSpectate(ctx, message);
-          break;
-        case "join_queue":
-          await handleJoinQueue(ctx);
-          break;
-        case "leave_queue":
-          handleLeaveQueue(ctx);
-          break;
+      // Un handler qui plante (erreur Prisma, bug) ne doit pas tuer le service :
+      // sans ce catch, la promesse rejetee arrete tout le processus Node
+      try {
+        switch (message.type) {
+          case "join_game":
+            await handleJoinGame(ctx, message);
+            break;
+          case "play_card":
+            await handlePlayCard(ctx, message);
+            break;
+          case "draw_card":
+            await handleDrawCard(ctx, message);
+            break;
+          case "call_uno":
+            handleCallUno(ctx, message);
+            break;
+          case "catch_uno":
+            handleCatchUno(ctx, message);
+            break;
+          case "challenge_bluff":
+            await handleChallengeBluff(ctx, message);
+            break;
+          case "accept_wild_draw4":
+            handleAcceptWildDraw4(ctx, message);
+            break;
+          case "chat_message":
+            handleChatMessage(ctx, message);
+            break;
+          case "create_room":
+            await handleCreateRoom(ctx, message);
+            break;
+          case "join_room":
+            await handleJoinRoom(ctx, message);
+            break;
+          case "leave_room":
+            handleLeaveRoom(ctx, message);
+            break;
+          case "update_room":
+            handleUpdateRoom(ctx, message);
+            break;
+          case "start_game":
+            handleStartGame(ctx, message);
+            break;
+          case "add_bot":
+            handleAddBot(ctx, message);
+            break;
+          case "remove_bot":
+            handleRemoveBot(ctx, message);
+            break;
+          case "spectate_game":
+            handleSpectateGame(ctx, message);
+            break;
+          case "leave_spectate":
+            handleLeaveSpectate(ctx, message);
+            break;
+          case "join_queue":
+            await handleJoinQueue(ctx);
+            break;
+          case "leave_queue":
+            handleLeaveQueue(ctx);
+            break;
+        }
+      } catch (err) {
+        fastify.log.error(
+          { err, userId, type: message.type },
+          "WebSocket handler failed",
+        );
+        sendError(socket, "Internal server error");
       }
     };
 
@@ -558,9 +611,7 @@ export default async function gameGateway(fastify: FastifyInstance) {
               advanceToNextPlayer(game);
               game.drawPileCount = game.drawPile.length;
               broadCastStateToRoom(gameId, game);
-              scheduleBotTurnIfNeeded(ctx, game, gameId);
-              const next = game.players.find((p) => p.isCurrentTurn);
-              if (!next?.userId.startsWith("bot_")) startTurnTimer(gameId);
+              continueTurn(ctx, game);
             }
           }, RECONNECT_GRACE_MS),
         );
