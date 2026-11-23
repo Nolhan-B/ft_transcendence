@@ -306,8 +306,13 @@ export default async function gameGateway(fastify: FastifyInstance) {
     }
     if (!game.winnerId) {
       const activePlayers = game.players.filter((p) => !p.disconnected);
-      game.winnerId =
-        activePlayers.length === 1 ? activePlayers[0].userId : null;
+      // Partie finie par abandons : le dernier joueur encore en jeu se classe
+      // juste apres ceux qui ont deja fini (en ranked, un joueur a pu finir avant)
+      const last = activePlayers.length === 1 ? activePlayers[0] : null;
+      if (last && !game.ranking.includes(last.userId)) {
+        game.ranking.push(last.userId);
+      }
+      game.winnerId = game.ranking[0] ?? null;
     }
     broadCastToRoom(gameId, {
       type: "game_ended",

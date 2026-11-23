@@ -47,19 +47,30 @@ async function buildServer() {
   const gameManager = new GameManager();
   const roomManager = new RoomManager();
   const sockets: WebSocket[] = [];
+  // Parties enregistrees par endGame, pour verifier gagnant et classement
+  const matches: any[] = [];
 
   fastify.register(cookie);
   fastify.register(jwt, { secret: JWT_SECRET });
 
   fastify.decorate("prisma", {
-    match: { create: async () => ({}) },
+    match: {
+      create: async ({ data }: any) => {
+        matches.push(data);
+        return {};
+      },
+    },
     user: {
       findUnique: async ({ where }: any) => ({
         id: where.id,
         username: `user_${where.id}`,
         elo: 1000,
       }),
+      findMany: async ({ where }: any) =>
+        where.id.in.map((id: string) => ({ id, elo: 1000 })),
+      update: async () => ({}),
     },
+    $transaction: async (ops: Promise<unknown>[]) => Promise.all(ops),
   } as any);
 
   fastify.decorate("gameManager", gameManager);
@@ -73,7 +84,7 @@ async function buildServer() {
   const address = fastify.server.address();
   const port = typeof address === "object" ? address!.port : 0;
 
-  return { fastify, port, gameManager, roomManager, sockets };
+  return { fastify, port, gameManager, roomManager, sockets, matches };
 }
 
 type Server = Awaited<ReturnType<typeof buildServer>>;
@@ -862,6 +873,56 @@ const tests = [
       assert(b.hand.length >= bHand + 4, "B doit avoir pioché les 4 cartes");
       assert(played, "Le bot doit avoir joué après le timer de bluff");
       assert(!b.disconnected, "B ne doit pas être compté AFK pendant le bluff");
+    });
+  }),
+
+  // ---------------- Fin de partie ranked par abandon ----------------
+
+  test("ranked: après des abandons, le gagnant reste celui qui a fini premier", async () => {
+    await withServer(async (server) => {
+      const ids = ["alice", "bob", "charlie"].map((n) => uniqueUserId(n));
+      const gameId = server.gameManager.createGame(
+        ids.map((id) => ({ id, username: id })),
+        GameMode.RANKED,
+      )!;
+      const game = server.gameManager.getGame(gameId)!;
+      const [a, b, c] = await Promise.all(
+        ids.map((id) => connectUser(server, id)),
+      );
+      for (const ws of [a, b, c]) {
+        send(ws, { type: "join_game", gameId });
+        await waitForMessage(ws, "game_updated");
+      }
+
+      // A pose sa derniere carte : classe 1er, la partie continue entre B et C
+      game.topCard = { id: "top", color: "red", value: "5" };
+      game.currentColor = "red";
+      game.players[0].hand = [{ id: "last", color: "red", value: "3" }];
+      send(a, { type: "play_card", gameId, cardId: "last" });
+      await waitForMessage(c, "game_updated");
+      assert(game.ranking[0] === ids[0], "A doit être classé premier");
+      assert(game.status === GameStatus.IN_PROGRESS, "La partie continue");
+
+      // B quitte : apres le delai de reconnexion, C reste seul
+      const ended = waitForMessage(c, "game_ended", 8000);
+      const elo = waitForMessage(c, "elo_updated", 8000);
+      b.close();
+      const endMsg = await ended;
+      const eloMsg = await elo;
+
+      assert(endMsg.winnerId === ids[0], "Le gagnant annoncé doit être A");
+      const match = server.matches[0];
+      assert(match?.winnerId === ids[0], "Le gagnant enregistré doit être A");
+      assert(
+        match.ranking[0] === ids[0] && match.ranking[1] === ids[2],
+        `Classement attendu A puis C, reçu ${JSON.stringify(match.ranking)}`,
+      );
+      const gain = (id: string) => {
+        const ch = eloMsg.changes.find((x: any) => x.userId === id);
+        return ch.newElo - ch.oldElo;
+      };
+      assert(gain(ids[0]) > gain(ids[2]), "A doit gagner plus d'ELO que C");
+      assert(gain(ids[2]) > gain(ids[1]), "C doit gagner plus d'ELO que B");
     });
   }),
 ];
