@@ -10,7 +10,7 @@ const MAX_BACKS = 7;
 
 interface Props {
   player: Player;
-  // Shows the "Catch UNO" button (rule enabled and one card left)
+  // Shows the "Catch UNO" button: one card left and UNO not said yet
   canCatchUno: boolean;
   onCatchUno: () => void;
 }
@@ -44,6 +44,7 @@ export function OpponentSeat({ player, canCatchUno, onCatchUno }: Props) {
             <Card
               key={i}
               color="neutral"
+              variant="neon"
               className="w-11 border-2! compact:w-8 short:w-6 tiny:w-4"
             >
               <CardBack />
@@ -58,7 +59,7 @@ export function OpponentSeat({ player, canCatchUno, onCatchUno }: Props) {
       {canCatchUno && (
         <button
           type="button"
-          className="btn btn-warning btn-xs absolute -bottom-3"
+          className="btn btn-error btn-sm absolute -bottom-4 z-10 animate-pulse shadow-[0_0_20px_var(--color-error)] compact:btn-xs compact:-bottom-3"
           onClick={onCatchUno}
         >
           Catch UNO

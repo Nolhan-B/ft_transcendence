@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 import { Card } from "./Card";
-import type { CardColor } from "./Card";
+import type { CardColor, CardVariant } from "./Card";
 
 export interface HandCard {
   id: string;
@@ -23,6 +23,7 @@ interface HandProps {
   // per card after the first, negative margin) and never rotate.
   fan?: "center" | "left" | "row";
   overlap?: string;
+  variant?: CardVariant; // look of the cards (default: classic)
   cardClassName?: string; // added to every card (e.g. a thinner border)
   className?: string; // width of the cards (default: 3/4 of the space on mobile, capped so that a card fits the screen height)
 }
@@ -35,6 +36,7 @@ export function Hand({
   step = 10,
   fan = "center",
   overlap = "-2rem",
+  variant = "classic",
   cardClassName = "",
   className = "w-3/4 max-w-[max(14rem,min(24rem,calc((100dvh_-_9rem)*56/87)))] sm:w-full",
 }: HandProps) {
@@ -49,6 +51,7 @@ export function Hand({
             <Card
               key={card.id}
               color={card.color}
+              variant={variant}
               style={index > 0 ? { marginLeft: overlap } : undefined}
               role={clickable ? "button" : undefined}
               tabIndex={clickable ? 0 : undefined}
@@ -97,6 +100,7 @@ export function Hand({
           <Card
             key={card.id}
             color={card.color}
+            variant={variant}
             style={
               { "--angle": `calc(${angle}deg * var(--fan))` } as CSSProperties
             }

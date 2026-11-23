@@ -10,7 +10,7 @@ import type {
 } from "shared";
 import { useWebSocket } from "../hooks/ws/useWebSocket";
 import { GameContext } from "./GameContext";
-import type { GameContextValue } from "./GameContext";
+import type { GameContextValue, UnoEvent } from "./GameContext";
 
 // The server closes the socket after these refusals. "Already connected" is
 // often only a race (page reload, hot reload: the old socket is not closed yet
@@ -25,6 +25,9 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const [winnerId, setWinnerId] = useState<string | null>(null);
   const [turnStartedAt, setTurnStartedAt] = useState<number | null>(null);
   const [inQueue, setInQueue] = useState(false);
+  const [unoCalls, setUnoCalls] = useState<Record<string, number>>({});
+  const [unoEvent, setUnoEvent] = useState<UnoEvent | null>(null);
+  const unoEventId = useRef(0);
   const [error, setError] = useState<string | null>(null);
 
   // Consecutive "Already connected" answers (reset once the server accepts us)
@@ -57,12 +60,30 @@ export function GameProvider({ children }: { children: ReactNode }) {
           // New game: forget the previous one
           setGameState(null);
           setWinnerId(null);
+          setUnoCalls({});
+          setUnoEvent(null);
           // The server removes the room when the game starts
           setRoom(null);
           break;
         case "game_updated":
           setGameState(event.state);
           setTurnStartedAt(Date.now());
+          break;
+        case "uno_called":
+          setUnoCalls((calls) => ({ ...calls, [event.userId]: Date.now() }));
+          setUnoEvent({
+            id: ++unoEventId.current,
+            kind: "called",
+            userId: event.userId,
+          });
+          break;
+        case "uno_caught":
+          setUnoEvent({
+            id: ++unoEventId.current,
+            kind: "caught",
+            userId: event.targetUserId,
+            byUserId: event.catcherUserId,
+          });
           break;
         case "game_ended":
           setWinnerId(event.winnerId);
@@ -78,6 +99,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
           setGameId(event.gameId);
           setGameState(null);
           setWinnerId(null);
+          setUnoCalls({});
+          setUnoEvent(null);
           break;
         case "error":
           if (event.message === "Already connected") {
@@ -154,6 +177,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
   const joinGame = useCallback(
     (id: string) => {
+      // Opened from the URL (reload, link): the actions need the game id too
+      setGameId(id);
       send({ type: "join_game", gameId: id });
     },
     [send],
@@ -195,6 +220,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
     setGameState(null);
     setWinnerId(null);
     setTurnStartedAt(null);
+    setUnoCalls({});
+    setUnoEvent(null);
   }, []);
 
   const clearError = useCallback(() => setError(null), []);
@@ -207,6 +234,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
       gameState,
       turnStartedAt,
       winnerId,
+      unoCalls,
+      unoEvent,
       inQueue,
       error,
       clearError,
@@ -233,6 +262,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
       gameState,
       turnStartedAt,
       winnerId,
+      unoCalls,
+      unoEvent,
       inQueue,
       error,
       clearError,
