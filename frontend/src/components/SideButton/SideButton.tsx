@@ -41,15 +41,13 @@ export function SideButton() {
         onClick={() => setOpen(true)}
         aria-label="Open menu"
         aria-expanded={open}
-        className="btn btn-secondary fixed right-0 top-1/2 z-20 h-auto -translate-y-1/2 rounded-r-none px-2 py-4 [writing-mode:vertical-rl]"
+        className={!showNotification ? 
+          "btn btn-secondary fixed right-0 top-1/2 z-20 h-auto -translate-y-1/2 rounded-r-none px-2 py-4 [writing-mode:vertical-rl]" :
+          "btn btn-warning fixed right-0 top-1/2 z-20 h-auto -translate-y-1/2 rounded-r-none px-2 py-4 [writing-mode:vertical-rl]"
+        }
       >
         <div className="flex gap-1 items-center">
-          {showNotification ? (
-            <div className="status status-accent animate-bounce"></div>
-          ) : (
-            ""
-          )}
-          Friends
+          Friends {showNotification ? "(!)" : ""}
         </div>
       </button>
 
