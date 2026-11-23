@@ -331,6 +331,10 @@ export default async function gameGateway(fastify: FastifyInstance) {
           winnerId: game.winnerId ?? "",
           chatLog: chatLogs.get(gameId) ?? [],
           moveLog: moveLogs.get(gameId) ?? [],
+          // Sans ca, startedAt prenait la valeur par defaut now() a l'enregistrement,
+          // soit la meme que endedAt : la duree de la partie valait toujours 0
+          startedAt: game.startedAt,
+          endedAt: new Date(),
         },
       });
     } catch (err) {

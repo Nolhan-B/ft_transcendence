@@ -12,6 +12,8 @@ import { getCardEffect, isValidPlay } from "./rules.js";
 
 export interface InternalGameState extends GameState {
   drawPile: Card[];
+  // Interne : sert a enregistrer la vraie duree de la partie (Match.startedAt)
+  startedAt: Date;
   lastWildDraw4?: {
     playerId: string;
     hadMatchingColor: boolean;
@@ -69,6 +71,7 @@ export function createGame(
     lastWildDraw4: undefined,
     ranking: [],
     winnerId: null,
+    startedAt: new Date(),
   };
 }
 

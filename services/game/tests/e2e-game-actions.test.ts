@@ -960,6 +960,7 @@ const tests = [
   test("ranked: après des abandons, le gagnant reste celui qui a fini premier", async () => {
     await withServer(async (server) => {
       const ids = ["alice", "bob", "charlie"].map((n) => uniqueUserId(n));
+      const createdAt = Date.now();
       const gameId = server.gameManager.createGame(
         ids.map((id) => ({ id, username: id })),
         GameMode.RANKED,
@@ -992,6 +993,15 @@ const tests = [
       assert(endMsg.winnerId === ids[0], "Le gagnant annoncé doit être A");
       const match = server.matches[0];
       assert(match?.winnerId === ids[0], "Le gagnant enregistré doit être A");
+      // La duree enregistree couvre toute la partie, de sa creation a sa fin
+      assert(
+        Math.abs(match.startedAt.getTime() - createdAt) < 500,
+        "startedAt doit être l'heure de création de la partie",
+      );
+      assert(
+        match.endedAt.getTime() - match.startedAt.getTime() >= 1000,
+        "La durée enregistrée ne doit pas être nulle",
+      );
       assert(
         match.ranking[0] === ids[0] && match.ranking[1] === ids[2],
         `Classement attendu A puis C, reçu ${JSON.stringify(match.ranking)}`,
