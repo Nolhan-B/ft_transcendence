@@ -14,11 +14,33 @@ export function FriendManager({
   currentOpenedFriendChat,
   setCurrentOpenedFriendChat,
 }: FriendManagerProps) {
-  const { friends, friendRequests, setFriendRequests, error } = useChat();
+  const {
+    friends,
+    friendRequests,
+    setFriendRequests,
+    error,
+    setUnreadSenders,
+    unreadSenders,
+  } = useChat();
 
   const [friendRequestsError, setFriendRequestsError] = useState<string | null>(
     null,
   );
+
+  function removeNotification(uid: string) {
+    if (!uid) return;
+    setUnreadSenders((all) => all.filter((id) => id !== uid));
+  }
+
+  useEffect(() => {
+    if (
+      currentOpenedFriendChat &&
+      unreadSenders.includes(currentOpenedFriendChat?.id)
+    ) {
+      const id = currentOpenedFriendChat.id;
+      removeNotification(id);
+    }
+  }, [unreadSenders, currentOpenedFriendChat]);
 
   // Close chat if friend is removed
   useEffect(() => {
@@ -26,10 +48,6 @@ export function FriendManager({
       setCurrentOpenedFriendChat(null);
     }
   }, [friends]);
-
-  function handleAddFriend(username: string) {
-    console.log("WIP, add friend: " + username);
-  }
 
   async function handleAcceptFriendRequest(userId: string) {
     try {
@@ -68,7 +86,7 @@ export function FriendManager({
     <div className="flex min-h-0 flex-1 flex-col gap-6 pt-1">
       <div className="flex shrink-0 flex-col gap-1">
         Send a friend request
-        <AddFriendField onAdd={handleAddFriend} />
+        <AddFriendField />
       </div>
 
       <div className="flex shrink-0 flex-col gap-1">
@@ -104,12 +122,16 @@ export function FriendManager({
               key={friend.id}
               name={friend.username}
               avatarUrl={friend.avatarUrl}
+              uid={friend.id}
               onRemove={() => handleDeclineFriendRequest(friend.id)}
-              onClick={() =>
-                currentOpenedFriendChat
-                  ? setCurrentOpenedFriendChat(null)
-                  : setCurrentOpenedFriendChat(friend)
-              }
+              currentOpenedChat={currentOpenedFriendChat}
+              onClick={() => {
+                if (currentOpenedFriendChat) {
+                  setCurrentOpenedFriendChat(null);
+                } else {
+                  setCurrentOpenedFriendChat(friend);
+                }
+              }}
             />
           ))
         )}
