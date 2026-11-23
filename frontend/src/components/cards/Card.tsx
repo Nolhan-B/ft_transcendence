@@ -1,15 +1,13 @@
 import type { HTMLAttributes, ReactNode } from "react";
 
 // Only theme colors (see styles/index.css), so the card follows the theme.
-export type CardColor =
-  "primary" | "secondary" | "accent" | "success" | "neutral";
+export type CardColor = "primary" | "secondary" | "accent" | "success";
 
 const COLOR_CLASSES: Record<CardColor, string> = {
   primary: "bg-primary",
   secondary: "bg-secondary",
   accent: "bg-accent",
   success: "bg-success",
-  neutral: "bg-neutral",
 };
 
 interface CardProps extends HTMLAttributes<HTMLDivElement> {
@@ -30,7 +28,7 @@ export function Card({
 }: CardProps) {
   return (
     <div
-      className={`card @container aspect-[56/87] min-h-0 overflow-hidden border-8 border-primary-content shadow-2xl ${COLOR_CLASSES[color]} ${className}`}
+      className={`card @container aspect-56/87 min-h-0 overflow-hidden border-8 border-primary-content shadow-2xl ${COLOR_CLASSES[color]} ${className}`}
       {...rest}
     >
       <div className="card-body min-h-0 p-[4cqw]">
