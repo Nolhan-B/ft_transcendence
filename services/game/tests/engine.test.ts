@@ -1542,5 +1542,67 @@ test("audit: jump-in valide → accepté, le tour repart du joueur qui coupe", (
 // RÉSULTATS
 // ============================================================
 
+// ============================================================
+// BLUFF CHALLENGE - +4 EN ATTENTE
+// ============================================================
+
+function setupPendingWildDraw4(jumpIn = false): InternalGameState {
+  const state = createGame(
+    [
+      { id: "1", username: "A" },
+      { id: "2", username: "B" },
+      { id: "3", username: "C" },
+    ],
+    GameMode.CLASSIC,
+    {
+      stacking: "none",
+      sevenZeroRule: false,
+      jumpIn,
+      bluffChallenge: true,
+      unoCallout: false,
+    },
+  );
+  state.players[0].hand.push({ id: "w4", color: "wild", value: "wild_draw4" });
+  playCard(state, "1", "w4", "red");
+  return state;
+}
+
+test("bluff: la cible ne peut pas jouer une carte au lieu de répondre au +4", () => {
+  const state = setupPendingWildDraw4();
+  assert(!!state.lastWildDraw4, "le +4 doit être en attente");
+  assert(state.players[1].isCurrentTurn, "c'est à la cible (B) de répondre");
+
+  state.players[1].hand.push({ id: "r5", color: "red", value: "5" });
+  const handSize = state.players[1].hand.length;
+  const result = playCard(state, "2", "r5");
+
+  assert(result === null, "le coup doit être refusé");
+  assert(state.players[1].hand.length === handSize, "la main de B est intacte");
+  assert(!!state.lastWildDraw4, "le +4 est toujours en attente");
+});
+
+test("bluff: la cible ne peut pas piocher une carte au lieu de répondre au +4", () => {
+  const state = setupPendingWildDraw4();
+  const handSize = state.players[1].hand.length;
+
+  assert(drawCard(state, "2") === null, "la pioche doit être refusée");
+  assert(state.players[1].hand.length === handSize, "B n'a pas pioché");
+  assert(state.players[1].isCurrentTurn, "c'est toujours à B de répondre");
+});
+
+test("bluff: pas de jump-in sur un +4 en attente", () => {
+  const state = setupPendingWildDraw4(true);
+  state.players[2].hand.push({ id: "w4b", color: "wild", value: "wild_draw4" });
+
+  assert(
+    playCard(state, "3", "w4b", "blue") === null,
+    "le jump-in doit être refusé",
+  );
+  assert(
+    state.lastWildDraw4?.playerId === "1",
+    "le +4 en attente n'est pas écrasé",
+  );
+});
+
 console.log(`\n=== ${passed} passed, ${failed} failed ===`);
 if (failed > 0) process.exit(1);

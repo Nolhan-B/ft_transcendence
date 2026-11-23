@@ -82,6 +82,10 @@ export function playCard(
   // PHASE 1 : tout verifier, sans rien modifier
   if (state.status === GameStatus.FINISHED) return null;
 
+  // Un +4 attend une reponse (accept / challenge) : personne ne joue avant,
+  // sinon la cible esquive la penalite (et un jump-in ecraserait le +4 en attente)
+  if (state.lastWildDraw4) return null;
+
   const player: Player | undefined = getPlayer(state, playerId);
   if (!player || player.disconnected) return null;
 
@@ -310,6 +314,8 @@ export function drawCard(
   const player = getPlayer(state, playerId);
   if (!player || player.disconnected) return null;
   if (!player.isCurrentTurn) return null;
+  // Face a un +4 contestable, il faut passer par accept_wild_draw4 ou challenge_bluff
+  if (state.lastWildDraw4) return null;
 
   const count = state.pendingDrawCount > 0 ? state.pendingDrawCount : 1;
   drawCardsForCurrentPlayer(state, count);
