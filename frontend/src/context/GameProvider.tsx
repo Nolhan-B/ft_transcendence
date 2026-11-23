@@ -2,6 +2,7 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import type {
   CardColor,
+  ChatMessageEvent,
   CreateRoomPayload,
   GameSettings,
   GameState,
@@ -26,6 +27,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const [turnStartedAt, setTurnStartedAt] = useState<number | null>(null);
   const [inQueue, setInQueue] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [chatMessages, setChatMessages] = useState<ChatMessageEvent[]>([]);
 
   // Consecutive "Already connected" answers (reset once the server accepts us)
   const refusals = useRef(0);
@@ -78,6 +80,9 @@ export function GameProvider({ children }: { children: ReactNode }) {
           setGameId(event.gameId);
           setGameState(null);
           setWinnerId(null);
+          break;
+        case "chat_message":
+          setChatMessages((prev) => [...prev, event]);
           break;
         case "error":
           if (event.message === "Already connected") {
@@ -197,6 +202,14 @@ export function GameProvider({ children }: { children: ReactNode }) {
     setTurnStartedAt(null);
   }, []);
 
+  const sendChatMessage = useCallback(
+    (content: string) => {
+      if (!gameId) return;
+      send({ type: "chat_message", gameId, content });
+    },
+    [send, gameId],
+  );
+
   const clearError = useCallback(() => setError(null), []);
 
   const value = useMemo<GameContextValue>(
@@ -225,6 +238,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
       callUno,
       catchUno,
       clearGame,
+      chatMessages,
+      sendChatMessage,
     }),
     [
       status,
@@ -251,6 +266,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
       callUno,
       catchUno,
       clearGame,
+      chatMessages,
+      sendChatMessage,
     ],
   );
 

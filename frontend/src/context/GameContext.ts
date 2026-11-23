@@ -1,6 +1,7 @@
 import { createContext } from "react";
 import type {
   CardColor,
+  ChatMessageEvent,
   CreateRoomPayload,
   GameSettings,
   GameState,
@@ -42,6 +43,10 @@ export interface GameContextValue {
   catchUno: (targetUserId: string) => void;
   // Forget the finished game (back to the lobby)
   clearGame: () => void;
+
+  // Chat related
+  chatMessages: ChatMessageEvent[];
+  sendChatMessage: (content: string) => void;
 }
 
 export const GameContext = createContext<GameContextValue | null>(null);
