@@ -9,6 +9,8 @@ import {
   MAX_PLAYERS,
   MIN_PLAYERS,
   ROOM_NAME_MAX_LENGTH,
+  isValidSettings,
+  pickSettings,
 } from "../gateway/utils.js";
 
 export default async function gameRoutes(fastify: FastifyInstance) {
@@ -32,7 +34,7 @@ export default async function gameRoutes(fastify: FastifyInstance) {
                 },
               },
             },
-            mode: { type: "string", minLength: 1 },
+            mode: { type: "string", enum: Object.values(GameMode) },
             settings: { type: "object" },
           },
         },
@@ -66,10 +68,14 @@ export default async function gameRoutes(fastify: FastifyInstance) {
         return reply.code(400).send({ error: "Creator must be a participant" });
       }
 
+      if (settings !== undefined && !isValidSettings(settings)) {
+        return reply.code(400).send({ error: "Invalid game settings" });
+      }
+
       const gameId = fastify.gameManager.createGame(
         participants,
         mode,
-        settings,
+        settings && pickSettings(settings),
       );
       return reply.code(201).send({ gameId });
     },
@@ -88,7 +94,7 @@ export default async function gameRoutes(fastify: FastifyInstance) {
               minLength: 1,
               maxLength: ROOM_NAME_MAX_LENGTH,
             },
-            mode: { type: "string", minLength: 1 },
+            mode: { type: "string", enum: Object.values(GameMode) },
             maxPlayers: {
               type: "integer",
               minimum: MIN_PLAYERS,

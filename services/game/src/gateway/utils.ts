@@ -4,7 +4,9 @@ import {
   CardValue,
   GameMode,
   type ClientMessage,
+  type GameSettings,
   type GameState,
+  type StackingRule,
 } from "shared";
 import { InternalGameState } from "../engine/game-state.js";
 import { Room } from "../managers/room.manager.js";
@@ -15,6 +17,35 @@ import type { RoomInfo } from "shared";
 export const MIN_PLAYERS = 2;
 export const MAX_PLAYERS = 4;
 export const ROOM_NAME_MAX_LENGTH = 50;
+
+const STACKING_RULES: StackingRule[] = ["none", "same", "all"];
+const BOOLEAN_SETTINGS = [
+  "sevenZeroRule",
+  "jumpIn",
+  "bluffChallenge",
+  "unoCallout",
+] as const;
+
+// Settings incomplets ou faux = regles cassees (ex : stacking absent, un +2
+// pouvait etre ignore). On exige l'objet complet, avec les bons types
+export function isValidSettings(raw: unknown): raw is GameSettings {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw))
+    return false;
+  const s = raw as Record<string, unknown>;
+  if (!STACKING_RULES.includes(s.stacking as StackingRule)) return false;
+  return BOOLEAN_SETTINGS.every((key) => typeof s[key] === "boolean");
+}
+
+// Copie limitee aux champs connus : les cles en trop ne sont pas stockees
+export function pickSettings(s: GameSettings): GameSettings {
+  return {
+    stacking: s.stacking,
+    sevenZeroRule: s.sevenZeroRule,
+    jumpIn: s.jumpIn,
+    bluffChallenge: s.bluffChallenge,
+    unoCallout: s.unoCallout,
+  };
+}
 
 export function sendError(socket: WebSocket, message: string): void {
   socket.send(JSON.stringify({ type: "error", message }));
@@ -124,7 +155,7 @@ export function validateMessage(raw: unknown): ClientMessage | null {
       if (typeof msg.roomCode !== "string") return null;
       break;
     case "update_room":
-      if (typeof msg.roomCode !== "string" || typeof msg.settings !== "object")
+      if (typeof msg.roomCode !== "string" || !isValidSettings(msg.settings))
         return null;
       break;
     case "add_bot":

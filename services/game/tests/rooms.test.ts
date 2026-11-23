@@ -590,6 +590,95 @@ await test("create_room via WebSocket rejects invalid payloads", async () => {
   client.ws.close();
 });
 
+await test("update_room rejects invalid settings", async () => {
+  const res = await post(
+    "/game/games/rooms",
+    { name: "Bad Settings", mode: "classic", maxPlayers: 4 },
+    aliceToken,
+  );
+  const client = await createClient(aliceToken);
+  await client.waitFor("connected");
+  client.send({ type: "join_room", roomCode: res.roomCode });
+  await client.waitFor("room_updated");
+
+  const valid = {
+    stacking: "all",
+    sevenZeroRule: true,
+    jumpIn: false,
+    bluffChallenge: false,
+    unoCallout: false,
+  };
+  const invalid = [
+    null,
+    {}, // settings vides : le stacking absent permettait d'ignorer un +2
+    [],
+    { ...valid, stacking: "foo" },
+    { ...valid, jumpIn: "true" },
+    { stacking: "all" },
+  ];
+  for (const settings of invalid) {
+    client.send({ type: "update_room", roomCode: res.roomCode, settings });
+    const error = await client.waitFor("error");
+    assert(
+      error.message === "Invalid message format",
+      `Should reject ${JSON.stringify(settings)}`,
+    );
+  }
+
+  // Les cles inconnues ne sont pas stockees
+  client.send({
+    type: "update_room",
+    roomCode: res.roomCode,
+    settings: { ...valid, hacked: true },
+  });
+  const update = await client.waitFor("room_updated");
+  assert(update.room.settings.stacking === "all", "Valid settings applied");
+  assert(!("hacked" in update.room.settings), "Unknown keys must be dropped");
+  log("Invalid settings rejected, unknown keys dropped");
+  client.ws.close();
+});
+
+await test("update_room by non-leader returns an error", async () => {
+  const res = await post(
+    "/game/games/rooms",
+    { name: "Leader Error", mode: "classic", maxPlayers: 4 },
+    aliceToken,
+  );
+  const bobClient = await createClient(bobToken);
+  await bobClient.waitFor("connected");
+  bobClient.send({ type: "join_room", roomCode: res.roomCode });
+  await bobClient.waitFor("room_updated");
+
+  bobClient.send({
+    type: "update_room",
+    roomCode: res.roomCode,
+    settings: {
+      stacking: "all",
+      sevenZeroRule: false,
+      jumpIn: false,
+      bluffChallenge: false,
+      unoCallout: false,
+    },
+  });
+  const error = await bobClient.waitFor("error");
+  assert(
+    error.message === "Only the leader can update settings",
+    `Unexpected error: ${error.message}`,
+  );
+  log("Non-leader gets an explicit error");
+  bobClient.ws.close();
+});
+
+await test("POST /games/rooms rejects unknown mode", async () => {
+  const res = await post(
+    "/game/games/rooms",
+    { name: "Bad mode", mode: "nope", maxPlayers: 4 },
+    aliceToken,
+  );
+  assert(!res.roomCode, "Should not create a room with an unknown mode");
+  log("Unknown mode rejected");
+});
+
 await test("join non-existent room returns error", async () => {
   const client = await createClient(aliceToken);
   await client.waitFor("connected");
