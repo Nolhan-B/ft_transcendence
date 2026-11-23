@@ -9,12 +9,9 @@ const ENTRY_SELECT = {
   elo: true,
 } as const;
 
-// Exclude E2E test accounts and any bot entries from leaderboard rankings
+// Exclude bot entries from leaderboard rankings
 const REAL_PLAYER_WHERE = {
-  AND: [
-    { NOT: { email: { endsWith: "@test.com" } } },
-    { NOT: { id: { startsWith: "bot_" } } },
-  ],
+  NOT: { id: { startsWith: "bot_" } },
 };
 
 export async function getTopPlayers(
