@@ -107,6 +107,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
           setWinnerId(null);
           setUnoCalls({});
           setUnoEvent(null);
+          setChatMessages([]);
           // The server removes the room when the game starts
           setRoom(null);
           break;
@@ -158,6 +159,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
           setWinnerId(null);
           setUnoCalls({});
           setUnoEvent(null);
+          setChatMessages([]);
           break;
         case "chat_message":
           setChatMessages((prev) => [...prev, event]);
@@ -365,6 +367,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     setTurnStartedAt(null);
     setUnoCalls({});
     setUnoEvent(null);
+    setChatMessages([]);
   }, []);
 
   const sendChatMessage = useCallback(

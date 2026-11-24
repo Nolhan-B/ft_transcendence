@@ -4,6 +4,7 @@ import { TableBackground } from "../components/layout/TableBackground";
 import { Header } from "../components/Header/Header";
 import { DebugHeader } from "../components/DebugHeader/DebugHeader";
 import { SideButton } from "../components/SideButton/SideButton";
+import { FloatingMessageBox } from "../components/FloatingMessageBox/FloatingMessageBox";
 
 // Layout of the game pages: like the main layout, without the footer. On a
 // landscape phone (short screen) the navbar is hidden too, the board needs
@@ -30,6 +31,7 @@ export function GameLayout() {
       <div className="tiny:hidden">
         <SideButton />
       </div>
+      <FloatingMessageBox></FloatingMessageBox>
     </div>
   );
 }
