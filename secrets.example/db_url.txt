@@ -1,0 +1,1 @@
+postgresql://transcendence_user:changeme@postgres:5432/transcendence_db?schema=public
