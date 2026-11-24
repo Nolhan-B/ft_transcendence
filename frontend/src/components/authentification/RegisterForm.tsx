@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ErrorAlert } from "../ui/ErrorAlert";
 import { useRegister } from "../../hooks/auth/useRegister";
 import { Link, useNavigate } from "react-router-dom";
+import { USERNAME_HINT, USERNAME_PATTERN } from "../../constants";
 
 export function RegisterForm() {
   const { submit, loading, error } = useRegister();
@@ -37,10 +38,12 @@ export function RegisterForm() {
             required
             minLength={3}
             maxLength={20}
+            pattern={USERNAME_PATTERN}
+            title={USERNAME_HINT}
             className="input input-md validator w-full"
             onChange={(e) => setUsername(e.target.value)}
           />
-          <p className="validator-hint">3 to 20 characters</p>
+          <p className="validator-hint">{USERNAME_HINT}</p>
         </label>
         <label className="floating-label w-full flex-col">
           <span>Email</span>
