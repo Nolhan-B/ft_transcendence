@@ -8,6 +8,10 @@ import { GameManager } from "../src/managers/game.manager.js";
 import { RoomManager } from "../src/managers/room.manager.js";
 import { QueueManager } from "../src/managers/queue.manager.js";
 
+// Bots play fast in tests (the game default is 2.5 to 4.5 s)
+process.env.BOT_MIN_DELAY_MS = "500";
+process.env.BOT_EXTRA_DELAY_MS = "1000";
+
 // Délai de grâce court pour les tests : doit être défini AVANT de charger le gateway
 const GRACE_MS = 500;
 process.env.RECONNECT_GRACE_MS = String(GRACE_MS);

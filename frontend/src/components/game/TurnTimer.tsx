@@ -13,8 +13,8 @@ export function TurnTimer({ secondsLeft, total, large = false }: Props) {
     <div
       role="timer"
       aria-label={`${secondsLeft} seconds left`}
-      className={`radial-progress font-bold ${
-        urgent ? "text-error" : "text-accent"
+      className={`radial-progress bg-black/30 font-bold ${
+        urgent ? "animate-pulse text-error" : "text-accent"
       } ${large ? "text-xl" : "text-sm"}`}
       style={
         {

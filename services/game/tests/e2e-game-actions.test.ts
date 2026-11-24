@@ -8,10 +8,17 @@ import { GameManager } from "../src/managers/game.manager.js";
 import { RoomManager } from "../src/managers/room.manager.js";
 import { QueueManager } from "../src/managers/queue.manager.js";
 
+// Bots play fast in tests (the game default is 2.5 to 4.5 s)
+process.env.BOT_MIN_DELAY_MS = "500";
+process.env.BOT_EXTRA_DELAY_MS = "1000";
+
 // Délais courts pour les tests : doivent être définis AVANT de charger le gateway
 const TURN_MS = 1500;
 process.env.TURN_TIMEOUT_MS = String(TURN_MS);
 process.env.RECONNECT_GRACE_MS = "5000";
+// Bluff window of the tests (the game default is longer)
+const BLUFF_MS = 5000;
+process.env.BLUFF_TIMEOUT_MS = String(BLUFF_MS);
 const JOIN_TIMEOUT_MS = 1000;
 process.env.GAME_JOIN_TIMEOUT_MS = String(JOIN_TIMEOUT_MS);
 const UNO_WINDOW_MS = 1500;
@@ -869,10 +876,10 @@ const tests = [
       assert(b.isCurrentTurn, "B est la victime du +4");
       const bHand = b.hand.length;
 
-      // B ne repond pas : au bout de 5 s il pioche 4, puis c'est au bot
+      // B ne repond pas : au bout du delai de bluff il pioche 4, puis c'est au bot
       const played = await waitUntil(
         () => !bot.hand.some((c) => c.id === "bot_r3"),
-        5000 + 2500,
+        BLUFF_MS + 2500,
       );
       assert(b.hand.length >= bHand + 4, "B doit avoir pioché les 4 cartes");
       assert(played, "Le bot doit avoir joué après le timer de bluff");
@@ -1289,7 +1296,7 @@ const tests = [
       assert(pending.playerId === a.id, "posé par A");
       assert(pending.targetId === b.id, "B doit répondre");
       assert(
-        pending.timeLeftMs > 0 && pending.timeLeftMs <= 5000,
+        pending.timeLeftMs > 0 && pending.timeLeftMs <= BLUFF_MS,
         `délai de réponse attendu, reçu ${pending.timeLeftMs}`,
       );
       assert(
@@ -1331,7 +1338,7 @@ const tests = [
         .pendingWildDraw4;
       assert(pending?.targetId === b.id, "B doit toujours répondre");
       assert(
-        pending.timeLeftMs < 5000 - 600,
+        pending.timeLeftMs < BLUFF_MS - 600,
         `le délai ne doit pas repartir à zéro, reçu ${pending.timeLeftMs}`,
       );
     });

@@ -3,6 +3,7 @@ import { ErrorAlert } from "../ui/ErrorAlert";
 import type { FormEvent } from "react";
 import type { Profile } from "shared";
 import { useAuth } from "../../hooks/auth/useAuth";
+import { USERNAME_HINT, USERNAME_PATTERN } from "../../constants";
 
 const FALLBACK_ERROR = "Unable to save the profile.";
 
@@ -89,10 +90,12 @@ export function EditProfile({ profile, onSaved }: Props) {
                 value={username}
                 minLength={3}
                 maxLength={20}
+                pattern={USERNAME_PATTERN}
+                title={USERNAME_HINT}
                 required
                 onChange={(event) => setUsername(event.target.value)}
               />
-              <p className="validator-hint">3 to 20 characters</p>
+              <p className="validator-hint">{USERNAME_HINT}</p>
             </fieldset>
 
             <fieldset className="fieldset">

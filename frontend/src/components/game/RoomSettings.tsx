@@ -34,7 +34,7 @@ const TOGGLES: {
   {
     key: "bluffChallenge",
     label: "Challenge a Wild +4",
-    help: "A Wild +4 is only allowed without a card of the current color. The next player has 5 s to challenge it: a bluff makes its player draw 4 cards, otherwise the challenger draws 6.",
+    help: "A Wild +4 is only allowed without a card of the current color. The next player has 10 s to challenge it: a bluff makes its player draw 4 cards, otherwise the challenger draws 6.",
   },
   {
     key: "unoCallout",

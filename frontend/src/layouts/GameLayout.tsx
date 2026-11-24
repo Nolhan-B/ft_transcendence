@@ -1,6 +1,6 @@
 import { Outlet } from "react-router-dom";
 import { BackToGame } from "../components/game/BackToGame";
-import { CityBackground } from "../components/layout/CityBackground";
+import { TableBackground } from "../components/layout/TableBackground";
 import { Header } from "../components/Header/Header";
 import { DebugHeader } from "../components/DebugHeader/DebugHeader";
 import { SideButton } from "../components/SideButton/SideButton";
@@ -11,8 +11,8 @@ import { SideButton } from "../components/SideButton/SideButton";
 export function GameLayout() {
   return (
     <div className="isolate flex min-h-dvh flex-col text-base-content">
-      {/* Neon city behind every page */}
-      <CityBackground />
+      {/* Red card table behind every page */}
+      <TableBackground />
       {/* Dev-only: `VITE_DEBUG_HEADER=false` hides it, prod build strips it */}
       {import.meta.env.DEV && import.meta.env.VITE_DEBUG_HEADER !== "false" && (
         <DebugHeader />
@@ -21,7 +21,7 @@ export function GameLayout() {
       <div className="snug:hidden">
         <Header />
       </div>
-      <main className="container mx-auto flex flex-1 flex-col px-4 py-4 compact:py-2 snug:py-1 short:px-2 tiny:py-1">
+      <main className="container mx-auto flex flex-1 flex-col px-4 py-4 compact:py-2 snug:py-1 short:px-2 tiny:py-1 phone:px-2">
         <Outlet />
       </main>
       {/* Spectating: the way back to my own game, if I play one */}

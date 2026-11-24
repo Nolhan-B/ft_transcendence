@@ -14,15 +14,12 @@ export function UserMenu() {
   if (!user) {
     return (
       <div className="flex gap-2">
-        <Link
-          to="/auth"
-          className="btn btn-neutral sm:btn-ghost font-cyber text-xs font-bold uppercase tracking-wider"
-        >
+        <Link to="/auth" className="btn btn-ghost text-white">
           Sign in
         </Link>
         <Link
           to="/auth?mode=register"
-          className="btn btn-primary font-cyber hidden text-xs font-bold uppercase tracking-wider sm:inline-flex"
+          className="btn btn-accent hidden sm:inline-flex"
         >
           Sign up
         </Link>
@@ -84,7 +81,7 @@ export function UserMenu() {
         <li>
           <Link
             to="/profile"
-            className="btn btn-neutral font-cyber w-full text-xs font-bold uppercase tracking-wider"
+            className="btn btn-neutral w-full"
             onClick={close}
           >
             <svg
@@ -108,7 +105,7 @@ export function UserMenu() {
         <li className="mt-1">
           <Link
             to="/settings"
-            className="btn btn-neutral font-cyber w-full text-xs font-bold uppercase tracking-wider"
+            className="btn btn-neutral w-full"
             onClick={close}
           >
             <svg
@@ -137,7 +134,7 @@ export function UserMenu() {
         <li className="mt-2">
           <button
             type="button"
-            className="btn btn-error font-cyber w-full text-xs font-bold uppercase tracking-wider"
+            className="btn btn-error w-full"
             onClick={handleLogout}
           >
             Logout

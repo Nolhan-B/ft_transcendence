@@ -9,6 +9,10 @@ import { RoomManager } from "../src/managers/room.manager.js";
 import { QueueManager } from "../src/managers/queue.manager.js";
 import { isValidPlay } from "../src/engine/rules.js";
 
+// Bots play fast in tests (the game default is 2.5 to 4.5 s)
+process.env.BOT_MIN_DELAY_MS = "500";
+process.env.BOT_EXTRA_DELAY_MS = "1000";
+
 // Délais courts pour les tests : doivent être définis AVANT de charger le gateway
 const TICK_MS = 100;
 const JOIN_TIMEOUT_MS = 500;

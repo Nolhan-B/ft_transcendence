@@ -16,6 +16,11 @@ const uuidParamSchema = {
   },
 };
 
+// Usernames: 3 to 20 letters (any language), digits, "_", "." or "-". No
+// spaces, so a name can never be blank or look empty. Same rule in the
+// frontend forms (USERNAME_PATTERN) and in the other service.
+const USERNAME_PATTERN = "^[\\p{L}\\p{N}_.\\-]{3,20}$";
+
 export default async function profileRoutes(fastify: FastifyInstance) {
   fastify.get(
     "/profile/:id",
@@ -49,7 +54,12 @@ export default async function profileRoutes(fastify: FastifyInstance) {
           minProperties: 1,
           additionalProperties: false,
           properties: {
-            username: { type: "string", minLength: 3, maxLength: 20 },
+            username: {
+              type: "string",
+              minLength: 3,
+              maxLength: 20,
+              pattern: USERNAME_PATTERN,
+            },
           },
         },
       },

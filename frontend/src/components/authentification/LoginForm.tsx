@@ -47,7 +47,7 @@ export function LoginForm() {
         <button
           type="submit"
           disabled={loading}
-          className="btn flex-1 btn-neutral"
+          className="btn flex-1 btn-accent"
         >
           {loading && (
             <span className="loading loading-spinner loading-xs"></span>

@@ -9,7 +9,7 @@ import { continueTurn } from "./bot-turn.js";
 import { unoKey } from "../../utils.js";
 
 // Delai pour accepter ou contester un +4 avant qu'il soit accepte d'office
-const BLUFF_TIMEOUT_MS = Number(process.env.BLUFF_TIMEOUT_MS) || 5000;
+const BLUFF_TIMEOUT_MS = Number(process.env.BLUFF_TIMEOUT_MS) || 10000;
 // Delai pendant lequel un joueur a 1 carte qui n'a pas dit UNO peut etre attrape
 const UNO_WINDOW_MS = Number(process.env.UNO_WINDOW_MS) || 5000;
 

@@ -18,6 +18,13 @@ export interface UnoEvent {
   byUserId?: string;
 }
 
+// A game the server would not let us join: it does not exist (any more), or
+// we are not one of its players
+export interface RefusedGame {
+  id: string;
+  reason: "not_found" | "not_player";
+}
+
 export interface GameContextValue {
   status: Status;
   room: RoomInfo | null;
@@ -33,6 +40,8 @@ export interface GameContextValue {
   unoEvent: UnoEvent | null;
   // true while waiting for a ranked opponent
   inQueue: boolean;
+  // Set when join_game is refused (the game page shows it instead of the board)
+  refusedGame: RefusedGame | null;
   error: string | null;
   clearError: () => void;
   createRoom: (payload: CreateRoomPayload) => void;
@@ -52,6 +61,10 @@ export interface GameContextValue {
   ) => void;
   drawCard: () => void;
   callUno: () => void;
+  // Wild +4 with the bluff rule: the targeted player accepts the 4 cards, or
+  // challenges (the player who put it draws 4 if it was a bluff, else 6 for me)
+  challengeBluff: () => void;
+  acceptWildDraw4: () => void;
   catchUno: (targetUserId: string) => void;
   // Forget the finished game (back to the lobby)
   clearGame: () => void;
