@@ -169,7 +169,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
           break;
         case "elo_updated":
           void refresh();
-          break ;
+          break;
         case "error":
           // The stored game is over: forget it without bothering the user
           if (restoring.current && GONE.includes(event.message)) {
