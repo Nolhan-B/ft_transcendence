@@ -14,10 +14,15 @@ import { handleAcceptWildDraw4 } from "./accept-wild-draw4.js";
 import { handlePlayCard } from "./play-card.js";
 import { handleCallUno } from "./call-uno.js";
 
-// Delai de reflexion du bot : entre 1,5 s et 3 s, pour que les humains
-// voient passer les coups
-const BOT_MIN_DELAY_MS = 2500;
-const BOT_EXTRA_DELAY_MS = 2000;
+// Delai de reflexion du bot : entre 2,5 s et 4,5 s par defaut, pour que les
+// humains voient passer les coups. Reglable par l'environnement (les tests le
+// raccourcissent). Lu a chaque coup, pas au chargement du module. Doit rester
+// sous BLUFF_TIMEOUT_MS, sinon le bot n'a jamais le temps de contester un +4
+function botDelayMs(): number {
+  const min = Number(process.env.BOT_MIN_DELAY_MS) || 2500;
+  const extra = Number(process.env.BOT_EXTRA_DELAY_MS) || 2000;
+  return min + Math.random() * extra;
+}
 
 // A appeler apres tout changement de tour (coup d'un joueur, timer AFK, timer
 // de bluff, deconnexion) : fait jouer le bot si c'est son tour, et relance
@@ -137,12 +142,9 @@ export function scheduleBotTurnIfNeeded(
   };
 
   // Lance hors d'un handler : une erreur non rattrapee ici tuerait le processus
-  setTimeout(
-    () => {
-      playBotTurn().catch((err) => {
-        ctx.fastify.log.error({ err, botId, gameId }, "Bot turn failed");
-      });
-    },
-    BOT_MIN_DELAY_MS + Math.random() * BOT_EXTRA_DELAY_MS,
-  );
+  setTimeout(() => {
+    playBotTurn().catch((err) => {
+      ctx.fastify.log.error({ err, botId, gameId }, "Bot turn failed");
+    });
+  }, botDelayMs());
 }
