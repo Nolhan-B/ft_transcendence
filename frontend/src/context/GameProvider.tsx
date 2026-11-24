@@ -56,6 +56,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
   // Game asked with join_game whose first state has not arrived yet: a
   // refusal now is about it (not about an action in a game in progress)
   const joining = useRef<string | null>(null);
+  // Game asked with spectate_game, until its first state arrives
+  const watching = useRef<string | null>(null);
 
   // Consecutive "Already connected" answers (reset once the server accepts us)
   const refusals = useRef(0);
@@ -105,6 +107,11 @@ export function GameProvider({ children }: { children: ReactNode }) {
           setUnoEvent(null);
           // The server removes the room when the game starts
           setRoom(null);
+          break;
+        case "spectate_started":
+          if (watching.current === event.state.id) watching.current = null;
+          setGameState(event.state);
+          setTurnStartedAt(Date.now());
           break;
         case "game_updated":
           if (joining.current === event.state.id) joining.current = null;
@@ -165,6 +172,19 @@ export function GameProvider({ children }: { children: ReactNode }) {
           }
           // The game we are opening does not exist or is not ours: the game
           // page says it in full screen, no toast
+          // The game we want to watch is over, or we play in it
+          if (
+            watching.current &&
+            (event.message === GONE[0] ||
+              event.message === "You are a player in this game")
+          ) {
+            setRefusedGame({
+              id: watching.current,
+              reason: event.message === GONE[0] ? "not_found" : "is_player",
+            });
+            watching.current = null;
+            break;
+          }
           if (joining.current && GONE.includes(event.message)) {
             setRefusedGame({
               id: joining.current,
@@ -266,6 +286,30 @@ export function GameProvider({ children }: { children: ReactNode }) {
     [send],
   );
 
+  const spectateGame = useCallback(
+    (id: string) => {
+      watching.current = id;
+      setRefusedGame(null);
+      setGameState((state) => (state?.id === id ? state : null));
+      setWinnerId(null);
+      setUnoCalls({});
+      setUnoEvent(null);
+      send({ type: "spectate_game", gameId: id });
+    },
+    [send],
+  );
+
+  const leaveSpectate = useCallback(
+    (id: string) => {
+      watching.current = null;
+      send({ type: "leave_spectate", gameId: id });
+      // Forget the watched game (not my own game, if I have one)
+      setGameState((state) => (state?.id === id ? null : state));
+      setWinnerId(null);
+    },
+    [send],
+  );
+
   const playCard = useCallback(
     (
       cardId: string,
@@ -344,6 +388,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
       joinQueue,
       leaveQueue,
       joinGame,
+      spectateGame,
+      leaveSpectate,
       playCard,
       drawCard,
       callUno,
@@ -375,6 +421,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
       joinQueue,
       leaveQueue,
       joinGame,
+      spectateGame,
+      leaveSpectate,
       playCard,
       drawCard,
       callUno,

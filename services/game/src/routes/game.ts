@@ -160,6 +160,21 @@ export default async function gameRoutes(fastify: FastifyInstance) {
     }));
   });
 
+  // Parties en cours que l'on peut regarder en spectateur. Aucune carte : juste
+  // les joueurs, leur nombre de cartes et a qui c'est le tour
+  fastify.get("/games/live", async () => {
+    return fastify.gameManager.listLiveGames().map((game) => ({
+      id: game.id,
+      mode: game.mode,
+      players: game.players.map((player) => ({
+        userId: player.userId,
+        username: player.username,
+        cardCount: player.hand.length,
+        isCurrentTurn: player.isCurrentTurn,
+      })),
+    }));
+  });
+
   fastify.get("/games/history", async (request, reply) => {
     await request.jwtVerify();
     const { id } = request.user as JwtPayload;
