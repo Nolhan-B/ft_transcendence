@@ -5,7 +5,8 @@ import { Card } from "../../../components/cards/Card";
 import { CardFace } from "../../../components/game/CardFace";
 import { StartPlayingButton } from "../Components/StartPlayingButton";
 import { BrandLogo } from "../../../components/texts/BrandLogo";
-import { WEBSITE_DESCRIPTION, WEBSITE_NAME } from "../../../constants";
+import { WEBSITE_DESCRIPTION } from "../../../constants";
+import { BrandName } from "../../../components/texts/BrandName";
 
 interface FloatingCardItem {
   color: CardColor;
@@ -71,7 +72,10 @@ export function HomeHero() {
       />
 
       {/* Floating cards using the real Card & CardFace components */}
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 max-sm:hidden"
+      >
         {FLOATING_CARDS.map((card) => (
           <div
             key={`${card.value}-${card.className}`}
@@ -95,8 +99,8 @@ export function HomeHero() {
         <BrandLogo size="xl" className="animate-pop" />
 
         <div className="max-w-3xl">
-          <p className="mb-3 text-lg font-semibold tracking-[0.3em] text-white/70 uppercase sm:text-xl">
-            {WEBSITE_NAME}
+          <p className="mb-4">
+            <BrandName size="lg" />
           </p>
           <h1 className="text-display mb-5 text-5xl leading-tight sm:text-7xl">
             Play. <span className="text-accent">Bluff.</span>{" "}

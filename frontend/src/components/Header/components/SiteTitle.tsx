@@ -1,6 +1,6 @@
-import { WEBSITE_NAME } from "../../../constants";
 import { Link } from "react-router-dom";
 import { BrandLogo } from "../../texts/BrandLogo";
+import { BrandName } from "../../texts/BrandName";
 
 // Header brand link: the SNS badge and the name of the site
 export function SiteTitle() {
@@ -13,9 +13,7 @@ export function SiteTitle() {
         size="sm"
         className="transition-transform duration-300 group-hover:rotate-4"
       />
-      <span className="hidden text-lg font-bold tracking-wide sm:inline">
-        {WEBSITE_NAME}
-      </span>
+      <BrandName size="sm" className="hidden min-[360px]:inline-block" />
     </Link>
   );
 }
