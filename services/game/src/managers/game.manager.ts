@@ -24,6 +24,13 @@ export class GameManager {
     return this.games.get(gameId);
   }
 
+  // Parties en cours, pour la liste des parties a regarder (spectateur)
+  listLiveGames(): InternalGameState[] {
+    return [...this.games.values()].filter(
+      (game) => game.status === GameStatus.IN_PROGRESS,
+    );
+  }
+
   playCard(
     gameId: string,
     playerId: string,

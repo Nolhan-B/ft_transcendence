@@ -2,12 +2,14 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { CreateRoomForm } from "../../components/game/CreateRoomForm";
 import { JoinByCodeForm } from "../../components/game/JoinByCodeForm";
+import { LiveGames } from "../../components/game/LiveGames";
 import { RankedCard } from "../../components/game/RankedCard";
 import { RoomList } from "../../components/game/RoomList";
 import { useRooms } from "../../hooks/game/useRooms";
 import { useGame } from "../../hooks/ws/useGame";
 
-// The lobby: ranked matchmaking, join by code, then the open rooms as a grid
+// The lobby: ranked matchmaking, join by code, the open rooms as a grid,
+// then the games in progress to watch
 export function PlayPage() {
   const { room, gameId } = useGame();
   const navigate = useNavigate();
@@ -78,6 +80,9 @@ export function PlayPage() {
         error={error}
         onCreate={() => setCreating(true)}
       />
+
+      {/* Games being played: watch them as a spectator */}
+      <LiveGames />
 
       <CreateRoomForm open={creating} onClose={() => setCreating(false)} />
     </div>

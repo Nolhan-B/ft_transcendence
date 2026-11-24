@@ -10,10 +10,5 @@ export const USERNAME_PATTERN = "^[\\p{L}\\p{N}_.\\-]{3,20}$";
 export const USERNAME_HINT = "3 to 20 letters, digits, _ . or - (no spaces)";
 
 // Pages
-export const HOME_PAGE_TITLE: string = "Home";
-export const AUTH_PAGE_TITLE: string = "Authentification";
-export const GAME_PAGE_TITLE: string = "Game";
-export const LEGAL_PAGE_TITLE: string = "Legal";
 export const PRIVACY_PAGE_TITLE: string = "Privacy Policy";
 export const TERMS_PAGE_TITLE: string = "Terms";
-export const PROFILE_PAGE_TITLE: string = "My profile";
