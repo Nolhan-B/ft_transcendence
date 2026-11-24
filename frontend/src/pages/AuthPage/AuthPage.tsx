@@ -7,7 +7,8 @@ import { Hand } from "../../components/cards/Hand";
 import type { HandCard } from "../../components/cards/Hand";
 import { RegisterForm } from "../../components/authentification/RegisterForm";
 import { BrandLogo } from "../../components/texts/BrandLogo";
-import { WEBSITE_DESCRIPTION, WEBSITE_NAME } from "../../constants";
+import { WEBSITE_DESCRIPTION } from "../../constants";
+import { BrandName } from "../../components/texts/BrandName";
 
 type Mode = "login" | "register";
 
@@ -84,8 +85,8 @@ export function AuthPage() {
           <BrandLogo size="xl" className="animate-pop" />
 
           <div>
-            <p className="mb-3 text-xl font-semibold tracking-[0.3em] text-white/70 uppercase lg:text-2xl">
-              {WEBSITE_NAME}
+            <p className="mb-4">
+              <BrandName size="lg" />
             </p>
             <h1 className="text-display mb-4 text-5xl lg:text-6xl">
               Play. <span className="text-accent">Bluff.</span>{" "}

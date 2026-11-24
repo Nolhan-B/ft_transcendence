@@ -23,7 +23,9 @@ export interface UnoEvent {
 // we are not one of its players
 export interface RefusedGame {
   id: string;
-  reason: "not_found" | "not_player";
+  // not_found: no such game (or over); not_player: join_game on a game that
+  // is not ours; is_player: spectate_game on our own game
+  reason: "not_found" | "not_player" | "is_player";
 }
 
 export interface GameContextValue {
@@ -56,6 +58,9 @@ export interface GameContextValue {
   joinQueue: () => void;
   leaveQueue: () => void;
   joinGame: (gameId: string) => void;
+  // Watch a game without playing (its state arrives in gameState), and stop
+  spectateGame: (gameId: string) => void;
+  leaveSpectate: (gameId: string) => void;
   playCard: (
     cardId: string,
     options?: { chosenColor?: CardColor; targetUserId?: string },

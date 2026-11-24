@@ -54,6 +54,8 @@ const SEATS: Record<number, Seat[]> = {
   1: ["top"],
   2: ["left", "right"],
   3: ["left", "top", "right"],
+  // Spectator: nobody is "me", the fourth player sits at the bottom
+  4: ["left", "top", "right", "bottom"],
 };
 
 // Grid cell of each seat around the central board
@@ -61,6 +63,7 @@ const SEAT_CELL: Record<Seat, string> = {
   top: "col-start-2 row-start-1 justify-self-center",
   left: "col-start-1 row-start-2 self-center",
   right: "col-start-3 row-start-2 self-center",
+  bottom: "col-start-2 row-start-3 justify-self-center",
 };
 
 function seatOpponents(players: Player[], myId: string) {
@@ -86,11 +89,13 @@ function seatOpponents(players: Player[], myId: string) {
 interface Props {
   state: GameState;
   myId: string;
+  // Watching only: every player sits around the table, no hand, no action
+  spectator?: boolean;
 }
 
 // Basic board: opponents on top, the table (draw pile and top card) in the
 // middle, my hand at the bottom
-export function GameBoard({ state, myId }: Props) {
+export function GameBoard({ state, myId, spectator = false }: Props) {
   const {
     playCard,
     drawCard,
@@ -180,7 +185,7 @@ export function GameBoard({ state, myId }: Props) {
             <div key={player.userId} className={SEAT_CELL[seat]}>
               <OpponentSeat
                 player={player}
-                canCatchUno={unoAtRisk.includes(player.userId)}
+                canCatchUno={!spectator && unoAtRisk.includes(player.userId)}
                 onCatchUno={() => catchUno(player.userId)}
               />
             </div>
@@ -207,69 +212,77 @@ export function GameBoard({ state, myId }: Props) {
         direction={state.direction}
       />
 
-      {/* Me: my hand, and the UNO button beside it while I can say it (I
+      {!spectator && (
+        <>
+          {/* Me: my hand, and the UNO button beside it while I can say it (I
           have only one card left then, so there is room for it) */}
-      <div className="flex items-end justify-center gap-6 compact:gap-3 phone:flex-col phone:items-center phone:gap-1">
-        {/* Me: avatar and name, glowing on my turn */}
-        {me && (
-          <div
-            className={`mb-6 flex shrink-0 items-center gap-2 rounded-full bg-black/40 py-1 pr-4 pl-1 font-semibold compact:mb-2 snug:hidden phone:hidden ${
-              myTurn ? "animate-turn" : ""
-            }`}
-          >
-            <UserAvatar username={me.username} size="sm" />
-            You
-          </div>
-        )}
+          <div className="flex items-end justify-center gap-6 compact:gap-3 phone:flex-col phone:items-center phone:gap-1">
+            {/* Me: avatar and name, glowing on my turn */}
+            {me && (
+              <div
+                className={`mb-6 flex shrink-0 items-center gap-2 rounded-full bg-black/40 py-1 pr-4 pl-1 font-semibold compact:mb-2 snug:hidden phone:hidden ${
+                  myTurn ? "animate-turn" : ""
+                }`}
+              >
+                <UserAvatar username={me.username} size="sm" />
+                You
+              </div>
+            )}
 
-        {mustCallUno && (
-          <button
-            type="button"
-            className="text-display animate-wobble mb-8 shrink-0 cursor-pointer rounded-full border-4 border-white bg-primary px-7 py-3 text-4xl text-white shadow-[0_0_30px_var(--color-primary)] compact:mb-2 compact:px-5 compact:py-2 compact:text-2xl tiny:border-2 tiny:px-3 tiny:py-1 tiny:text-lg"
-            onClick={callUno}
-          >
-            UNO!
-          </button>
-        )}
+            {mustCallUno && (
+              <button
+                type="button"
+                className="text-display animate-wobble mb-8 shrink-0 cursor-pointer rounded-full border-4 border-white bg-primary px-7 py-3 text-4xl text-white shadow-[0_0_30px_var(--color-primary)] compact:mb-2 compact:px-5 compact:py-2 compact:text-2xl tiny:border-2 tiny:px-3 tiny:py-1 tiny:text-lg"
+                onClick={callUno}
+              >
+                UNO!
+              </button>
+            )}
 
-        {/* My hand: one row, or several when it is big (the first rows
+            {/* My hand: one row, or several when it is big (the first rows
             behind, only their top shows). --card-base: width of a card for
             this screen, --card-w: the width used (smaller for a big hand) */}
-        <div
-          ref={handBox}
-          className="relative min-w-0 flex-1 pt-8 pb-2 [--card-base:min(9.75rem,16vw)] compact:pt-3 compact:pb-0 compact:[--card-base:min(5.5rem,16vw)] snug:pt-1 snug:[--card-base:min(4.5rem,16vw)] short:[--card-base:min(4.75rem,16vw)] tiny:pt-1 tiny:[--card-base:min(3.5rem,16vw)] phone:w-full phone:flex-none phone:pt-4 phone:[--card-base:min(5.5rem,20vw)]"
-          style={
-            { "--card-w": `calc(var(--card-base) * ${scale})` } as CSSProperties
-          }
-          data-anchor={`seat-${myId}`}
-        >
-          <div
-            ref={cardProbe}
-            aria-hidden="true"
-            className="invisible absolute h-0 w-(--card-base)"
-          />
-          {handRows.map((row, index) => (
             <div
-              key={index}
-              style={index > 0 ? { marginTop: rowLift(rowsLayout) } : undefined}
+              ref={handBox}
+              className="relative min-w-0 flex-1 pt-8 pb-2 [--card-base:min(9.75rem,16vw)] compact:pt-3 compact:pb-0 compact:[--card-base:min(5.5rem,16vw)] snug:pt-1 snug:[--card-base:min(4.5rem,16vw)] short:[--card-base:min(4.75rem,16vw)] tiny:pt-1 tiny:[--card-base:min(3.5rem,16vw)] phone:w-full phone:flex-none phone:pt-4 phone:[--card-base:min(5.5rem,20vw)]"
+              style={
+                {
+                  "--card-w": `calc(var(--card-base) * ${scale})`,
+                } as CSSProperties
+              }
+              data-anchor={`seat-${myId}`}
             >
-              <Hand
-                cards={row}
-                fan="row"
-                arc
-                variant="game"
-                className="max-w-full"
-                overlap={rowOverlap(row.length, rowsLayout)}
-                cardClassName="w-(--card-w)"
-                onSelect={(id) => {
-                  const card = me?.hand.find((c) => c.id === id);
-                  if (card) play(card);
-                }}
+              <div
+                ref={cardProbe}
+                aria-hidden="true"
+                className="invisible absolute h-0 w-(--card-base)"
               />
+              {handRows.map((row, index) => (
+                <div
+                  key={index}
+                  style={
+                    index > 0 ? { marginTop: rowLift(rowsLayout) } : undefined
+                  }
+                >
+                  <Hand
+                    cards={row}
+                    fan="row"
+                    arc
+                    variant="game"
+                    className="max-w-full"
+                    overlap={rowOverlap(row.length, rowsLayout)}
+                    cardClassName="w-(--card-w)"
+                    onSelect={(id) => {
+                      const card = me?.hand.find((c) => c.id === id);
+                      if (card) play(card);
+                    }}
+                  />
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-      </div>
+          </div>
+        </>
+      )}
 
       <CardFlights state={state} />
 

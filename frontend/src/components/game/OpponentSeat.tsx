@@ -4,7 +4,7 @@ import { Card } from "../cards/Card";
 import { UserAvatar } from "../user/UserAvatar";
 import { CardBack } from "./CardFace";
 
-export type Seat = "top" | "left" | "right";
+export type Seat = "top" | "left" | "right" | "bottom";
 
 // Hidden cards shown at most (the pill gives the real count)
 const MAX_BACKS = 7;
