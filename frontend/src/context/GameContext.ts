@@ -18,6 +18,13 @@ export interface UnoEvent {
   byUserId?: string;
 }
 
+// A game the server would not let us join: it does not exist (any more), or
+// we are not one of its players
+export interface RefusedGame {
+  id: string;
+  reason: "not_found" | "not_player";
+}
+
 export interface GameContextValue {
   status: Status;
   room: RoomInfo | null;
@@ -33,6 +40,8 @@ export interface GameContextValue {
   unoEvent: UnoEvent | null;
   // true while waiting for a ranked opponent
   inQueue: boolean;
+  // Set when join_game is refused (the game page shows it instead of the board)
+  refusedGame: RefusedGame | null;
   error: string | null;
   clearError: () => void;
   createRoom: (payload: CreateRoomPayload) => void;

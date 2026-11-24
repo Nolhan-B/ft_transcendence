@@ -1,6 +1,5 @@
 import type { CardColor as GameColor, GameState } from "shared";
 import { Card } from "../cards/Card";
-import { TurnTimer } from "./TurnTimer";
 import { CardBack, CardFace } from "./CardFace";
 import { cardName, themeColor } from "./cards";
 
@@ -29,34 +28,17 @@ const DISCARD = "w-28 sm:w-36 compact:w-24 snug:w-20 short:w-20 tiny:w-14";
 
 interface Props {
   state: GameState;
-  myTurn: boolean;
   // I may draw now (my turn, no Wild +4 waiting for an answer)
   canDraw: boolean;
   // My turn and no card fits: drawing is the only move
   mustDraw: boolean;
   onDraw: () => void;
-  // Name of the player whose turn it is, and the seconds left (null: no timer)
-  turnName: string;
-  secondsLeft: number | null;
-  turnSeconds: number;
-  // A bot is playing: no timer, shown as "thinking"
-  botTurn: boolean;
 }
 
 // The middle of the table: the draw pile, the discard pile (top card) with a
-// ring in the color to play, the direction of play turning behind them and
-// a small panel telling whose turn it is
-export function GameTable({
-  state,
-  myTurn,
-  canDraw,
-  mustDraw,
-  onDraw,
-  turnName,
-  secondsLeft,
-  turnSeconds,
-  botTurn,
-}: Props) {
+// ring in the color to play, and the direction of play turning behind them.
+// Whose turn it is: TurnBar, between the table and my hand.
+export function GameTable({ state, canDraw, mustDraw, onDraw }: Props) {
   const clockwise = state.direction === 1;
 
   return (
@@ -161,44 +143,14 @@ export function GameTable({
             </span>
           )}
         </div>
-        <span className="flex items-center gap-1.5 rounded-full bg-black/40 px-3 py-0.5 text-sm font-semibold capitalize tiny:px-2 tiny:text-xs">
+        <span
+          className="flex items-center gap-1.5 rounded-full bg-black/40 px-3 py-0.5 text-sm font-semibold capitalize tiny:px-2 tiny:text-xs"
+          aria-label={`Color to play: ${state.currentColor}`}
+        >
           <span
             className={`size-2.5 rounded-full bg-current ${TEXT[state.currentColor]}`}
           />
           {state.currentColor === "wild" ? "Any color" : state.currentColor}
-        </span>
-      </div>
-
-      {/* Whose turn it is */}
-      <div
-        className={`panel-glass flex w-32 flex-col items-center gap-2 rounded-box border p-3 text-center compact:w-28 compact:gap-1 compact:p-2 snug:w-24 snug:p-1 short:w-24 tiny:w-20 tiny:p-1 ${
-          myTurn ? "animate-turn" : ""
-        }`}
-        aria-label={`Color to play: ${state.currentColor}`}
-      >
-        {myTurn ? (
-          <span className="text-display text-xl text-accent compact:text-lg tiny:text-sm">
-            Your turn!
-          </span>
-        ) : (
-          <span className="w-full truncate text-lg font-bold compact:text-base tiny:text-xs">
-            {turnName}
-          </span>
-        )}
-        <div className="flex h-14 items-center justify-center compact:h-11 snug:h-10 short:h-10 tiny:h-9">
-          {secondsLeft !== null && (
-            <TurnTimer secondsLeft={secondsLeft} total={turnSeconds} />
-          )}
-          {botTurn && (
-            <span
-              className="loading loading-dots loading-lg text-accent"
-              role="status"
-              aria-label="The bot is playing"
-            />
-          )}
-        </div>
-        <span className="text-xs font-semibold text-white/60 tiny:hidden">
-          {clockwise ? "Clockwise ↻" : "Counter-clockwise ↺"}
         </span>
       </div>
     </div>

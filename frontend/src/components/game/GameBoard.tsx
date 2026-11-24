@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import type { CSSProperties } from "react";
 import type { Card, CardColor, GameState, Player } from "shared";
 import { useCountdown } from "../../hooks/game/useCountdown";
 import { useUnoWindows } from "../../hooks/game/useUnoWindows";
@@ -16,6 +17,15 @@ import { TurnAnnouncement } from "./TurnAnnouncement";
 import { UnoAnnouncement } from "./UnoAnnouncement";
 import { UserAvatar } from "../user/UserAvatar";
 import { OpponentSeat } from "./OpponentSeat";
+import { TurnBar } from "./TurnBar";
+import {
+  handScale,
+  rowLift,
+  rowOverlap,
+  scaled,
+  splitIntoRows,
+  useHandLayout,
+} from "./handRows";
 import type { Seat } from "./OpponentSeat";
 
 // Length of a turn on the server (TURN_TIMEOUT_MS, 20 s by default). It does
@@ -95,6 +105,10 @@ export function GameBoard({ state, myId }: Props) {
   const turnLeft = useCountdown(turnStartedAt, TURN_SECONDS);
   // The board, shaken when I take cards (ActionBursts)
   const board = useRef<HTMLDivElement>(null);
+  // Room for my hand, and a hidden probe giving the width of a card
+  const handBox = useRef<HTMLDivElement>(null);
+  const cardProbe = useRef<HTMLDivElement>(null);
+  const handLayout = useHandLayout(handBox, cardProbe);
   // A card waiting for a choice: its color (wild) or the player to swap with (7)
   const [asking, setAsking] = useState<{
     card: Card;
@@ -105,7 +119,6 @@ export function GameBoard({ state, myId }: Props) {
   const turnPlayer = state.players.find((player) => player.isCurrentTurn);
   const seated = seatOpponents(state.players, myId);
   const myTurn = me?.isCurrentTurn ?? false;
-  // Cards stay visible when it is not your turn (except with jump-in)
   // On my turn the cards I can play rise, the others are dimmed; out of my
   // turn only a jump-in copy of the top card can rise
   const playable = playableCards(state, myId);
@@ -115,8 +128,11 @@ export function GameBoard({ state, myId }: Props) {
   // My turn, but no card fits: the draw pile insists
   const nothingToPlay =
     myTurn && !state.pendingWildDraw4 && playable.size === 0;
-  // Visible part of each card: 70% of it, less when the hand is large
-  const overlap = `calc(var(--card-w) * -1 + min(var(--card-w) * 0.7, ${60 / Math.max(handCards.length - 1, 1)}rem, ${85 / Math.max(handCards.length - 1, 1)}vw))`;
+  // A big hand goes on several rows, the first ones behind. From 3 rows the
+  // cards shrink (--card-w, from the base size --card-base).
+  const handRows = splitIntoRows(handCards, handLayout);
+  const scale = handScale(handRows.length);
+  const rowsLayout = scaled(handLayout, scale);
   const opponents = seated.map(({ player }) => player);
   // Players down to one card who have not said UNO yet (5 s window)
   const unoAtRisk = useUnoWindows(state, turnStartedAt, unoCalls);
@@ -156,8 +172,9 @@ export function GameBoard({ state, myId }: Props) {
         aria-hidden="true"
         className={`pointer-events-none absolute top-[45%] left-1/2 -z-10 size-[32rem] -translate-x-1/2 -translate-y-1/2 rounded-full opacity-35 blur-3xl transition-colors duration-500 compact:size-80 ${GLOW[state.currentColor]}`}
       />
-      {/* Opponents around the board: left, top and right */}
-      <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] grid-rows-[auto_auto] items-center gap-4 compact:gap-2 snug:gap-1 tiny:gap-1">
+      {/* Opponents around the board: left, top and right. On a phone held
+          upright they all sit in one row above the table. */}
+      <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] grid-rows-[auto_auto] items-center gap-4 compact:gap-2 snug:gap-1 tiny:gap-1 phone:flex phone:flex-wrap phone:justify-center phone:gap-0.5">
         <>
           {seated.map(({ player, seat }) => (
             <div key={player.userId} className={SEAT_CELL[seat]}>
@@ -171,28 +188,32 @@ export function GameBoard({ state, myId }: Props) {
         </>
 
         {/* Central board */}
-        <div className="col-start-2 row-start-2">
+        <div className="col-start-2 row-start-2 phone:w-full phone:pt-2">
           <GameTable
             state={state}
-            myTurn={myTurn}
             canDraw={myTurn && !state.pendingWildDraw4}
             mustDraw={nothingToPlay}
             onDraw={drawCard}
-            turnName={turnPlayer?.username ?? ""}
-            secondsLeft={turnPlayer ? timerFor(turnPlayer) : null}
-            turnSeconds={TURN_SECONDS}
-            botTurn={turnPlayer?.userId.startsWith("bot_") ?? false}
           />
         </div>
       </div>
 
+      {/* Whose turn it is, between the table and my hand */}
+      <TurnBar
+        turnPlayer={turnPlayer}
+        myTurn={myTurn}
+        secondsLeft={turnPlayer ? timerFor(turnPlayer) : null}
+        turnSeconds={TURN_SECONDS}
+        direction={state.direction}
+      />
+
       {/* Me: my hand, and the UNO button beside it while I can say it (I
           have only one card left then, so there is room for it) */}
-      <div className="flex items-end justify-center gap-6 compact:gap-3">
+      <div className="flex items-end justify-center gap-6 compact:gap-3 phone:flex-col phone:items-center phone:gap-1">
         {/* Me: avatar and name, glowing on my turn */}
         {me && (
           <div
-            className={`mb-6 flex shrink-0 items-center gap-2 rounded-full bg-black/40 py-1 pr-4 pl-1 font-semibold compact:mb-2 snug:hidden ${
+            className={`mb-6 flex shrink-0 items-center gap-2 rounded-full bg-black/40 py-1 pr-4 pl-1 font-semibold compact:mb-2 snug:hidden phone:hidden ${
               myTurn ? "animate-turn" : ""
             }`}
           >
@@ -211,23 +232,42 @@ export function GameBoard({ state, myId }: Props) {
           </button>
         )}
 
+        {/* My hand: one row, or several when it is big (the first rows
+            behind, only their top shows). --card-base: width of a card for
+            this screen, --card-w: the width used (smaller for a big hand) */}
         <div
-          className="pt-8 pb-2 compact:pt-3 compact:pb-0 snug:pt-1 tiny:pt-1"
+          ref={handBox}
+          className="relative min-w-0 flex-1 pt-8 pb-2 [--card-base:min(9.75rem,16vw)] compact:pt-3 compact:pb-0 compact:[--card-base:min(5.5rem,16vw)] snug:pt-1 snug:[--card-base:min(4.5rem,16vw)] short:[--card-base:min(4.75rem,16vw)] tiny:pt-1 tiny:[--card-base:min(3.5rem,16vw)] phone:w-full phone:flex-none phone:pt-4 phone:[--card-base:min(5.5rem,20vw)]"
+          style={
+            { "--card-w": `calc(var(--card-base) * ${scale})` } as CSSProperties
+          }
           data-anchor={`seat-${myId}`}
         >
-          <Hand
-            cards={handCards}
-            fan="row"
-            arc
-            variant="game"
-            className="max-w-full"
-            overlap={overlap}
-            cardClassName="[--card-w:min(9.75rem,16vw)] w-(--card-w) compact:[--card-w:min(5.5rem,16vw)] snug:[--card-w:min(4.5rem,16vw)] short:[--card-w:min(4.75rem,16vw)] tiny:[--card-w:min(3.5rem,16vw)]"
-            onSelect={(id) => {
-              const card = me?.hand.find((c) => c.id === id);
-              if (card) play(card);
-            }}
+          <div
+            ref={cardProbe}
+            aria-hidden="true"
+            className="invisible absolute h-0 w-(--card-base)"
           />
+          {handRows.map((row, index) => (
+            <div
+              key={index}
+              style={index > 0 ? { marginTop: rowLift(rowsLayout) } : undefined}
+            >
+              <Hand
+                cards={row}
+                fan="row"
+                arc
+                variant="game"
+                className="max-w-full"
+                overlap={rowOverlap(row.length, rowsLayout)}
+                cardClassName="w-(--card-w)"
+                onSelect={(id) => {
+                  const card = me?.hand.find((c) => c.id === id);
+                  if (card) play(card);
+                }}
+              />
+            </div>
+          ))}
         </div>
       </div>
 

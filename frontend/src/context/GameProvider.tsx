@@ -10,7 +10,7 @@ import type {
 } from "shared";
 import { useWebSocket } from "../hooks/ws/useWebSocket";
 import { GameContext } from "./GameContext";
-import type { GameContextValue, UnoEvent } from "./GameContext";
+import type { GameContextValue, RefusedGame, UnoEvent } from "./GameContext";
 
 // The server closes the socket after these refusals. "Already connected" is
 // often only a race (page reload, hot reload: the old socket is not closed yet
@@ -52,6 +52,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const [unoEvent, setUnoEvent] = useState<UnoEvent | null>(null);
   const unoEventId = useRef(0);
   const [error, setError] = useState<string | null>(null);
+  const [refusedGame, setRefusedGame] = useState<RefusedGame | null>(null);
+  // Game asked with join_game whose first state has not arrived yet: a
+  // refusal now is about it (not about an action in a game in progress)
+  const joining = useRef<string | null>(null);
 
   // Consecutive "Already connected" answers (reset once the server accepts us)
   const refusals = useRef(0);
@@ -103,6 +107,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
           setRoom(null);
           break;
         case "game_updated":
+          if (joining.current === event.state.id) joining.current = null;
           if (restoring.current === event.state.id) {
             restoring.current = null;
             setGameId(event.state.id);
@@ -148,7 +153,24 @@ export function GameProvider({ children }: { children: ReactNode }) {
         case "error":
           // The stored game is over: forget it without bothering the user
           if (restoring.current && GONE.includes(event.message)) {
+            // Shown only if the game page is open on this game (reload)
+            setRefusedGame({
+              id: restoring.current,
+              reason: event.message === GONE[0] ? "not_found" : "not_player",
+            });
             restoring.current = null;
+            joinedOn.current = null;
+            storeGame(null);
+            break;
+          }
+          // The game we are opening does not exist or is not ours: the game
+          // page says it in full screen, no toast
+          if (joining.current && GONE.includes(event.message)) {
+            setRefusedGame({
+              id: joining.current,
+              reason: event.message === GONE[0] ? "not_found" : "not_player",
+            });
+            joining.current = null;
             joinedOn.current = null;
             storeGame(null);
             break;
@@ -237,6 +259,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
       storeGame(id);
       if (joinedOn.current === id) return;
       joinedOn.current = id;
+      joining.current = id;
+      setRefusedGame(null);
       send({ type: "join_game", gameId: id });
     },
     [send],
@@ -285,6 +309,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
   const clearGame = useCallback(() => {
     setGameId(null);
+    setRefusedGame(null);
     storeGame(null);
     setGameState(null);
     setWinnerId(null);
@@ -306,6 +331,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       unoCalls,
       unoEvent,
       inQueue,
+      refusedGame,
       error,
       clearError,
       createRoom,
@@ -336,6 +362,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       unoCalls,
       unoEvent,
       inQueue,
+      refusedGame,
       error,
       clearError,
       createRoom,

@@ -31,6 +31,10 @@ body {
    Declared after "short" so that it wins over it. */
 @custom-variant tiny (@media (max-height: 480px));
 
+/* Phone held upright: narrow and portrait. Declared last so that it wins
+   over "compact" (which also matches a phone). */
+@custom-variant phone (@media (max-width: 767px) and (orientation: portrait));
+
 /* Decorative "light rays" depth effect, shared by the auth page and the home
    hero. Tune the pivot with --rays-origin (e.g. [--rays-origin:50%_80%]). */
 /* Home hero: cards drifting in the background. Each card overrides the

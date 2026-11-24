@@ -21,7 +21,7 @@ export function GameLayout() {
       <div className="snug:hidden">
         <Header />
       </div>
-      <main className="container mx-auto flex flex-1 flex-col px-4 py-4 compact:py-2 snug:py-1 short:px-2 tiny:py-1">
+      <main className="container mx-auto flex flex-1 flex-col px-4 py-4 compact:py-2 snug:py-1 short:px-2 tiny:py-1 phone:px-2">
         <Outlet />
       </main>
       {/* Spectating: the way back to my own game, if I play one */}
