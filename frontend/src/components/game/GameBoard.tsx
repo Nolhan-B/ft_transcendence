@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { Card, CardColor, GameState, Player } from "shared";
 import { useCountdown } from "../../hooks/game/useCountdown";
 import { useUnoWindows } from "../../hooks/game/useUnoWindows";
@@ -6,6 +6,9 @@ import { useGame } from "../../hooks/ws/useGame";
 import { ChoiceDialog } from "./ChoiceDialog";
 import { Hand } from "../cards/Hand";
 import { toHandCard } from "./handCards";
+import { playableCards } from "./playable";
+import { ActionBursts } from "./ActionBursts";
+import { BluffDialog } from "./BluffDialog";
 import { sortHand } from "./cards";
 import { GameTable } from "./GameTable";
 import { CardFlights } from "./CardFlights";
@@ -83,11 +86,15 @@ export function GameBoard({ state, myId }: Props) {
     drawCard,
     callUno,
     catchUno,
+    challengeBluff,
+    acceptWildDraw4,
     turnStartedAt,
     unoCalls,
     unoEvent,
   } = useGame();
   const turnLeft = useCountdown(turnStartedAt, TURN_SECONDS);
+  // The board, shaken when I take cards (ActionBursts)
+  const board = useRef<HTMLDivElement>(null);
   // A card waiting for a choice: its color (wild) or the player to swap with (7)
   const [asking, setAsking] = useState<{
     card: Card;
@@ -99,10 +106,15 @@ export function GameBoard({ state, myId }: Props) {
   const seated = seatOpponents(state.players, myId);
   const myTurn = me?.isCurrentTurn ?? false;
   // Cards stay visible when it is not your turn (except with jump-in)
-  const canPlayNow = myTurn || state.settings.jumpIn;
+  // On my turn the cards I can play rise, the others are dimmed; out of my
+  // turn only a jump-in copy of the top card can rise
+  const playable = playableCards(state, myId);
   const handCards = sortHand(me?.hand ?? []).map((card) =>
-    toHandCard(card, !canPlayNow),
+    toHandCard(card, playable.has(card.id), myTurn && !playable.has(card.id)),
   );
+  // My turn, but no card fits: the draw pile insists
+  const nothingToPlay =
+    myTurn && !state.pendingWildDraw4 && playable.size === 0;
   // Visible part of each card: 70% of it, less when the hand is large
   const overlap = `calc(var(--card-w) * -1 + min(var(--card-w) * 0.7, ${60 / Math.max(handCards.length - 1, 1)}rem, ${85 / Math.max(handCards.length - 1, 1)}vw))`;
   const opponents = seated.map(({ player }) => player);
@@ -131,7 +143,10 @@ export function GameBoard({ state, myId }: Props) {
 
   return (
     // The table: green cloth with a dark wooden edge
-    <div className="relative isolate flex flex-1 flex-col justify-around gap-6 overflow-hidden rounded-[2rem] border-[6px] border-[#3a1d0e] bg-[radial-gradient(ellipse_at_50%_45%,var(--color-felt)_0%,#125a2c_45%,var(--color-felt-dark)_100%)] p-4 shadow-[inset_0_0_120px_rgb(0_0_0/0.6),0_0_0_3px_rgb(255_255_255/0.08),0_25px_60px_rgb(0_0_0/0.5)] compact:gap-3 compact:rounded-3xl compact:p-2 snug:gap-2 snug:p-1 short:gap-2 tiny:gap-1 tiny:rounded-2xl tiny:border-[3px] tiny:p-1">
+    <div
+      ref={board}
+      className="relative isolate flex flex-1 flex-col justify-around gap-6 overflow-hidden rounded-[2rem] border-[6px] border-[#3a1d0e] bg-[radial-gradient(ellipse_at_50%_45%,var(--color-felt)_0%,#125a2c_45%,var(--color-felt-dark)_100%)] p-4 shadow-[inset_0_0_120px_rgb(0_0_0/0.6),0_0_0_3px_rgb(255_255_255/0.08),0_25px_60px_rgb(0_0_0/0.5)] compact:gap-3 compact:rounded-3xl compact:p-2 snug:gap-2 snug:p-1 short:gap-2 tiny:gap-1 tiny:rounded-2xl tiny:border-[3px] tiny:p-1"
+    >
       {/* Felt grain, and the halo of the color to play */}
       <div
         aria-hidden="true"
@@ -160,6 +175,8 @@ export function GameBoard({ state, myId }: Props) {
           <GameTable
             state={state}
             myTurn={myTurn}
+            canDraw={myTurn && !state.pendingWildDraw4}
+            mustDraw={nothingToPlay}
             onDraw={drawCard}
             turnName={turnPlayer?.username ?? ""}
             secondsLeft={turnPlayer ? timerFor(turnPlayer) : null}
@@ -215,6 +232,16 @@ export function GameBoard({ state, myId }: Props) {
       </div>
 
       <CardFlights state={state} />
+
+      <ActionBursts state={state} myId={myId} board={board} />
+
+      <BluffDialog
+        key={state.topCard.id}
+        state={state}
+        myId={myId}
+        onChallenge={challengeBluff}
+        onAccept={acceptWildDraw4}
+      />
 
       <TurnAnnouncement
         playerId={turnPlayer?.userId}

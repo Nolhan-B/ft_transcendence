@@ -30,6 +30,10 @@ const DISCARD = "w-28 sm:w-36 compact:w-24 snug:w-20 short:w-20 tiny:w-14";
 interface Props {
   state: GameState;
   myTurn: boolean;
+  // I may draw now (my turn, no Wild +4 waiting for an answer)
+  canDraw: boolean;
+  // My turn and no card fits: drawing is the only move
+  mustDraw: boolean;
   onDraw: () => void;
   // Name of the player whose turn it is, and the seconds left (null: no timer)
   turnName: string;
@@ -45,6 +49,8 @@ interface Props {
 export function GameTable({
   state,
   myTurn,
+  canDraw,
+  mustDraw,
   onDraw,
   turnName,
   secondsLeft,
@@ -70,7 +76,7 @@ export function GameTable({
       <div className="flex flex-col items-center gap-3 short:gap-1">
         <button
           type="button"
-          disabled={!myTurn}
+          disabled={!canDraw}
           onClick={onDraw}
           aria-label="Draw a card"
           data-anchor="draw"
@@ -91,16 +97,26 @@ export function GameTable({
             color="neutral"
             variant="game"
             className={`w-full transition-transform duration-200 ${
-              myTurn
-                ? "animate-nudge ring-4 ring-accent group-hover:-translate-y-2.5 group-hover:rotate-3 group-hover:animate-none"
-                : "brightness-90"
+              mustDraw
+                ? "animate-nudge shadow-[0_0_0_4px_var(--color-accent),0_0_30px_var(--color-accent)] group-hover:-translate-y-2.5 group-hover:rotate-3 group-hover:animate-none"
+                : canDraw
+                  ? "shadow-[0_0_0_2px_rgb(255_255_255/0.5)] group-hover:-translate-y-2 group-hover:rotate-2"
+                  : "brightness-90"
             }`}
           >
             <CardBack />
           </Card>
-          {myTurn && (
-            <span className="animate-hop absolute -top-7 left-1/2 -translate-x-1/2 text-sm font-bold whitespace-nowrap text-accent compact:-top-6 compact:text-xs snug:hidden">
-              Draw!
+          {mustDraw && (
+            <span
+              className={`animate-hop absolute -top-9 left-1/2 -translate-x-1/2 rounded-full px-3 py-0.5 text-sm font-bold whitespace-nowrap shadow-lg compact:-top-7 compact:text-xs snug:hidden ${
+                state.pendingDrawCount > 0
+                  ? "bg-primary text-white"
+                  : "bg-accent text-accent-content"
+              }`}
+            >
+              {state.pendingDrawCount > 0
+                ? `Take +${state.pendingDrawCount}`
+                : "Nothing to play: draw!"}
             </span>
           )}
         </button>
@@ -123,6 +139,12 @@ export function GameTable({
             aria-hidden="true"
             className={`absolute -inset-3 rounded-[1.4rem] border-[5px] transition-[border-color,box-shadow] duration-500 compact:-inset-2 compact:border-4 tiny:-inset-1 tiny:border-2 ${RING[state.currentColor]}`}
           />
+          {/* Shock wave when a new card lands (after its flight) */}
+          <span
+            key={state.topCard.id}
+            aria-hidden="true"
+            className="animate-impact pointer-events-none absolute -inset-1 rounded-[1.4rem] border-4 border-white"
+          />
           <Card
             color={themeColor(state.topCard.color)}
             variant="game"
@@ -131,7 +153,10 @@ export function GameTable({
             <CardFace color={state.topCard.color} value={state.topCard.value} />
           </Card>
           {state.pendingDrawCount > 0 && (
-            <span className="animate-pop absolute -top-4 -right-6 z-10 rounded-full border-[3px] border-white bg-primary px-3 py-0.5 text-xl font-bold text-white shadow-lg compact:text-base tiny:-right-3 tiny:px-1.5 tiny:text-xs">
+            <span
+              key={state.pendingDrawCount}
+              className="animate-pop absolute -top-5 -right-7 z-10 rounded-full border-[3px] border-white bg-primary px-3.5 py-0.5 text-2xl font-black text-white shadow-[0_0_20px_var(--color-primary)] compact:text-lg tiny:-right-3 tiny:px-1.5 tiny:text-xs"
+            >
               +{state.pendingDrawCount}
             </span>
           )}

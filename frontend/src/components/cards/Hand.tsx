@@ -8,6 +8,8 @@ export interface HandCard {
   label: string; // accessible name, used when the card is clickable
   content?: ReactNode; // shown in the card's central panel
   disabled?: boolean; // visible but not clickable (not your turn...)
+  highlight?: boolean; // playable right now: raised and outlined
+  dimmed?: boolean; // darker (not playable while the player could play)
 }
 
 interface HandProps {
@@ -54,10 +56,16 @@ export function Hand({
           // the ends a little lower
           const offset = index - (cards.length - 1) / 2;
           const spread = Math.min(3, 24 / Math.max(cards.length, 1));
+          // Playable cards rise out of the hand, the others sink a little
+          const lift = card.highlight
+            ? "1rem"
+            : card.dimmed
+              ? "-0.4rem"
+              : "0px";
           const bend = arc
             ? ({
                 "--rot": `${offset * spread}deg`,
-                "--drop": `${Math.abs(offset) ** 1.6 * 0.12 * spread}px`,
+                "--drop": `calc(${Math.abs(offset) ** 1.6 * 0.12 * spread}px - ${lift})`,
               } as CSSProperties)
             : undefined;
           return (
@@ -83,7 +91,15 @@ export function Hand({
                   ? "origin-[50%_130%] [rotate:var(--rot)] [translate:0_var(--drop)]"
                   : ""
               } ${cardClassName} ${
-                card.disabled ? "brightness-[0.6] saturate-[0.7]" : ""
+                card.dimmed
+                  ? "brightness-[0.5] saturate-[0.6]"
+                  : card.disabled
+                    ? "brightness-[0.75]"
+                    : ""
+              } ${
+                card.highlight
+                  ? "shadow-[0_0_0_3px_var(--color-accent),0_0_24px_var(--color-accent)]"
+                  : ""
               } ${
                 clickable
                   ? arc

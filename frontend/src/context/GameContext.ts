@@ -52,6 +52,10 @@ export interface GameContextValue {
   ) => void;
   drawCard: () => void;
   callUno: () => void;
+  // Wild +4 with the bluff rule: the targeted player accepts the 4 cards, or
+  // challenges (the player who put it draws 4 if it was a bluff, else 6 for me)
+  challengeBluff: () => void;
+  acceptWildDraw4: () => void;
   catchUno: (targetUserId: string) => void;
   // Forget the finished game (back to the lobby)
   clearGame: () => void;

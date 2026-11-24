@@ -3,13 +3,20 @@ import type { HandCard } from "../cards/Hand";
 import { CardFace } from "./CardFace";
 import { cardName, themeColor } from "./cards";
 
-// A card of the game, as the Hand component wants it
-export function toHandCard(card: Card, disabled: boolean): HandCard {
+// A card of the game, as the Hand component wants it. "playable": it can be
+// played right now (raised); the others are dimmed and not clickable.
+export function toHandCard(
+  card: Card,
+  playable: boolean,
+  dimmed: boolean,
+): HandCard {
   return {
     id: card.id,
     color: themeColor(card.color),
     label: `Play ${cardName(card)}`,
     content: <CardFace color={card.color} value={card.value} />,
-    disabled,
+    disabled: !playable,
+    highlight: playable,
+    dimmed,
   };
 }

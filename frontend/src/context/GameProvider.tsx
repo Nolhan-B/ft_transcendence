@@ -265,6 +265,16 @@ export function GameProvider({ children }: { children: ReactNode }) {
     send({ type: "call_uno", gameId });
   }, [send, gameId]);
 
+  const challengeBluff = useCallback(() => {
+    if (!gameId) return;
+    send({ type: "challenge_bluff", gameId });
+  }, [send, gameId]);
+
+  const acceptWildDraw4 = useCallback(() => {
+    if (!gameId) return;
+    send({ type: "accept_wild_draw4", gameId });
+  }, [send, gameId]);
+
   const catchUno = useCallback(
     (targetUserId: string) => {
       if (!gameId) return;
@@ -311,6 +321,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
       playCard,
       drawCard,
       callUno,
+      challengeBluff,
+      acceptWildDraw4,
       catchUno,
       clearGame,
     }),
@@ -339,6 +351,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
       playCard,
       drawCard,
       callUno,
+      challengeBluff,
+      acceptWildDraw4,
       catchUno,
       clearGame,
     ],
