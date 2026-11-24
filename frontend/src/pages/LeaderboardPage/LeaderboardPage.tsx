@@ -77,7 +77,7 @@ function Leaderboard() {
             leaderboard.map((leader, index) => (
               <tr className={user?.id !== leader.id ? "" : "bg-base-200"}>
                 <th>{index + 1}</th>
-                <td>{user?.id !== leader.id ? leader.username : "You"}</td>
+                <td>{leader.username}</td>
                 <td>{leader.elo}</td>
               </tr>
             ))}
