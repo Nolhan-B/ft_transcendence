@@ -12,6 +12,7 @@ import type {
 import { useWebSocket } from "../hooks/ws/useWebSocket";
 import { GameContext } from "./GameContext";
 import type { GameContextValue, RefusedGame, UnoEvent } from "./GameContext";
+import { useAuth } from "../hooks/auth/useAuth";
 
 // The server closes the socket after these refusals. "Already connected" is
 // often only a race (page reload, hot reload: the old socket is not closed yet
@@ -68,6 +69,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const joinedOn = useRef<string | null>(null);
   // Stored game we are trying to join back after a reload
   const restoring = useRef<string | null>(null);
+
+  const { refresh } = useAuth();
 
   const { status, send } = useWebSocket({
     path: "/api/game/ws",
@@ -164,6 +167,9 @@ export function GameProvider({ children }: { children: ReactNode }) {
         case "chat_message":
           setChatMessages((prev) => [...prev, event]);
           break;
+        case "elo_updated":
+          void refresh();
+          break ;
         case "error":
           // The stored game is over: forget it without bothering the user
           if (restoring.current && GONE.includes(event.message)) {
