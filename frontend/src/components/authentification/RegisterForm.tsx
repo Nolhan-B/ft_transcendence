@@ -79,7 +79,7 @@ export function RegisterForm() {
           <p className="validator-hint">Confirm your password</p>
         </label>
       </div>
-      <button type="submit" disabled={loading} className="btn btn-neutral">
+      <button type="submit" disabled={loading} className="btn btn-accent">
         {loading && (
           <span className="loading loading-spinner loading-xs"></span>
         )}

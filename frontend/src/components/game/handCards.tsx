@@ -9,7 +9,7 @@ export function toHandCard(card: Card, disabled: boolean): HandCard {
     id: card.id,
     color: themeColor(card.color),
     label: `Play ${cardName(card)}`,
-    content: <CardFace value={card.value} />,
+    content: <CardFace color={card.color} value={card.value} />,
     disabled,
   };
 }

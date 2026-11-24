@@ -96,51 +96,335 @@ body {
 }
 
 @plugin "daisyui/theme" {
-  name: "uno";
+  name: "sns";
   default: true;
   color-scheme: dark;
 
-  /* surfaces (Dark mode arcade chic) */
-  --color-base-100: #1e1e2e;
-  --color-base-200: #181825;
-  --color-base-300: #11111b;
-  --color-base-content: #cdd6f4;
+  /* surfaces: they follow the table color chosen in the settings (see the
+     --table-* variables below) */
+  --color-base-100: var(--table-base-1);
+  --color-base-200: var(--table-base-2);
+  --color-base-300: var(--table-base-3);
+  --color-base-content: #ffffff;
 
-  /* brand: the neon colors of the SNS logo, one per UNO color. They are
-     bright, so the text on them is dark */
-  --color-primary: #ff2a85; /* red: neon pink */
-  --color-primary-content: #11111b;
-  --color-secondary: #00f0ff; /* blue: neon cyan */
-  --color-secondary-content: #11111b;
-  --color-accent: #fcee0a; /* yellow: neon yellow */
-  --color-accent-content: #11111b;
-  --color-neutral: #313244;
-  --color-neutral-content: #cdd6f4;
+  /* the four UNO colors, one per theme color (cards use them, see
+     components/game/cards.ts): red, blue, yellow, green */
+  --color-primary: #e53935;
+  --color-primary-content: #ffffff;
+  --color-secondary: #1e88e5;
+  --color-secondary-content: #ffffff;
+  --color-accent: #fbc02d;
+  --color-accent-content: #161616;
+  --color-neutral: #1b1b1b;
+  --color-neutral-content: #ffffff;
 
-  /* feedback, same neons */
-  --color-info: #00f0ff;
-  --color-info-content: #11111b;
-  --color-success: #39ff14; /* green: neon green */
-  --color-success-content: #11111b;
-  --color-warning: #fcee0a;
-  --color-warning-content: #11111b;
-  --color-error: #ff2a85;
-  --color-error-content: #11111b;
+  /* feedback */
+  --color-info: #1e88e5;
+  --color-info-content: #ffffff;
+  --color-success: #43a047;
+  --color-success-content: #ffffff;
+  --color-warning: #fbc02d;
+  --color-warning-content: #161616;
+  --color-error: #ff5252;
+  --color-error-content: #ffffff;
 
-  /* shape (Bordures marquées style Neo-Brutalism) */
-  --radius-selector: 0.75rem;
-  --radius-field: 0.75rem;
-  --radius-box: 1rem;
-  --border: 3px;
+  /* shape: soft and round, like a real card */
+  --radius-selector: 1rem;
+  --radius-field: 0.875rem;
+  --radius-box: 1.25rem;
+  --border: 2px;
+  --depth: 1;
+  --noise: 0;
 }
 
-/* Third brand color of the SNS logo (between the pink and the cyan), for
-   gradients and glows: bg-tertiary, via-tertiary, text-tertiary... */
 @theme {
-  --color-tertiary: #a855f7;
+  /* used to be the purple of the neon theme: now the yellow, so the old
+     "from-secondary via-tertiary to-primary" gradients go blue/yellow/red */
+  --color-tertiary: #fbc02d;
+  /* dark outline of the UNO lettering */
+  --color-ink: #161616;
+  /* green cloth of the game table */
+  --color-felt: #1f7a3f;
+  --color-felt-dark: #0a2e17;
+
+  --font-sans: "Outfit", ui-sans-serif, system-ui, sans-serif;
 }
 
-/* Cyberpunk display font used for brand name and hero headline */
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Display font for the brand and the page titles (it was Orbitron): now the
+   same round font, heavier */
 @utility font-cyber {
-  font-family: "Orbitron", ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-sans);
+  font-weight: 700;
+}
+
+/* Display lettering for titles and big labels: heavy, tight, with a hard
+   drop shadow so it stands out on the red table */
+@utility text-display {
+  font-family: var(--font-sans);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  text-shadow: 0 0.06em 0 rgb(0 0 0 / 0.35);
+}
+
+/* Glass panel over the red page (lobby cards, header, seats...) */
+@utility panel-glass {
+  background-color: var(--table-glass);
+  border-color: rgb(255 255 255 / 0.12);
+  backdrop-filter: blur(8px);
+}
+
+/* Buttons: chunky, they sink when pressed (a darker "edge" under them) */
+@layer components {
+  .btn:not(.btn-ghost):not(.btn-link):not(.btn-outline):not(.btn-soft) {
+    --btn-shadow: 0 4px 0
+      color-mix(in oklab, var(--btn-color, var(--color-base-200)) 55%, black);
+    box-shadow: var(--btn-shadow);
+    border-color: transparent;
+  }
+  .btn:not(.btn-ghost):not(.btn-link):not(.btn-outline):not(
+      .btn-soft
+    ):active:not(:disabled) {
+    translate: 0 3px;
+    box-shadow: 0 1px 0
+      color-mix(in oklab, var(--btn-color, var(--color-base-200)) 55%, black);
+  }
+  .btn {
+    font-weight: 600;
+    transition:
+      translate 0.12s,
+      box-shadow 0.12s,
+      background-color 0.2s;
+  }
+  .btn:hover:not(:disabled):not(:active) {
+    translate: 0 -2px;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Animations of the UNO design                                        */
+/* ------------------------------------------------------------------ */
+
+@keyframes uno-pop {
+  from {
+    transform: scale(0.85);
+    opacity: 0;
+  }
+}
+@utility animate-pop {
+  animation: uno-pop 0.35s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+
+/* The card just played lands on the discard pile */
+@keyframes uno-slam {
+  from {
+    transform: translateY(40%) scale(1.3) rotate(-25deg);
+    opacity: 0;
+  }
+  70% {
+    transform: scale(0.95) rotate(3deg);
+    opacity: 1;
+  }
+}
+@utility animate-slam {
+  animation: uno-slam 0.45s cubic-bezier(0.2, 1.3, 0.4, 1);
+}
+
+/* The draw pile asks to be clicked */
+@keyframes uno-nudge {
+  50% {
+    transform: translateY(-5px);
+  }
+}
+@utility animate-nudge {
+  animation: uno-nudge 1.4s ease-in-out infinite;
+}
+
+/* The player whose turn it is */
+@keyframes uno-pulse-ring {
+  0%,
+  100% {
+    box-shadow: 0 0 0 3px var(--color-accent);
+  }
+  50% {
+    box-shadow:
+      0 0 0 3px var(--color-accent),
+      0 0 0 9px color-mix(in oklab, var(--color-accent) 35%, transparent);
+  }
+}
+@utility animate-turn {
+  animation: uno-pulse-ring 1.6s ease-in-out infinite;
+}
+
+/* The UNO button wobbles */
+@keyframes uno-wobble {
+  50% {
+    transform: scale(1.12) rotate(-6deg);
+  }
+}
+@utility animate-wobble {
+  animation: uno-wobble 0.7s ease-in-out infinite;
+}
+
+@keyframes uno-bounce {
+  50% {
+    transform: translateY(-4px) scale(1.08);
+  }
+}
+@utility animate-hop {
+  animation: uno-bounce 0.9s ease-in-out infinite;
+}
+
+/* Direction of play: a dashed ring that slowly turns */
+@utility animate-spin-slow {
+  animation: spin 14s linear infinite;
+}
+
+/* Cards rising from the bottom of the auth / home pages */
+@keyframes uno-float-up {
+  from {
+    transform: translateY(0) rotate(-20deg);
+  }
+  to {
+    transform: translateY(-140vh) rotate(25deg);
+  }
+}
+@utility animate-float-up {
+  animation: uno-float-up linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-pop,
+  .animate-slam,
+  .animate-nudge,
+  .animate-turn,
+  .animate-wobble,
+  .animate-hop,
+  .animate-spin-slow,
+  .animate-float-up {
+    animation: none;
+  }
+}
+
+@keyframes confetti {
+  to {
+    transform: translateY(110vh) rotate(720deg);
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* daisyUI pieces in the UNO look                                      */
+/* ------------------------------------------------------------------ */
+@layer components {
+  /* Pop-ups: a red card-like gradient */
+  .modal-box {
+    background: linear-gradient(
+      160deg,
+      var(--table-modal),
+      var(--table-base-2)
+    );
+    border: 1px solid rgb(255 255 255 / 0.12);
+    box-shadow: 0 30px 80px rgb(0 0 0 / 0.5);
+    border-radius: 1.4rem;
+  }
+  .modal-backdrop,
+  .modal::backdrop {
+    background-color: rgb(0 0 0 / 0.55);
+  }
+
+  /* Fields: dark hollows, yellow when focused */
+  .input,
+  .select,
+  .textarea {
+    background-color: rgb(0 0 0 / 0.35);
+    border-color: transparent;
+  }
+  .input:focus,
+  .input:focus-within,
+  .select:focus,
+  .textarea:focus {
+    border-color: var(--color-accent);
+    outline-color: var(--color-accent);
+  }
+
+  /* Page panels (daisyUI cards on the plain surfaces): dark red glass */
+  .card.bg-base-100,
+  .card.bg-base-200,
+  .card.bg-base-300 {
+    background-color: var(--table-glass);
+    border: 1px solid rgb(255 255 255 / 0.12);
+    backdrop-filter: blur(8px);
+  }
+
+  /* Tabs and menus: the active item is yellow */
+  .tabs-box .tab-active,
+  .tabs-box .tab:checked {
+    background-color: var(--color-accent);
+    color: var(--color-accent-content);
+  }
+  .menu :where(li > a.active, li > .menu-active) {
+    background-color: var(--color-accent);
+    color: var(--color-accent-content);
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Table colors: the page gradient, the surfaces, the glass panels and */
+/* the pop-ups. Chosen in the settings, set as data-table on <html>    */
+/* (see theme/tableColors.ts). Midnight is the default.                */
+/* ------------------------------------------------------------------ */
+:root,
+:root[data-table="midnight"] {
+  --table-1: #4c3fc2;
+  --table-2: #241f6b;
+  --table-3: #0a0822;
+  --table-base-1: #221d5c;
+  --table-base-2: #1a1647;
+  --table-base-3: #0e0c2b;
+  --table-glass: rgb(8 6 30 / 0.5);
+  --table-modal: #3a32a8;
+}
+:root[data-table="crimson"] {
+  --table-1: #d32f2f;
+  --table-2: #8e1515;
+  --table-3: #2a0505;
+  --table-base-1: #5e0d0d;
+  --table-base-2: #440909;
+  --table-base-3: #2a0505;
+  --table-glass: rgb(20 0 0 / 0.45);
+  --table-modal: #a51d1d;
+}
+:root[data-table="ocean"] {
+  --table-1: #0e7490;
+  --table-2: #0c3b4f;
+  --table-3: #03141c;
+  --table-base-1: #0d3446;
+  --table-base-2: #0a2836;
+  --table-base-3: #051820;
+  --table-glass: rgb(0 14 20 / 0.45);
+  --table-modal: #0e5f78;
+}
+:root[data-table="plum"] {
+  --table-1: #9333ea;
+  --table-2: #4c1170;
+  --table-3: #14031f;
+  --table-base-1: #3d0f5c;
+  --table-base-2: #2e0b46;
+  --table-base-3: #1a0629;
+  --table-glass: rgb(18 2 28 / 0.45);
+  --table-modal: #6b21a8;
+}
+:root[data-table="graphite"] {
+  --table-1: #52525b;
+  --table-2: #27272a;
+  --table-3: #09090b;
+  --table-base-1: #27272a;
+  --table-base-2: #1f1f23;
+  --table-base-3: #111113;
+  --table-glass: rgb(0 0 0 / 0.4);
+  --table-modal: #3f3f46;
 }

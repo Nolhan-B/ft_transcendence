@@ -1,20 +1,19 @@
 import { WEBSITE_NAME } from "../../../constants";
 import { Link } from "react-router-dom";
-import snsLogo from "../../../assets/images/sns-logo.svg?url";
+import { BrandLogo } from "../../texts/BrandLogo";
 
-// Header brand link displaying the SNS emblem and cyberpunk site name
+// Header brand link: the SNS badge and the name of the site
 export function SiteTitle() {
   return (
     <Link
       to="/"
-      className="btn btn-ghost gap-3 border-transparent text-xl shadow-none transition-transform duration-200 hover:scale-105 hover:border-transparent hover:bg-transparent active:scale-95"
+      className="group flex items-center gap-3 px-2 transition-transform duration-200 hover:scale-105 active:scale-95"
     >
-      <img
-        src={snsLogo}
-        alt="SNS"
-        className="h-8 w-auto drop-shadow-[0_0_8px_color-mix(in_oklab,var(--color-secondary)_30%,transparent)]"
+      <BrandLogo
+        size="sm"
+        className="transition-transform duration-300 group-hover:rotate-4"
       />
-      <span className="font-cyber hidden bg-gradient-to-r from-secondary via-tertiary to-primary bg-clip-text text-lg font-extrabold tracking-wider text-transparent sm:inline">
+      <span className="hidden text-lg font-bold tracking-wide sm:inline">
         {WEBSITE_NAME}
       </span>
     </Link>

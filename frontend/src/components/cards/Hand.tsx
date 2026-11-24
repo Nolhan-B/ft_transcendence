@@ -23,6 +23,8 @@ interface HandProps {
   // per card after the first, negative margin) and never rotate.
   fan?: "center" | "left" | "row";
   overlap?: string;
+  // "row" only: the row bends into a light arc, like cards held in a hand
+  arc?: boolean;
   variant?: CardVariant; // look of the cards (default: classic)
   cardClassName?: string; // added to every card (e.g. a thinner border)
   className?: string; // width of the cards (default: 3/4 of the space on mobile, capped so that a card fits the screen height)
@@ -36,6 +38,7 @@ export function Hand({
   step = 10,
   fan = "center",
   overlap = "-2rem",
+  arc = false,
   variant = "classic",
   cardClassName = "",
   className = "w-3/4 max-w-[max(14rem,min(24rem,calc((100dvh_-_9rem)*56/87)))] sm:w-full",
@@ -47,12 +50,22 @@ export function Hand({
       <div className={`flex items-end justify-center ${className}`}>
         {cards.map((card, index) => {
           const clickable = onSelect !== undefined && !card.disabled;
+          // Arc: the cards turn around a point below the hand, the ones at
+          // the ends a little lower
+          const offset = index - (cards.length - 1) / 2;
+          const spread = Math.min(3, 24 / Math.max(cards.length, 1));
+          const bend = arc
+            ? ({
+                "--rot": `${offset * spread}deg`,
+                "--drop": `${Math.abs(offset) ** 1.6 * 0.12 * spread}px`,
+              } as CSSProperties)
+            : undefined;
           return (
             <Card
               key={card.id}
               color={card.color}
               variant={variant}
-              style={index > 0 ? { marginLeft: overlap } : undefined}
+              style={{ ...bend, ...(index > 0 ? { marginLeft: overlap } : {}) }}
               role={clickable ? "button" : undefined}
               tabIndex={clickable ? 0 : undefined}
               aria-label={clickable ? card.label : undefined}
@@ -65,11 +78,17 @@ export function Hand({
                     }
                   : undefined
               }
-              className={`shrink-0 transition-all duration-300 ${cardClassName} ${
-                card.disabled ? "brightness-75" : ""
+              className={`shrink-0 transition-all duration-300 ${
+                arc
+                  ? "origin-[50%_130%] [rotate:var(--rot)] [translate:0_var(--drop)]"
+                  : ""
+              } ${cardClassName} ${
+                card.disabled ? "brightness-[0.6] saturate-[0.7]" : ""
               } ${
                 clickable
-                  ? "cursor-pointer hover:z-10 hover:-translate-y-3"
+                  ? arc
+                    ? "cursor-pointer hover:z-10 hover:[translate:0_calc(var(--drop)-2rem)] hover:scale-[1.06] hover:shadow-[0_0_0_3px_var(--color-accent),0_14px_28px_rgb(0_0_0/0.45)]"
+                    : "cursor-pointer hover:z-10 hover:-translate-y-3"
                   : ""
               }`}
             >

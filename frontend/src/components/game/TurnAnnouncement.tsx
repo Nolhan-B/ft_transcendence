@@ -29,8 +29,10 @@ export function TurnAnnouncement({ playerId, name, mine }: Props) {
     <div className="pointer-events-none absolute left-4 top-4 z-30 compact:left-2 compact:top-2">
       <div
         role="status"
-        className={`alert px-6 py-4 text-2xl font-bold shadow-2xl compact:px-4 compact:py-2 compact:text-lg tiny:px-2 tiny:py-1 tiny:text-sm ${
-          mine ? "alert-warning" : "alert-info"
+        className={`animate-pop rounded-full px-6 py-3 text-2xl font-bold shadow-2xl compact:px-4 compact:py-1.5 compact:text-lg tiny:px-2 tiny:py-1 tiny:text-sm ${
+          mine
+            ? "bg-accent text-accent-content"
+            : "border border-white/15 bg-black/60 text-white backdrop-blur-sm"
         }`}
       >
         {mine ? "Your turn!" : `${name}'s turn`}

@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import type { Player } from "shared";
 import { Card } from "../cards/Card";
 import { UserAvatar } from "../user/UserAvatar";
@@ -5,7 +6,7 @@ import { CardBack } from "./CardFace";
 
 export type Seat = "top" | "left" | "right";
 
-// Hidden cards shown at most (the badge gives the real count)
+// Hidden cards shown at most (the pill gives the real count)
 const MAX_BACKS = 7;
 
 interface Props {
@@ -15,54 +16,66 @@ interface Props {
   onCatchUno: () => void;
 }
 
-// One opponent: a square with avatar, name and number of cards
+// One opponent: the hidden hand fanned out, then a pill with avatar, name
+// and number of cards. The seat glows yellow on its turn.
 export function OpponentSeat({ player, canCatchUno, onCatchUno }: Props) {
+  const backs = Math.min(player.hand.length, MAX_BACKS);
+  const lastCard = player.hand.length === 1;
+
   return (
     <div
       data-anchor={`seat-${player.userId}`}
-      className={`card relative aspect-square w-52 items-center justify-center gap-1 bg-base-200/70 p-2 shadow-xl backdrop-blur-sm transition-shadow compact:w-36 snug:w-32 short:w-32 short:gap-0.5 short:p-1 tiny:aspect-auto tiny:w-24 ${
-        player.isCurrentTurn ? "ring-4 ring-accent" : ""
-      } ${player.disconnected ? "opacity-40" : ""}`}
+      className={`relative flex w-52 flex-col items-center gap-2 rounded-box p-3 transition-[background-color,opacity,filter] duration-300 compact:w-40 compact:gap-1 compact:p-2 snug:w-32 short:w-32 short:gap-0.5 short:p-1 tiny:w-24 ${
+        player.isCurrentTurn ? "animate-turn bg-black/30" : ""
+      } ${player.disconnected ? "opacity-40 grayscale" : ""}`}
     >
-      <div className="compact:hidden">
-        <UserAvatar username={player.username} size="md" />
-      </div>
-      <div className="hidden compact:block tiny:hidden">
-        <UserAvatar username={player.username} size="sm" />
-      </div>
-      <span className="w-full truncate text-center text-base font-semibold compact:text-sm tiny:text-xs">
-        {player.username}
-      </span>
-
-      {/* The hidden hand, a flat row of overlapping cards */}
+      {/* The hidden hand, a small fan of overlapping backs */}
       <div
-        className="flex -space-x-6 pt-1 compact:-space-x-5 short:-space-x-4 short:pt-0 tiny:-space-x-2"
+        className="flex h-20 items-end justify-center -space-x-7 compact:h-14 compact:-space-x-5 snug:h-11 short:h-10 short:-space-x-4 tiny:h-7 tiny:-space-x-2"
         aria-hidden="true"
       >
-        {Array.from({ length: Math.min(player.hand.length, MAX_BACKS) }).map(
-          (_, i) => (
+        {Array.from({ length: backs }).map((_, i) => (
+          <div
+            key={i}
+            className="origin-bottom [rotate:var(--rot)]"
+            style={
+              { "--rot": `${(i - (backs - 1) / 2) * 7}deg` } as CSSProperties
+            }
+          >
             <Card
-              key={i}
               color="neutral"
-              variant="neon"
-              className="w-11 border-2! compact:w-8 short:w-6 tiny:w-4"
+              variant="game"
+              className="w-12 compact:w-9 snug:w-7 short:w-6 tiny:w-4"
             >
               <CardBack />
             </Card>
-          ),
-        )}
+          </div>
+        ))}
       </div>
-      <span className="badge badge-lg badge-primary text-xl font-bold compact:badge-md compact:text-base short:badge-sm short:text-sm tiny:badge-xs tiny:text-xs">
-        {player.hand.length} cards
-      </span>
+
+      <div className="flex max-w-full items-center gap-2 rounded-full bg-black/40 py-1.5 pr-4 pl-1.5 compact:gap-1.5 compact:py-1 compact:pr-3 compact:pl-1 tiny:pr-2">
+        <div className="shrink-0 compact:hidden">
+          <UserAvatar username={player.username} size="sm" />
+        </div>
+        <div className="flex min-w-0 flex-col leading-tight">
+          <span className="truncate font-semibold compact:text-sm tiny:text-xs">
+            {player.username}
+          </span>
+          <span
+            className={`text-xs tiny:text-[0.65rem] ${lastCard ? "font-bold text-accent" : "text-white/65"}`}
+          >
+            {player.hand.length} {player.hand.length === 1 ? "card" : "cards"}
+          </span>
+        </div>
+      </div>
 
       {canCatchUno && (
         <button
           type="button"
-          className="btn btn-error btn-sm absolute -bottom-4 z-10 animate-pulse shadow-[0_0_20px_var(--color-error)] compact:btn-xs compact:-bottom-3"
+          className="text-display animate-wobble absolute -bottom-4 z-10 cursor-pointer rounded-full border-[3px] border-white bg-primary px-4 py-1 text-lg text-white shadow-[0_0_20px_var(--color-primary)] compact:-bottom-3 compact:text-sm"
           onClick={onCatchUno}
         >
-          Catch UNO
+          Catch UNO!
         </button>
       )}
     </div>

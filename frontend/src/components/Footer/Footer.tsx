@@ -1,27 +1,22 @@
 import { Link } from "react-router-dom";
 import { WEBSITE_DESCRIPTION, WEBSITE_NAME } from "../../constants";
-import snsLogo from "../../assets/images/sns-logo.svg?url";
+import { BrandLogo } from "../texts/BrandLogo";
 
 export function Footer() {
   return (
-    <div className="relative bg-base-200">
-      {/* Subtle neon gradient divider along the top edge */}
-      <div
-        aria-hidden="true"
-        className="h-px w-full bg-gradient-to-r from-transparent via-tertiary/60 to-transparent"
-      />
+    <div className="relative border-t border-white/10 bg-black/30 backdrop-blur-sm">
+      {/* The four UNO colors along the top edge */}
+      <div aria-hidden="true" className="flex h-1 w-full">
+        <span className="flex-1 bg-primary" />
+        <span className="flex-1 bg-accent" />
+        <span className="flex-1 bg-success" />
+        <span className="flex-1 bg-secondary" />
+      </div>
       <footer className="footer sm:footer-horizontal text-base-content p-10">
         <aside>
-          <img
-            src={snsLogo}
-            alt="SNS"
-            className="mb-1 h-10 w-auto drop-shadow-[0_0_8px_color-mix(in_oklab,var(--color-secondary)_30%,transparent)]"
-          />
+          <BrandLogo size="md" className="mb-2" />
           <p className="text-base-content/75">
-            <span className="font-cyber bg-gradient-to-r from-secondary via-tertiary to-primary bg-clip-text font-extrabold tracking-wider text-transparent">
-              {WEBSITE_NAME}
-            </span>{" "}
-            © 2026
+            <span className="font-bold text-white">{WEBSITE_NAME}</span> © 2026
             <br />
             {WEBSITE_DESCRIPTION}
           </p>

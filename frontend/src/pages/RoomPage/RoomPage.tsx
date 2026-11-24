@@ -39,7 +39,7 @@ export function RoomPage() {
       <MainTitle title={room.name} />
 
       {/* Mode and code of the room: the code is what friends need to join */}
-      <div className="flex flex-wrap items-center justify-between gap-4 rounded-box border-2 border-base-content/10 bg-base-200/80 p-4 backdrop-blur-sm">
+      <div className="panel-glass flex flex-wrap items-center justify-between gap-4 rounded-box border p-4">
         <div className="flex flex-wrap items-center gap-2">
           <span className="badge badge-lg badge-secondary font-bold uppercase tracking-wider">
             {room.mode}
@@ -50,13 +50,14 @@ export function RoomPage() {
             </span>
           )}
         </div>
-        <div className="flex items-center gap-3">
-          <span className="text-sm font-semibold uppercase tracking-wider">
+        {/* The code as a white ticket, slightly tilted */}
+        <div className="flex rotate-2 flex-col items-center rounded-2xl bg-white px-6 py-2 text-ink shadow-[0_6px_0_rgb(0_0_0/0.25)] transition-transform hover:-rotate-2 hover:scale-105">
+          <span className="text-xs font-semibold tracking-wider text-neutral-500 uppercase">
             Room code
           </span>
-          <kbd className="kbd kbd-lg font-mono text-2xl font-black tracking-[0.25em] text-secondary">
+          <span className="text-3xl font-bold tracking-[0.2em] text-primary">
             {room.code}
-          </kbd>
+          </span>
         </div>
       </div>
 
@@ -86,13 +87,13 @@ export function RoomPage() {
             Waiting for the leader to start the game...
           </span>
         )}
-        <button type="button" className="btn" onClick={leave}>
+        <button type="button" className="btn btn-lg" onClick={leave}>
           Leave
         </button>
         {isLeader && (
           <button
             type="button"
-            className="btn btn-primary"
+            className="btn btn-accent btn-lg"
             disabled={room.players.length < 2}
             onClick={startGame}
           >

@@ -10,6 +10,10 @@ import { BrowserRouter } from "react-router-dom";
 import { AuthProvider } from "./context/AuthProvider.tsx";
 import Router from "./router/router.tsx";
 import "./styles/index.css";
+import { applyStoredTableColor } from "./theme/tableColors.ts";
+
+// The table color chosen in the settings, before the first render
+applyStoredTableColor();
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

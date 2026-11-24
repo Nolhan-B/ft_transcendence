@@ -1,6 +1,6 @@
 import { Outlet } from "react-router-dom";
 import { BackToGame } from "../components/game/BackToGame";
-import { CityBackground } from "../components/layout/CityBackground";
+import { TableBackground } from "../components/layout/TableBackground";
 import { Header } from "../components/Header/Header";
 import { Footer } from "../components/Footer/Footer";
 import { DebugHeader } from "../components/DebugHeader/DebugHeader";
@@ -12,8 +12,8 @@ export function MainLayout() {
 
   return (
     <div className="isolate min-h-screen flex flex-col text-base-content">
-      {/* Neon city behind every page */}
-      <CityBackground />
+      {/* Red card table behind every page */}
+      <TableBackground />
       {/* Dev-only: `VITE_DEBUG_HEADER=false` hides it, prod build strips it */}
       {import.meta.env.DEV && import.meta.env.VITE_DEBUG_HEADER !== "false" && (
         <DebugHeader />

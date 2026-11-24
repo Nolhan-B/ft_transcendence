@@ -45,7 +45,7 @@ export function TwoFactorForm() {
         <button
           type="submit"
           disabled={loading || code.length !== 6}
-          className="btn btn-neutral"
+          className="btn btn-accent"
         >
           {loading && (
             <span className="loading loading-spinner loading-xs"></span>

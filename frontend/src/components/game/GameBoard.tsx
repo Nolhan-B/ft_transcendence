@@ -11,6 +11,7 @@ import { GameTable } from "./GameTable";
 import { CardFlights } from "./CardFlights";
 import { TurnAnnouncement } from "./TurnAnnouncement";
 import { UnoAnnouncement } from "./UnoAnnouncement";
+import { UserAvatar } from "../user/UserAvatar";
 import { OpponentSeat } from "./OpponentSeat";
 import type { Seat } from "./OpponentSeat";
 
@@ -19,11 +20,20 @@ import type { Seat } from "./OpponentSeat";
 const TURN_SECONDS = 20;
 
 const COLOR_CHOICES: { color: CardColor; label: string; button: string }[] = [
-  { color: "red", label: "Red", button: "btn-primary" },
-  { color: "yellow", label: "Yellow", button: "btn-accent" },
-  { color: "green", label: "Green", button: "btn-success" },
-  { color: "blue", label: "Blue", button: "btn-secondary" },
+  { color: "red", label: "Red", button: "bg-primary" },
+  { color: "yellow", label: "Yellow", button: "bg-accent" },
+  { color: "green", label: "Green", button: "bg-success" },
+  { color: "blue", label: "Blue", button: "bg-secondary" },
 ];
+
+// Halo of the color to play, in the middle of the table
+const GLOW: Record<CardColor | "wild", string> = {
+  red: "bg-primary",
+  yellow: "bg-accent",
+  green: "bg-success",
+  blue: "bg-secondary",
+  wild: "bg-white/50",
+};
 
 // Where the opponents sit, by number of opponents. They are placed in turn
 // order starting after me: the next player is on my left.
@@ -120,8 +130,17 @@ export function GameBoard({ state, myId }: Props) {
   }
 
   return (
-    // Frame of the game: 80% opaque, the neon city shows a little through it
-    <div className="relative flex flex-1 flex-col justify-around gap-6 rounded-box border-4 border-base-content/20 bg-base-200/80 p-4 shadow-[inset_0_0_120px_var(--color-base-300)] compact:gap-3 compact:p-2 snug:gap-2 snug:p-1 short:gap-2 tiny:gap-1 tiny:border-2 tiny:p-1">
+    // The table: green cloth with a dark wooden edge
+    <div className="relative isolate flex flex-1 flex-col justify-around gap-6 overflow-hidden rounded-[2rem] border-[6px] border-[#3a1d0e] bg-[radial-gradient(ellipse_at_50%_45%,var(--color-felt)_0%,#125a2c_45%,var(--color-felt-dark)_100%)] p-4 shadow-[inset_0_0_120px_rgb(0_0_0/0.6),0_0_0_3px_rgb(255_255_255/0.08),0_25px_60px_rgb(0_0_0/0.5)] compact:gap-3 compact:rounded-3xl compact:p-2 snug:gap-2 snug:p-1 short:gap-2 tiny:gap-1 tiny:rounded-2xl tiny:border-[3px] tiny:p-1">
+      {/* Felt grain, and the halo of the color to play */}
+      <div
+        aria-hidden="true"
+        className="bg-felt pointer-events-none absolute inset-0 -z-10 opacity-50 mix-blend-overlay"
+      />
+      <div
+        aria-hidden="true"
+        className={`pointer-events-none absolute top-[45%] left-1/2 -z-10 size-[32rem] -translate-x-1/2 -translate-y-1/2 rounded-full opacity-35 blur-3xl transition-colors duration-500 compact:size-80 ${GLOW[state.currentColor]}`}
+      />
       {/* Opponents around the board: left, top and right */}
       <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] grid-rows-[auto_auto] items-center gap-4 compact:gap-2 snug:gap-1 tiny:gap-1">
         <>
@@ -153,10 +172,22 @@ export function GameBoard({ state, myId }: Props) {
       {/* Me: my hand, and the UNO button beside it while I can say it (I
           have only one card left then, so there is room for it) */}
       <div className="flex items-end justify-center gap-6 compact:gap-3">
+        {/* Me: avatar and name, glowing on my turn */}
+        {me && (
+          <div
+            className={`mb-6 flex shrink-0 items-center gap-2 rounded-full bg-black/40 py-1 pr-4 pl-1 font-semibold compact:mb-2 snug:hidden ${
+              myTurn ? "animate-turn" : ""
+            }`}
+          >
+            <UserAvatar username={me.username} size="sm" />
+            You
+          </div>
+        )}
+
         {mustCallUno && (
           <button
             type="button"
-            className="btn btn-warning btn-xl mb-8 animate-pulse text-3xl font-black shadow-[0_0_30px_var(--color-warning)] compact:btn-lg compact:mb-2 compact:text-2xl tiny:btn-md tiny:text-lg"
+            className="text-display animate-wobble mb-8 shrink-0 cursor-pointer rounded-full border-4 border-white bg-primary px-7 py-3 text-4xl text-white shadow-[0_0_30px_var(--color-primary)] compact:mb-2 compact:px-5 compact:py-2 compact:text-2xl tiny:border-2 tiny:px-3 tiny:py-1 tiny:text-lg"
             onClick={callUno}
           >
             UNO!
@@ -170,7 +201,8 @@ export function GameBoard({ state, myId }: Props) {
           <Hand
             cards={handCards}
             fan="row"
-            variant="neon"
+            arc
+            variant="game"
             className="max-w-full"
             overlap={overlap}
             cardClassName="[--card-w:min(9.75rem,16vw)] w-(--card-w) compact:[--card-w:min(5.5rem,16vw)] snug:[--card-w:min(4.5rem,16vw)] short:[--card-w:min(4.75rem,16vw)] tiny:[--card-w:min(3.5rem,16vw)]"
@@ -197,16 +229,18 @@ export function GameBoard({ state, myId }: Props) {
         title="Choose a color"
         onClose={() => setAsking(null)}
       >
-        {COLOR_CHOICES.map(({ color, label, button }) => (
-          <button
-            key={color}
-            type="button"
-            className={`btn ${button}`}
-            onClick={() => choose({ chosenColor: color })}
-          >
-            {label}
-          </button>
-        ))}
+        <div className="grid grid-cols-2 gap-4">
+          {COLOR_CHOICES.map(({ color, label, button }) => (
+            <button
+              key={color}
+              type="button"
+              aria-label={label}
+              title={label}
+              className={`size-28 cursor-pointer rounded-3xl border-4 border-white shadow-[0_6px_0_rgb(0_0_0/0.3)] transition-transform hover:scale-105 hover:-rotate-3 active:scale-95 compact:size-20 ${button}`}
+              onClick={() => choose({ chosenColor: color })}
+            />
+          ))}
+        </div>
       </ChoiceDialog>
 
       <ChoiceDialog
@@ -220,10 +254,14 @@ export function GameBoard({ state, myId }: Props) {
             <button
               key={player.userId}
               type="button"
-              className="btn btn-neutral"
+              className="flex w-full cursor-pointer items-center gap-3 rounded-2xl bg-black/30 p-3 text-left font-semibold transition-colors hover:bg-black/50"
               onClick={() => choose({ targetUserId: player.userId })}
             >
-              {player.username} ({player.hand.length})
+              <UserAvatar username={player.username} size="sm" />
+              <span className="flex-1 truncate">{player.username}</span>
+              <span className="text-sm text-white/65">
+                {player.hand.length} cards
+              </span>
             </button>
           ))}
       </ChoiceDialog>

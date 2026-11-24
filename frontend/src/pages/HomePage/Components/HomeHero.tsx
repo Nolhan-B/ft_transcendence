@@ -1,11 +1,10 @@
 import type { CSSProperties } from "react";
 import { Link } from "react-router-dom";
-import type { CardValue } from "shared";
-import snsLogo from "../../../assets/images/sns-logo.svg";
+import type { CardColor, CardValue } from "shared";
 import { Card } from "../../../components/cards/Card";
-import type { CardColor } from "../../../components/cards/Card";
 import { CardFace } from "../../../components/game/CardFace";
 import { StartPlayingButton } from "../Components/StartPlayingButton";
+import { BrandLogo } from "../../../components/texts/BrandLogo";
 import { WEBSITE_DESCRIPTION, WEBSITE_NAME } from "../../../constants";
 
 interface FloatingCardItem {
@@ -17,11 +16,11 @@ interface FloatingCardItem {
   duration: string;
 }
 
-// Decorative neon cards drifting behind the hero using the shared Card component.
+// Decorative cards drifting behind the hero using the shared Card component.
 // Hidden from assistive tech; motion is disabled by prefers-reduced-motion.
 const FLOATING_CARDS: FloatingCardItem[] = [
   {
-    color: "primary",
+    color: "red",
     value: "7",
     className: "left-[5%] top-[16%]",
     rotate: "-12deg",
@@ -29,7 +28,7 @@ const FLOATING_CARDS: FloatingCardItem[] = [
     duration: "8s",
   },
   {
-    color: "secondary",
+    color: "blue",
     value: "reverse",
     className: "left-[14%] bottom-[12%]",
     rotate: "8deg",
@@ -37,7 +36,7 @@ const FLOATING_CARDS: FloatingCardItem[] = [
     duration: "9s",
   },
   {
-    color: "accent",
+    color: "yellow",
     value: "draw2",
     className: "right-[6%] top-[12%]",
     rotate: "12deg",
@@ -45,7 +44,7 @@ const FLOATING_CARDS: FloatingCardItem[] = [
     duration: "7.5s",
   },
   {
-    color: "success",
+    color: "green",
     value: "skip",
     className: "right-[15%] bottom-[14%]",
     rotate: "-8deg",
@@ -53,9 +52,9 @@ const FLOATING_CARDS: FloatingCardItem[] = [
     duration: "10s",
   },
   {
-    color: "primary",
+    color: "wild",
     value: "wild_draw4",
-    className: "left-[44%] top-[4%] hidden lg:block",
+    className: "left-[26%] top-[5%] hidden xl:block",
     rotate: "4deg",
     delay: "2.4s",
     duration: "11s",
@@ -64,42 +63,19 @@ const FLOATING_CARDS: FloatingCardItem[] = [
 
 export function HomeHero() {
   return (
-    <section className="hero relative min-h-[calc(100vh-8rem)] overflow-hidden rounded-box border-3 border-base-300 bg-base-300">
-      {/* Subtle cyber grid faded out toward the edges, matching AuthPage */}
+    <section className="hero relative min-h-[calc(100vh-8rem)] overflow-hidden">
+      {/* Spotlight behind the title */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0"
-        style={{
-          backgroundImage:
-            "linear-gradient(to right, color-mix(in oklab, var(--color-secondary) 6%, transparent) 1px, transparent 1px), linear-gradient(to bottom, color-mix(in oklab, var(--color-secondary) 6%, transparent) 1px, transparent 1px)",
-          backgroundSize: "48px 48px",
-          maskImage:
-            "radial-gradient(ellipse 85% 80% at 50% 50%, #000 35%, transparent 100%)",
-          WebkitMaskImage:
-            "radial-gradient(ellipse 85% 80% at 50% 50%, #000 35%, transparent 100%)",
-        }}
+        className="hero-glow pointer-events-none absolute top-1/4 left-1/2 size-[36rem] -translate-x-1/2 rounded-full bg-accent/20 blur-3xl"
       />
 
-      {/* Ambient neon glows matching the SNS logo palette */}
-      <div
-        aria-hidden="true"
-        className="hero-glow pointer-events-none absolute -left-24 top-1/4 size-96 rounded-full bg-secondary/12 blur-3xl"
-      />
-      <div
-        aria-hidden="true"
-        className="hero-glow pointer-events-none absolute -right-24 bottom-1/4 size-96 rounded-full bg-primary/14 blur-3xl [animation-delay:2s]"
-      />
-      <div
-        aria-hidden="true"
-        className="hero-glow pointer-events-none absolute left-1/2 top-0 size-72 -translate-x-1/2 rounded-full bg-tertiary/14 blur-3xl [animation-delay:4s]"
-      />
-
-      {/* Floating cards using the real neon Card & CardFace components */}
+      {/* Floating cards using the real Card & CardFace components */}
       <div aria-hidden="true" className="pointer-events-none absolute inset-0">
         {FLOATING_CARDS.map((card) => (
           <div
             key={`${card.value}-${card.className}`}
-            className={`hero-float absolute w-20 opacity-85 sm:w-24 ${card.className}`}
+            className={`hero-float absolute w-20 sm:w-28 ${card.className}`}
             style={
               {
                 "--card-rotate": card.rotate,
@@ -108,53 +84,44 @@ export function HomeHero() {
               } as CSSProperties
             }
           >
-            <Card color={card.color} variant="neon">
-              <CardFace value={card.value} />
+            <Card variant="game">
+              <CardFace color={card.color} value={card.value} />
             </Card>
           </div>
         ))}
       </div>
 
-      <div className="hero-content relative z-10 flex-col gap-6 px-4 py-14 text-center">
-        <img
-          src={snsLogo}
-          alt="SNS"
-          className="h-44 w-auto drop-shadow-[0_0_14px_color-mix(in_oklab,var(--color-secondary)_28%,transparent)] sm:h-56"
-        />
+      <div className="hero-content relative z-10 flex-col gap-8 px-4 py-14 text-center">
+        <BrandLogo size="xl" className="animate-pop" />
 
         <div className="max-w-3xl">
-          <p className="font-cyber mb-4 text-lg font-extrabold uppercase tracking-[0.28em] text-secondary drop-shadow-[0_0_8px_color-mix(in_oklab,var(--color-secondary)_45%,transparent)] sm:text-xl">
+          <p className="mb-3 text-lg font-semibold tracking-[0.3em] text-white/70 uppercase sm:text-xl">
             {WEBSITE_NAME}
           </p>
-          <h1 className="font-cyber mb-5 bg-gradient-to-r from-secondary via-tertiary to-primary bg-clip-text text-4xl font-black uppercase tracking-tight leading-tight text-transparent drop-shadow-[0_0_12px_color-mix(in_oklab,var(--color-tertiary)_30%,transparent)] sm:text-6xl">
-            Play. Bluff. Win.
+          <h1 className="text-display mb-5 text-5xl leading-tight sm:text-7xl">
+            Play. <span className="text-accent">Bluff.</span>{" "}
+            <span className="text-success">Win.</span>
           </h1>
-          <p className="mx-auto max-w-xl text-base text-base-content/70 sm:text-lg">
+          <p className="mx-auto max-w-xl text-base text-white/75 sm:text-lg">
             {WEBSITE_DESCRIPTION}
           </p>
         </div>
 
         <div className="flex flex-wrap items-center justify-center gap-4">
           <StartPlayingButton>Play now</StartPlayingButton>
-          <Link
-            to="/rules"
-            className="btn btn-outline btn-lg font-cyber uppercase tracking-wider"
-          >
+          <Link to="/rules" className="btn btn-lg">
             How to play
           </Link>
         </div>
 
-        <ul className="mt-4 flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-sm text-base-content/60">
-          <li className="flex items-center gap-2">
-            <span className="size-2 rounded-full bg-secondary" />
+        <ul className="mt-2 flex flex-wrap items-center justify-center gap-3 text-sm font-semibold">
+          <li className="rounded-full bg-secondary px-4 py-1.5 text-secondary-content">
             Real-time multiplayer
           </li>
-          <li className="flex items-center gap-2">
-            <span className="size-2 rounded-full bg-tertiary" />
+          <li className="rounded-full bg-accent px-4 py-1.5 text-accent-content">
             Ranked Elo
           </li>
-          <li className="flex items-center gap-2">
-            <span className="size-2 rounded-full bg-primary" />
+          <li className="rounded-full bg-success px-4 py-1.5 text-success-content">
             Friends &amp; chat
           </li>
         </ul>
