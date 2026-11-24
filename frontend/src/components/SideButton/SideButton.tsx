@@ -42,9 +42,9 @@ export function SideButton() {
         aria-label="Open menu"
         aria-expanded={open}
         className={
-          !showNotification ?
-          "btn btn-secondary font-cyber fixed right-0 top-1/2 z-20 h-auto -translate-y-1/2 rounded-r-none px-2 py-4 text-xs font-bold uppercase tracking-wider [writing-mode:vertical-rl]"
-          : "btn btn-warning font-cyber fixed right-0 top-1/2 z-20 h-auto -translate-y-1/2 rounded-r-none px-2 py-4 text-xs font-bold uppercase tracking-wider [writing-mode:vertical-rl]"
+          !showNotification
+            ? "btn btn-secondary font-cyber fixed right-0 top-1/2 z-20 h-auto -translate-y-1/2 rounded-r-none px-2 py-4 text-xs font-bold uppercase tracking-wider [writing-mode:vertical-rl]"
+            : "btn btn-warning font-cyber fixed right-0 top-1/2 z-20 h-auto -translate-y-1/2 rounded-r-none px-2 py-4 text-xs font-bold uppercase tracking-wider [writing-mode:vertical-rl]"
         }
       >
         <div className="flex gap-1 items-center">
