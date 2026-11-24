@@ -14,6 +14,11 @@ import { handleAcceptWildDraw4 } from "./accept-wild-draw4.js";
 import { handlePlayCard } from "./play-card.js";
 import { handleCallUno } from "./call-uno.js";
 
+// Delai de reflexion du bot : entre 1,5 s et 3 s, pour que les humains
+// voient passer les coups
+const BOT_MIN_DELAY_MS = 2500;
+const BOT_EXTRA_DELAY_MS = 2000;
+
 // A appeler apres tout changement de tour (coup d'un joueur, timer AFK, timer
 // de bluff, deconnexion) : fait jouer le bot si c'est son tour, et relance
 // toujours un chrono neuf. Sans ca, le chrono du joueur precedent continuait :
@@ -138,6 +143,6 @@ export function scheduleBotTurnIfNeeded(
         ctx.fastify.log.error({ err, botId, gameId }, "Bot turn failed");
       });
     },
-    500 + Math.random() * 1000,
+    BOT_MIN_DELAY_MS + Math.random() * BOT_EXTRA_DELAY_MS,
   );
 }
