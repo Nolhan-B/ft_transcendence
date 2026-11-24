@@ -45,12 +45,21 @@ export class GameManager {
     return actualisedGameState;
   }
 
-  drawCard(gameId: string, playerId: string): InternalGameState | null {
+  // auto : pioche forcee par le chrono du tour (AFK)
+  drawCard(
+    gameId: string,
+    playerId: string,
+    auto = false,
+  ): InternalGameState | null {
     const currentGameState = this.games.get(gameId);
 
     if (!currentGameState) return null;
 
-    const actualisedGameState = engine.drawCard(currentGameState, playerId);
+    const actualisedGameState = engine.drawCard(
+      currentGameState,
+      playerId,
+      auto,
+    );
 
     return actualisedGameState;
   }

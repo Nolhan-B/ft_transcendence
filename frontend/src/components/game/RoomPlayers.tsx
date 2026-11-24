@@ -29,12 +29,15 @@ export function RoomPlayers({ room, isLeader, onAddBot, onRemoveBot }: Props) {
 
         <ul className="list">
           {room.players.map((player) => (
-            <li key={player.id} className="list-row items-center">
+            <li
+              key={player.id}
+              className="list-row animate-pop mb-2 items-center rounded-2xl bg-black/25"
+            >
               <UserAvatar username={player.username} size="md" />
               <div className="list-col-grow flex items-center gap-2 font-semibold">
                 {player.username}
                 {player.id === room.leaderId && (
-                  <span className="badge badge-accent badge-sm">Leader</span>
+                  <span className="badge badge-accent badge-sm">👑 Leader</span>
                 )}
                 {isBot(player.id) && (
                   <span className="badge badge-ghost badge-sm">Bot</span>
@@ -52,8 +55,11 @@ export function RoomPlayers({ room, isLeader, onAddBot, onRemoveBot }: Props) {
             </li>
           ))}
           {empty.map((slot) => (
-            <li key={slot} className="list-row items-center opacity-50">
-              <div className="skeleton h-12 w-12 shrink-0" />
+            <li
+              key={slot}
+              className="list-row mb-2 items-center rounded-2xl border-2 border-dashed border-white/15 text-white/50"
+            >
+              <div className="size-12 shrink-0 rounded-full border-2 border-dashed border-white/30" />
               <div className="list-col-grow">Waiting for a player...</div>
             </li>
           ))}
@@ -63,7 +69,7 @@ export function RoomPlayers({ room, isLeader, onAddBot, onRemoveBot }: Props) {
           <div className="card-actions justify-end">
             <button
               type="button"
-              className="btn btn-outline btn-sm"
+              className="btn btn-secondary btn-sm"
               disabled={full}
               onClick={onAddBot}
             >

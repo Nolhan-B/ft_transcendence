@@ -1,4 +1,6 @@
 import { Outlet } from "react-router-dom";
+import { BackToGame } from "../components/game/BackToGame";
+import { TableBackground } from "../components/layout/TableBackground";
 import { Header } from "../components/Header/Header";
 import { Footer } from "../components/Footer/Footer";
 import { DebugHeader } from "../components/DebugHeader/DebugHeader";
@@ -9,7 +11,9 @@ export function MainLayout() {
   const { user } = useAuth();
 
   return (
-    <div className="min-h-screen flex flex-col bg-base-100 text-base-content">
+    <div className="isolate min-h-screen flex flex-col text-base-content">
+      {/* Red card table behind every page */}
+      <TableBackground />
       {/* Dev-only: `VITE_DEBUG_HEADER=false` hides it, prod build strips it */}
       {import.meta.env.DEV && import.meta.env.VITE_DEBUG_HEADER !== "false" && (
         <DebugHeader />
@@ -21,6 +25,7 @@ export function MainLayout() {
       </main>
       <Footer />
       {user ? <SideButton /> : <></>}
+      {user && <BackToGame />}
     </div>
   );
 }

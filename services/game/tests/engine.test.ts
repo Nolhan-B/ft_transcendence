@@ -1542,5 +1542,342 @@ test("audit: jump-in valide → accepté, le tour repart du joueur qui coupe", (
 // RÉSULTATS
 // ============================================================
 
+// ============================================================
+// BLUFF CHALLENGE - +4 EN ATTENTE
+// ============================================================
+
+function setupPendingWildDraw4(jumpIn = false): InternalGameState {
+  const state = createGame(
+    [
+      { id: "1", username: "A" },
+      { id: "2", username: "B" },
+      { id: "3", username: "C" },
+    ],
+    GameMode.CLASSIC,
+    {
+      stacking: "none",
+      sevenZeroRule: false,
+      jumpIn,
+      bluffChallenge: true,
+      unoCallout: false,
+    },
+  );
+  state.players[0].hand.push({ id: "w4", color: "wild", value: "wild_draw4" });
+  playCard(state, "1", "w4", "red");
+  return state;
+}
+
+test("bluff: la cible ne peut pas jouer une carte au lieu de répondre au +4", () => {
+  const state = setupPendingWildDraw4();
+  assert(!!state.lastWildDraw4, "le +4 doit être en attente");
+  assert(state.players[1].isCurrentTurn, "c'est à la cible (B) de répondre");
+
+  state.players[1].hand.push({ id: "r5", color: "red", value: "5" });
+  const handSize = state.players[1].hand.length;
+  const result = playCard(state, "2", "r5");
+
+  assert(result === null, "le coup doit être refusé");
+  assert(state.players[1].hand.length === handSize, "la main de B est intacte");
+  assert(!!state.lastWildDraw4, "le +4 est toujours en attente");
+});
+
+test("bluff: la cible ne peut pas piocher une carte au lieu de répondre au +4", () => {
+  const state = setupPendingWildDraw4();
+  const handSize = state.players[1].hand.length;
+
+  assert(drawCard(state, "2") === null, "la pioche doit être refusée");
+  assert(state.players[1].hand.length === handSize, "B n'a pas pioché");
+  assert(state.players[1].isCurrentTurn, "c'est toujours à B de répondre");
+});
+
+test("bluff: pas de jump-in sur un +4 en attente", () => {
+  const state = setupPendingWildDraw4(true);
+  state.players[2].hand.push({ id: "w4b", color: "wild", value: "wild_draw4" });
+
+  assert(
+    playCard(state, "3", "w4b", "blue") === null,
+    "le jump-in doit être refusé",
+  );
+  assert(
+    state.lastWildDraw4?.playerId === "1",
+    "le +4 en attente n'est pas écrasé",
+  );
+});
+
+// ============================================================
+// REGLE 7-0 - DERNIERE CARTE
+// ============================================================
+
+function setupSevenZero(mode: GameMode): InternalGameState {
+  const state = createGame(
+    [
+      { id: "1", username: "A" },
+      { id: "2", username: "B" },
+      { id: "3", username: "C" },
+    ],
+    mode,
+    {
+      stacking: "none",
+      sevenZeroRule: true,
+      jumpIn: false,
+      bluffChallenge: false,
+      unoCallout: false,
+    },
+  );
+  state.topCard = { id: "top", color: "red", value: "5" };
+  state.currentColor = "red";
+  return state;
+}
+
+test("7-0: poser un 7 en dernière carte fait gagner, sans échange", () => {
+  const state = setupSevenZero(GameMode.CLASSIC);
+  state.players[0].hand = [{ id: "r7", color: "red", value: "7" }];
+  const bHand = state.players[1].hand.length;
+
+  playCard(state, "1", "r7", undefined, "2");
+
+  assert(state.status === GameStatus.FINISHED, "la partie doit être finie");
+  assert(state.winnerId === "1", "A doit gagner");
+  assert(state.players[0].hand.length === 0, "A n'a plus de carte");
+  assert(state.players[1].hand.length === bHand, "la main de B est intacte");
+});
+
+test("7-0: poser un 0 en dernière carte fait gagner, sans rotation", () => {
+  const state = setupSevenZero(GameMode.CLASSIC);
+  state.players[0].hand = [{ id: "r0", color: "red", value: "0" }];
+  const hands = state.players.map((p) => p.hand.length);
+
+  playCard(state, "1", "r0");
+
+  assert(state.status === GameStatus.FINISHED, "la partie doit être finie");
+  assert(state.winnerId === "1", "A doit gagner");
+  assert(
+    state.players.every((p, i) => i === 0 || p.hand.length === hands[i]),
+    "les mains des autres sont intactes",
+  );
+});
+
+test("7-0: en ranked, un 7 en dernière carte classe le joueur sans échange", () => {
+  const state = setupSevenZero(GameMode.RANKED);
+  state.players[0].hand = [{ id: "r7", color: "red", value: "7" }];
+  const bHand = state.players[1].hand.length;
+
+  playCard(state, "1", "r7", undefined, "2");
+
+  assert(state.ranking[0] === "1", "A doit être classé premier");
+  assert(state.players[1].hand.length === bHand, "la main de B est intacte");
+  assert(
+    state.status === GameStatus.IN_PROGRESS,
+    "la partie continue entre B et C",
+  );
+});
+
+test("7-0: avec plusieurs cartes, le 7 échange toujours les mains", () => {
+  const state = setupSevenZero(GameMode.CLASSIC);
+  state.players[0].hand = [
+    { id: "r7", color: "red", value: "7" },
+    { id: "b1", color: "blue", value: "1" },
+  ];
+  const bHand = state.players[1].hand.length;
+
+  playCard(state, "1", "r7", undefined, "2");
+
+  assert(state.players[0].hand.length === bHand, "A récupère la main de B");
+  assert(state.players[1].hand.length === 1, "B récupère le bleu 1 de A");
+});
+
+// ============================================================
+// STACKING + BLUFF
+// ============================================================
+
+function setupStackingBluff(): InternalGameState {
+  const state = createGame(
+    [
+      { id: "1", username: "A" },
+      { id: "2", username: "B" },
+      { id: "3", username: "C" },
+    ],
+    GameMode.CLASSIC,
+    {
+      stacking: "all",
+      sevenZeroRule: false,
+      jumpIn: false,
+      bluffChallenge: true,
+      unoCallout: false,
+    },
+  );
+  state.topCard = { id: "top", color: "red", value: "5" };
+  state.currentColor = "red";
+  return state;
+}
+
+test("stacking+bluff: un +4 posé sur un +2 s'ajoute à la pile, sans bluff", () => {
+  const state = setupStackingBluff();
+  state.players[0].hand.push({ id: "d2", color: "red", value: "draw2" });
+  state.players[1].hand.push({ id: "w4", color: "wild", value: "wild_draw4" });
+
+  playCard(state, "1", "d2");
+  assert(state.pendingDrawCount === 2, "la pile doit valoir 2");
+  playCard(state, "2", "w4", "blue");
+
+  assert(state.lastWildDraw4 === undefined, "pas de fenêtre de bluff");
+  assert(state.pendingDrawCount === 6, "la pile doit valoir 6");
+  assert(state.players[2].isCurrentTurn, "c'est à C de répondre à la pile");
+
+  const cHand = state.players[2].hand.length;
+  drawCard(state, "3");
+  assert(state.players[2].hand.length === cHand + 6, "C pioche toute la pile");
+  assert(state.pendingDrawCount === 0, "la pile est vidée");
+});
+
+test("stacking+bluff: un +4 hors pile ouvre toujours la fenêtre de bluff", () => {
+  const state = setupStackingBluff();
+  state.players[0].hand.push({ id: "w4", color: "wild", value: "wild_draw4" });
+
+  playCard(state, "1", "w4", "blue");
+
+  assert(!!state.lastWildDraw4, "la fenêtre de bluff doit être ouverte");
+  assert(state.pendingDrawCount === 0, "pas de pile en cours");
+  assert(state.players[1].isCurrentTurn, "c'est à B de répondre au +4");
+});
+
+// ============================================================
+// ACTIONS NOTEES (lastActions)
+// ============================================================
+
+function setupActions(
+  settings: Partial<InternalGameState["settings"]> = {},
+): InternalGameState {
+  const state = createGame(
+    [
+      { id: "1", username: "A" },
+      { id: "2", username: "B" },
+      { id: "3", username: "C" },
+    ],
+    GameMode.CLASSIC,
+    {
+      stacking: "none",
+      sevenZeroRule: false,
+      jumpIn: false,
+      bluffChallenge: false,
+      unoCallout: false,
+      ...settings,
+    },
+  );
+  state.topCard = { id: "top", color: "red", value: "5" };
+  state.currentColor = "red";
+  state.players[0].hand.push({ id: "keep", color: "blue", value: "1" });
+  return state;
+}
+
+test("actions: une carte jouée est notée avec un seq croissant", () => {
+  const state = setupActions();
+  state.players[0].hand.push({ id: "r3", color: "red", value: "3" });
+  state.players[1].hand.push({ id: "r4", color: "red", value: "4" });
+
+  playCard(state, "1", "r3");
+  playCard(state, "2", "r4");
+
+  const [a, b] = state.pendingActions;
+  assert(a.type === "card_played" && a.userId === "1", "A a joué");
+  assert(a.type === "card_played" && a.card.id === "r3", "la carte est notée");
+  assert(b.type === "card_played" && b.userId === "2", "puis B a joué");
+  assert(b.seq === a.seq + 1, "les seq se suivent");
+});
+
+test("actions: un +2 sans stacking note la carte puis la pioche du suivant", () => {
+  const state = setupActions();
+  state.players[0].hand.push({ id: "d2", color: "red", value: "draw2" });
+  const bHand = [...state.players[1].hand];
+
+  playCard(state, "1", "d2");
+
+  const [played, drawn] = state.pendingActions;
+  assert(played.type === "card_played", "d'abord la carte jouée");
+  assert(drawn.type === "cards_drawn", "puis la pioche");
+  if (drawn.type !== "cards_drawn") return;
+  assert(drawn.userId === "2" && drawn.count === 2, "B pioche 2 cartes");
+  assert(drawn.reason === "draw2", "raison draw2");
+  assert(
+    drawn.cards!.every((c) => !bHand.includes(c)) &&
+      drawn.cards!.every((c) => state.players[1].hand.includes(c)),
+    "les cartes notées sont celles ajoutées à la main de B",
+  );
+});
+
+test("actions: la couleur choisie d'un joker est notée", () => {
+  const state = setupActions();
+  state.players[0].hand.push({ id: "w", color: "wild", value: "wild" });
+  playCard(state, "1", "w", "green");
+  const [a] = state.pendingActions;
+  assert(
+    a.type === "card_played" && a.chosenColor === "green",
+    "chosenColor = green",
+  );
+});
+
+test("actions: un 7 en règle 7-0 note la cible et l'échange", () => {
+  const state = setupActions({ sevenZeroRule: true });
+  state.players[0].hand.push({ id: "r7", color: "red", value: "7" });
+  playCard(state, "1", "r7", undefined, "3");
+  const [played, swapped] = state.pendingActions;
+  assert(
+    played.type === "card_played" && played.targetUserId === "3",
+    "la cible du 7 est notée",
+  );
+  assert(
+    swapped.type === "hands_swapped" &&
+      swapped.userId === "1" &&
+      swapped.targetUserId === "3",
+    "l'échange A <-> C est noté",
+  );
+});
+
+test("actions: pioche volontaire, pile et AFK ont chacune leur raison", () => {
+  const voluntary = setupActions();
+  drawCard(voluntary, "1");
+  const v = voluntary.pendingActions[0];
+  assert(
+    v.type === "cards_drawn" && v.reason === "voluntary" && v.count === 1,
+    "pioche volontaire d'une carte",
+  );
+  assert(
+    v.type === "cards_drawn" &&
+      v.cards![0] === voluntary.players[0].hand.at(-1),
+    "la carte notée est celle piochée",
+  );
+
+  const stack = setupActions({ stacking: "all" });
+  stack.players[0].hand.push({ id: "d2", color: "red", value: "draw2" });
+  playCard(stack, "1", "d2");
+  drawCard(stack, "2");
+  const s = stack.pendingActions.at(-1)!;
+  assert(
+    s.type === "cards_drawn" && s.reason === "stack" && s.count === 2,
+    "B subit la pile de 2",
+  );
+
+  const afk = setupActions();
+  drawCard(afk, "1", true);
+  const f = afk.pendingActions[0];
+  assert(
+    f.type === "cards_drawn" && f.reason === "afk" && f.auto === true,
+    "pioche AFK marquée auto",
+  );
+});
+
+test("actions: le gagnant est noté comme fini, rang 1", () => {
+  const state = setupActions();
+  state.players[0].hand = [{ id: "last", color: "red", value: "3" }];
+  playCard(state, "1", "last");
+  const finished = state.pendingActions.at(-1)!;
+  assert(
+    finished.type === "player_finished" &&
+      finished.userId === "1" &&
+      finished.rank === 1,
+    "A a fini premier",
+  );
+});
+
 console.log(`\n=== ${passed} passed, ${failed} failed ===`);
 if (failed > 0) process.exit(1);

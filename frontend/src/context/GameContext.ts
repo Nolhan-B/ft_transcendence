@@ -9,6 +9,23 @@ import type {
 } from "shared";
 import type { Status } from "../hooks/ws/useWebSocket";
 
+// Last UNO announced by the server: a player said UNO, or was caught
+// without saying it (and drew 2 cards). "id" changes with every event.
+export interface UnoEvent {
+  id: number;
+  kind: "called" | "caught";
+  userId: string;
+  // "caught": the player who caught them
+  byUserId?: string;
+}
+
+// A game the server would not let us join: it does not exist (any more), or
+// we are not one of its players
+export interface RefusedGame {
+  id: string;
+  reason: "not_found" | "not_player";
+}
+
 export interface GameContextValue {
   status: Status;
   room: RoomInfo | null;
@@ -19,8 +36,13 @@ export interface GameContextValue {
   turnStartedAt: number | null;
   // Set when the server announces the end of the game
   winnerId: string | null;
+  // When each player last said UNO (Date.now()), to know who is protected
+  unoCalls: Record<string, number>;
+  unoEvent: UnoEvent | null;
   // true while waiting for a ranked opponent
   inQueue: boolean;
+  // Set when join_game is refused (the game page shows it instead of the board)
+  refusedGame: RefusedGame | null;
   error: string | null;
   clearError: () => void;
   createRoom: (payload: CreateRoomPayload) => void;
@@ -40,6 +62,10 @@ export interface GameContextValue {
   ) => void;
   drawCard: () => void;
   callUno: () => void;
+  // Wild +4 with the bluff rule: the targeted player accepts the 4 cards, or
+  // challenges (the player who put it draws 4 if it was a bluff, else 6 for me)
+  challengeBluff: () => void;
+  acceptWildDraw4: () => void;
   catchUno: (targetUserId: string) => void;
   // Forget the finished game (back to the lobby)
   clearGame: () => void;

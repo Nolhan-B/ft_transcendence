@@ -15,6 +15,11 @@ const COOKIE_OPTIONS = {
   maxAge: 7 * 24 * 60 * 60,
 };
 
+// Usernames: 3 to 20 letters (any language), digits, "_", "." or "-". No
+// spaces, so a name can never be blank or look empty. Same rule in the
+// frontend forms (USERNAME_PATTERN) and in the other service.
+const USERNAME_PATTERN = "^[\\p{L}\\p{N}_.\\-]{3,20}$";
+
 export default async function authRoutes(fastify: FastifyInstance) {
   fastify.post(
     "/signup",
@@ -25,7 +30,12 @@ export default async function authRoutes(fastify: FastifyInstance) {
           required: ["email", "username", "password"],
           properties: {
             email: { type: "string", format: "email" },
-            username: { type: "string", minLength: 3, maxLength: 20 },
+            username: {
+              type: "string",
+              minLength: 3,
+              maxLength: 20,
+              pattern: USERNAME_PATTERN,
+            },
             password: { type: "string", minLength: 8 },
           },
         },

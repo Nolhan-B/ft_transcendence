@@ -1,6 +1,6 @@
 import { GatewayContext } from "../../types.js";
 import { GameStatus } from "shared";
-import { scheduleBotTurnIfNeeded } from "./bot-turn.js";
+import { continueTurn } from "./bot-turn.js";
 
 export async function handleDrawCard(
   ctx: GatewayContext,
@@ -33,19 +33,14 @@ export async function handleDrawCard(
     time: new Date().toISOString(),
   });
 
-  ctx.broadCastStateToRoom(updatedState.id, updatedState);
-
   ctx.afkCounts.set(`${game.id}:${ctx.userId}`, 0);
 
-  scheduleBotTurnIfNeeded(ctx, updatedState, updatedState.id);
+  // Effets d'abord (chrono, bot), envoi ensuite : l'etat diffuse contient
+  // ainsi le chrono du joueur suivant. Ne fait rien si la partie est finie
+  continueTurn(ctx, updatedState);
+  ctx.broadCastStateToRoom(updatedState.id, updatedState);
 
   if (updatedState.status === GameStatus.FINISHED) {
     await ctx.endGame(updatedState.id, updatedState);
-    return;
-  }
-
-  const nextPlayer = updatedState.players.find((p) => p.isCurrentTurn);
-  if (!nextPlayer?.userId.startsWith("bot_")) {
-    ctx.startTurnTimer(game.id);
   }
 }

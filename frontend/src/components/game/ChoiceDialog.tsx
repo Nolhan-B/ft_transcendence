@@ -11,13 +11,11 @@ interface Props {
 export function ChoiceDialog({ open, title, onClose, children }: Props) {
   return (
     <dialog className={`modal ${open ? "modal-open" : ""}`}>
-      <div className="modal-box">
-        <h3 className="text-lg font-bold">{title}</h3>
-        <div className="mt-4 flex flex-wrap justify-center gap-3">
-          {children}
-        </div>
+      <div className="modal-box animate-pop">
+        <h3 className="text-display text-center text-2xl">{title}</h3>
+        <div className="mt-5 flex flex-col items-center gap-3">{children}</div>
         <div className="modal-action">
-          <button type="button" className="btn" onClick={onClose}>
+          <button type="button" className="btn btn-ghost" onClick={onClose}>
             Cancel
           </button>
         </div>

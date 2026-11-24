@@ -144,7 +144,7 @@ export function RulesPage() {
         <p>
           A Wild +4 may only be played if you have no card matching the current
           color. When the bluff challenge is enabled, the next player has{" "}
-          <strong>5 seconds</strong> to challenge:
+          <strong>10 seconds</strong> to challenge:
         </p>
         <ul className="list-disc space-y-1 pl-5">
           <li>

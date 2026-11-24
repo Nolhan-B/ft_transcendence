@@ -13,7 +13,8 @@ interface Props {
   onNavigate?: () => void;
 }
 
-// <li> items, to put in a daisyUI "menu" (the navbar center or a dropdown)
+// <li> items for the navbar or the dropdown menu: the current page is a
+// yellow pill
 export function NavLinks({ onNavigate }: Props) {
   const { user } = useAuth();
 
@@ -25,10 +26,10 @@ export function NavLinks({ onNavigate }: Props) {
             to={to}
             onClick={onNavigate}
             className={({ isActive }) =>
-              `font-semibold ${
+              `rounded-full text-sm font-semibold sm:text-base ${
                 isActive
-                  ? "menu-active border-b-2 border-accent bg-neutral text-neutral-content"
-                  : "hover:bg-base-300"
+                  ? "menu-active bg-accent! text-accent-content!"
+                  : "text-white/80 hover:bg-white/10 hover:text-white"
               }`
             }
           >

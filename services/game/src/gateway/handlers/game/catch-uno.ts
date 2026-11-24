@@ -1,6 +1,7 @@
 import { GatewayContext } from "../../types.js";
 import { GameStatus, type ServerEvent } from "shared";
-import { drawCardsForPlayer } from "../../../engine/game-state.js";
+import { drawAndRecord, recordAction } from "../../../engine/game-state.js";
+import { unoKey } from "../../utils.js";
 
 export function handleCatchUno(
   ctx: GatewayContext,
@@ -31,16 +32,24 @@ export function handleCatchUno(
     return;
   }
 
-  if (!ctx.unoTimers.has(msg.targetUserId)) {
+  // Attrapable seulement dans la fenetre ET avec encore 1 seule carte (s'il a
+  // pioche depuis, il n'est plus en situation de UNO)
+  const key = unoKey(game.id, msg.targetUserId);
+  if (!ctx.unoTimers.has(key) || targetPlayer.hand.length !== 1) {
     ctx.sendError(ctx.socket, "Player already called UNO or not in UNO state");
     return;
   }
 
   // Tout est verifie : on applique la penalite
-  clearTimeout(ctx.unoTimers.get(msg.targetUserId));
-  ctx.unoTimers.delete(msg.targetUserId);
+  clearTimeout(ctx.unoTimers.get(key));
+  ctx.unoTimers.delete(key);
 
-  drawCardsForPlayer(game, msg.targetUserId, 2);
+  recordAction(game, {
+    type: "uno_caught",
+    userId: ctx.userId,
+    targetUserId: msg.targetUserId,
+  });
+  drawAndRecord(game, msg.targetUserId, 2, "uno_penalty");
 
   ctx.broadCastToRoom(msg.gameId, {
     type: "uno_caught",

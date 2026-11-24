@@ -9,7 +9,7 @@ function closeDropdown() {
 
 export function Header() {
   return (
-    <div className="navbar bg-base-200 shadow-sm">
+    <div className="navbar sticky top-0 z-20 border-b border-white/10 bg-black/25 backdrop-blur-md">
       <div className="navbar-start">
         {/* Small screens: the links are in a dropdown */}
         <div className="dropdown lg:hidden">
@@ -31,7 +31,7 @@ export function Header() {
           </div>
           <ul
             tabIndex={0}
-            className="menu dropdown-content z-50 mt-3 w-52 rounded-box bg-base-200 p-2 shadow-xl"
+            className="menu dropdown-content z-50 mt-3 w-52 rounded-box border border-white/10 bg-base-300 p-2 shadow-xl"
           >
             <NavLinks onNavigate={closeDropdown} />
           </ul>

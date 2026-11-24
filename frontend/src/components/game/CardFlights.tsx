@@ -1,10 +1,14 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { Card as GameCard, GameState } from "shared";
 import { Card } from "../cards/Card";
 import { CardBack, CardFace } from "./CardFace";
 import { themeColor } from "./cards";
 
 const FLIGHT_MS = 550;
+// A played card flies a little longer: it must be seen (the shock wave on
+// the discard pile, animate-impact, starts when it lands)
+const PLAY_MS = 520;
 const STAGGER_MS = 140;
 const MAX_FLIGHTS = 4;
 
@@ -43,24 +47,38 @@ function FlyingCard({
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const animation = ref.current?.animate(
-      [
-        {
-          transform: "translate(0, 0) scale(1)",
-          opacity: 1,
-        },
-        {
-          transform: `translate(${flight.to.x - flight.from.x}px, ${flight.to.y - flight.from.y}px) scale(0.85)`,
-          opacity: 0.9,
-        },
-      ],
-      {
-        duration: FLIGHT_MS,
-        delay: flight.delay,
-        easing: "cubic-bezier(0.2, 0.8, 0.3, 1)",
-        fill: "both",
-      },
-    );
+    const dx = flight.to.x - flight.from.x;
+    const dy = flight.to.y - flight.from.y;
+    // A played card is shown off: it rises in an arc, grows, spins a little
+    // and slams on the discard pile. A drawn card simply slides.
+    const keyframes: Keyframe[] = flight.card
+      ? [
+          { transform: "translate(0, 0) scale(1) rotate(0deg)", opacity: 1 },
+          {
+            transform: `translate(${dx * 0.5}px, ${dy * 0.5 - 90}px) scale(1.4) rotate(-14deg)`,
+            opacity: 1,
+            offset: 0.55,
+          },
+          {
+            transform: `translate(${dx}px, ${dy}px) scale(1.05) rotate(3deg)`,
+            opacity: 1,
+          },
+        ]
+      : [
+          { transform: "translate(0, 0) scale(1)", opacity: 1 },
+          {
+            transform: `translate(${dx}px, ${dy}px) scale(0.85)`,
+            opacity: 0.9,
+          },
+        ];
+    const animation = ref.current?.animate(keyframes, {
+      duration: flight.card ? PLAY_MS : FLIGHT_MS,
+      delay: flight.delay,
+      easing: flight.card
+        ? "cubic-bezier(0.3, 0.7, 0.4, 1)"
+        : "cubic-bezier(0.2, 0.8, 0.3, 1)",
+      fill: "both",
+    });
     if (!animation) return;
     animation.onfinish = () => onDone(flight.id);
     return () => animation.cancel();
@@ -82,12 +100,13 @@ function FlyingCard({
       {flight.card ? (
         <Card
           color={themeColor(flight.card.color)}
-          className="w-full border-4!"
+          variant="game"
+          className="w-full"
         >
-          <CardFace value={flight.card.value} />
+          <CardFace color={flight.card.color} value={flight.card.value} />
         </Card>
       ) : (
-        <Card color="neutral" className="w-full border-4!">
+        <Card color="neutral" variant="game" className="w-full">
           <CardBack />
         </Card>
       )}
@@ -163,11 +182,14 @@ export function CardFlights({ state }: Props) {
     setFlights((current) => current.filter((flight) => flight.id !== id)),
   ).current;
 
-  return (
+  // In <body>: the board may shake (ActionBursts) while the cards fly, and a
+  // moving parent would carry these fixed cards along
+  return createPortal(
     <>
       {flights.map((flight) => (
         <FlyingCard key={flight.id} flight={flight} onDone={remove} />
       ))}
-    </>
+    </>,
+    document.body,
   );
 }

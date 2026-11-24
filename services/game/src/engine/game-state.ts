@@ -6,16 +6,29 @@ import {
   CardColor,
 } from "shared";
 import { createDeck, dealCards, shuffleDeck } from "./deck.js";
-import type { Card, Player } from "shared";
+import type { Card, DrawReason, GameAction, Player } from "shared";
 import { v4 as uuid } from "uuid";
 import { getCardEffect, isValidPlay } from "./rules.js";
 
-export interface InternalGameState extends GameState {
+// Champs de GameState calcules par le gateway au moment de l'envoi (timers,
+// sockets) : ils ne sont pas stockes dans l'etat interne
+export type LiveStateFields =
+  "turnTimeLeftMs" | "pendingWildDraw4" | "unoVulnerable" | "reconnecting";
+
+export interface InternalGameState extends Omit<GameState, LiveStateFields> {
   drawPile: Card[];
+  // Actions pas encore diffusees : elles deviennent lastActions au prochain envoi
+  pendingActions: GameAction[];
+  // Dernier numero d'action attribue dans la partie
+  actionSeq: number;
+  // Interne : sert a enregistrer la vraie duree de la partie (Match.startedAt)
+  startedAt: Date;
   lastWildDraw4?: {
     playerId: string;
     hadMatchingColor: boolean;
     previousColor: CardColor;
+    // Heure limite pour repondre (posee par le gateway avec le timer de bluff)
+    expiresAt?: number;
   };
 }
 
@@ -69,7 +82,48 @@ export function createGame(
     lastWildDraw4: undefined,
     ranking: [],
     winnerId: null,
+    startedAt: new Date(),
+    lastActions: [],
+    pendingActions: [],
+    actionSeq: 0,
   };
+}
+
+// Omit applique a chaque membre de l'union (Omit simple casserait le type par action)
+type DistributiveOmit<T, K extends PropertyKey> = T extends unknown
+  ? Omit<T, K>
+  : never;
+
+// Une action sans son numero : recordAction l'attribue
+export type NewGameAction = DistributiveOmit<GameAction, "seq">;
+
+// Note une action : elle sera envoyee dans lastActions au prochain etat diffuse
+export function recordAction(
+  state: InternalGameState,
+  action: NewGameAction,
+): void {
+  state.actionSeq += 1;
+  state.pendingActions.push({ ...action, seq: state.actionSeq } as GameAction);
+}
+
+// Fait piocher un joueur et note la pioche (avec les cartes, filtrees a l'envoi)
+export function drawAndRecord(
+  state: InternalGameState,
+  playerId: string,
+  count: number,
+  reason: DrawReason,
+  auto = false,
+): Card[] {
+  const cards = drawCardsForPlayer(state, playerId, count);
+  recordAction(state, {
+    type: "cards_drawn",
+    userId: playerId,
+    count: cards.length,
+    reason,
+    cards,
+    ...(auto && { auto: true }),
+  });
+  return cards;
 }
 
 export function playCard(
@@ -81,6 +135,10 @@ export function playCard(
 ): InternalGameState | null {
   // PHASE 1 : tout verifier, sans rien modifier
   if (state.status === GameStatus.FINISHED) return null;
+
+  // Un +4 attend une reponse (accept / challenge) : personne ne joue avant,
+  // sinon la cible esquive la penalite (et un jump-in ecraserait le +4 en attente)
+  if (state.lastWildDraw4) return null;
 
   const player: Player | undefined = getPlayer(state, playerId);
   if (!player || player.disconnected) return null;
@@ -146,12 +204,36 @@ export function playCard(
   state.topCard = playedCard;
   state.discardPile.push(playedCard);
 
+  recordAction(state, {
+    type: "card_played",
+    userId: player.userId,
+    card: playedCard,
+    ...((effect.type === "wild" || effect.type === "wild_draw") && {
+      chosenColor: chosenColor as CardColor,
+    }),
+    ...(isSwap && { targetUserId }),
+    ...(isJumpIn && { jumpIn: true }),
+  });
+
   switch (effect.type) {
     case "none":
-      if (isSwap) {
+      // Derniere carte posee : le joueur a fini, pas d'echange ni de rotation
+      // (sinon il recupererait une main et l'autre joueur resterait a 0 carte)
+      if (player.hand.length === 0) {
+        // rien a faire, la victoire est geree plus bas
+      } else if (isSwap) {
         swapHands(state, player.userId, targetUserId!);
+        recordAction(state, {
+          type: "hands_swapped",
+          userId: player.userId,
+          targetUserId: targetUserId!,
+        });
       } else if (state.settings.sevenZeroRule && playedCard.value === "0") {
         rotateHands(state);
+        recordAction(state, {
+          type: "hands_rotated",
+          direction: state.direction,
+        });
       }
       advanceToNextPlayer(state);
       break;
@@ -171,7 +253,7 @@ export function playCard(
     case "draw":
       if (state.settings.stacking === "none") {
         advanceToNextPlayer(state);
-        drawCardsForCurrentPlayer(state, effect.count);
+        drawForCurrentPlayer(state, effect.count, "draw2");
         advanceToNextPlayer(state);
       } else {
         state.pendingDrawCount += effect.count;
@@ -186,7 +268,13 @@ export function playCard(
       const previousColor = state.currentColor;
       state.currentColor = chosenColor as CardColor;
 
-      if (state.settings.bluffChallenge) {
+      if (state.pendingDrawCount > 0) {
+        // +4 pose sur une pile en cours : il s'ajoute a la pile. Pas de bluff
+        // possible, le coup est autorise par le stacking et non par la couleur
+        // (sinon la pile restait en attente apres l'accept du +4)
+        state.pendingDrawCount += effect.count;
+        advanceToNextPlayer(state);
+      } else if (state.settings.bluffChallenge) {
         // Stocker l'info pour un eventuel challenge, ne pas faire piocher
         state.lastWildDraw4 = {
           playerId: player.userId,
@@ -196,7 +284,7 @@ export function playCard(
         advanceToNextPlayer(state);
       } else if (state.settings.stacking === "none") {
         advanceToNextPlayer(state);
-        drawCardsForCurrentPlayer(state, effect.count);
+        drawForCurrentPlayer(state, effect.count, "wild_draw4");
         advanceToNextPlayer(state);
       } else {
         state.pendingDrawCount += effect.count;
@@ -211,7 +299,7 @@ export function playCard(
   }
 
   if (player.hand.length === 0) {
-    state.ranking.push(player.userId);
+    finishPlayer(state, player.userId);
 
     if (state.mode === GameMode.CLASSIC) {
       state.winnerId = player.userId;
@@ -221,7 +309,7 @@ export function playCard(
       const activePlayers = state.players.filter((p) => !p.disconnected);
       if (activePlayers.length <= 1) {
         if (activePlayers.length === 1) {
-          state.ranking.push(activePlayers[0].userId);
+          finishPlayer(state, activePlayers[0].userId);
         }
         state.winnerId = state.ranking[0];
         state.status = GameStatus.FINISHED;
@@ -273,14 +361,17 @@ function changeDirection(state: InternalGameState): void {
   state.direction = state.direction === 1 ? -1 : 1;
 }
 
+// Pioche brute, sans action notee : utiliser drawAndRecord pour un coup de jeu.
+// Renvoie les cartes reellement piochees (moins si la pioche est vide)
 export function drawCardsForPlayer(
   state: InternalGameState,
   playerId: string,
   count: number,
-): void {
+): Card[] {
   const player = state.players.find((p) => p.userId === playerId);
-  if (!player) return;
+  if (!player) return [];
 
+  const drawn: Card[] = [];
   for (let i = 0; i < count; i++) {
     if (state.drawPile.length === 0) {
       const topCard = state.discardPile.pop()!;
@@ -288,31 +379,53 @@ export function drawCardsForPlayer(
       state.discardPile = [topCard];
     }
     const card = state.drawPile.shift();
-    if (card) player.hand.push(card);
+    if (card) {
+      player.hand.push(card);
+      drawn.push(card);
+    }
   }
 
   state.drawPileCount = state.drawPile.length;
+  return drawn;
 }
 
-function drawCardsForCurrentPlayer(
+function drawForCurrentPlayer(
   state: InternalGameState,
   count: number,
+  reason: DrawReason,
+  auto = false,
 ): void {
   const player = state.players.find((p) => p.isCurrentTurn);
   if (!player) return;
-  drawCardsForPlayer(state, player.userId, count);
+  drawAndRecord(state, player.userId, count, reason, auto);
 }
 
+// Classe le joueur (il a fini, ou il est le dernier en jeu) et le note
+export function finishPlayer(state: InternalGameState, userId: string): void {
+  state.ranking.push(userId);
+  recordAction(state, {
+    type: "player_finished",
+    userId,
+    rank: state.ranking.length,
+  });
+}
+
+// auto : pioche forcee par le chrono du tour (AFK)
 export function drawCard(
   state: InternalGameState,
   playerId: string,
+  auto = false,
 ): InternalGameState | null {
   const player = getPlayer(state, playerId);
   if (!player || player.disconnected) return null;
   if (!player.isCurrentTurn) return null;
+  // Face a un +4 contestable, il faut passer par accept_wild_draw4 ou challenge_bluff
+  if (state.lastWildDraw4) return null;
 
-  const count = state.pendingDrawCount > 0 ? state.pendingDrawCount : 1;
-  drawCardsForCurrentPlayer(state, count);
+  const stacked = state.pendingDrawCount > 0;
+  const count = stacked ? state.pendingDrawCount : 1;
+  const reason: DrawReason = auto ? "afk" : stacked ? "stack" : "voluntary";
+  drawForCurrentPlayer(state, count, reason, auto);
   state.pendingDrawCount = 0;
   advanceToNextPlayer(state);
 

@@ -20,34 +20,34 @@ export function LoginForm() {
       {error && <ErrorAlert message={error} />}
 
       <div className="flex flex-col gap-3">
-        <label className="floating-label">
+        <label className="floating-label w-full flex-col">
           <span>Email</span>
           <input
             type="email"
             placeholder="Email"
             required
-            className="input input-md validator flex-1"
+            className="input input-md validator w-full"
             onChange={(e) => setEmail(e.target.value)}
           />
           <p className="validator-hint">Enter a valid email address</p>
         </label>
-        <label className="floating-label">
+        <label className="floating-label w-full flex-col">
           <span>Password</span>
           <input
             type="password"
             placeholder="Password"
             required
-            className="input input-md validator flex-1"
+            className="input input-md validator w-full"
             onChange={(e) => setPassword(e.target.value)}
           />
           <p className="validator-hint">Enter your password</p>
         </label>
       </div>
-      <div className="flex flex-col gap-3 @xs:flex-row">
+      <div className="flex flex-col gap-3">
         <button
           type="submit"
           disabled={loading}
-          className="btn flex-1 btn-neutral"
+          className="btn flex-1 btn-accent"
         >
           {loading && (
             <span className="loading loading-spinner loading-xs"></span>

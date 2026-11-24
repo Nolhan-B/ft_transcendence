@@ -5,6 +5,13 @@ import {
   GameMode,
   JwtPayload,
 } from "shared";
+import {
+  MAX_PLAYERS,
+  MIN_PLAYERS,
+  ROOM_NAME_MAX_LENGTH,
+  isValidSettings,
+  pickSettings,
+} from "../gateway/utils.js";
 
 export default async function gameRoutes(fastify: FastifyInstance) {
   fastify.post(
@@ -27,7 +34,7 @@ export default async function gameRoutes(fastify: FastifyInstance) {
                 },
               },
             },
-            mode: { type: "string", minLength: 1 },
+            mode: { type: "string", enum: Object.values(GameMode) },
             settings: { type: "object" },
           },
         },
@@ -61,10 +68,14 @@ export default async function gameRoutes(fastify: FastifyInstance) {
         return reply.code(400).send({ error: "Creator must be a participant" });
       }
 
+      if (settings !== undefined && !isValidSettings(settings)) {
+        return reply.code(400).send({ error: "Invalid game settings" });
+      }
+
       const gameId = fastify.gameManager.createGame(
         participants,
         mode,
-        settings,
+        settings && pickSettings(settings),
       );
       return reply.code(201).send({ gameId });
     },
@@ -78,9 +89,17 @@ export default async function gameRoutes(fastify: FastifyInstance) {
           type: "object",
           required: ["name", "mode", "maxPlayers"],
           properties: {
-            name: { type: "string", minLength: 1, maxLength: 50 },
-            mode: { type: "string", minLength: 1 },
-            maxPlayers: { type: "integer", minimum: 2, maximum: 4 },
+            name: {
+              type: "string",
+              minLength: 1,
+              maxLength: ROOM_NAME_MAX_LENGTH,
+            },
+            mode: { type: "string", enum: Object.values(GameMode) },
+            maxPlayers: {
+              type: "integer",
+              minimum: MIN_PLAYERS,
+              maximum: MAX_PLAYERS,
+            },
             password: { type: "string" },
           },
         },
@@ -108,10 +127,10 @@ export default async function gameRoutes(fastify: FastifyInstance) {
         });
       }
 
-      if (maxPlayers < 2 || maxPlayers > 4) {
-        return reply
-          .code(400)
-          .send({ error: "Max players must be between 2 and 4" });
+      if (maxPlayers < MIN_PLAYERS || maxPlayers > MAX_PLAYERS) {
+        return reply.code(400).send({
+          error: `Max players must be between ${MIN_PLAYERS} and ${MAX_PLAYERS}`,
+        });
       }
 
       const roomCode = fastify.roomManager.createRoom(

@@ -1,43 +1,61 @@
+import type { CSSProperties } from "react";
 import { Link } from "react-router-dom";
-import unoLogo from "../../../assets/images/uno-logo.svg";
+import type { CardColor, CardValue } from "shared";
+import { Card } from "../../../components/cards/Card";
+import { CardFace } from "../../../components/game/CardFace";
 import { StartPlayingButton } from "../Components/StartPlayingButton";
+import { BrandLogo } from "../../../components/texts/BrandLogo";
 import { WEBSITE_DESCRIPTION, WEBSITE_NAME } from "../../../constants";
 
-// Decorative cards drifting behind the hero. Purely visual: hidden from
-// assistive tech, and their motion is disabled by prefers-reduced-motion.
-const FLOATING_CARDS = [
+interface FloatingCardItem {
+  color: CardColor;
+  value: CardValue;
+  className: string;
+  rotate: string;
+  delay: string;
+  duration: string;
+}
+
+// Decorative cards drifting behind the hero using the shared Card component.
+// Hidden from assistive tech; motion is disabled by prefers-reduced-motion.
+const FLOATING_CARDS: FloatingCardItem[] = [
   {
-    color: "bg-primary",
-    label: "7",
-    className: "left-[6%] top-[18%] -rotate-12",
+    color: "red",
+    value: "7",
+    className: "left-[5%] top-[16%]",
+    rotate: "-12deg",
     delay: "0s",
     duration: "8s",
   },
   {
-    color: "bg-secondary",
-    label: "3",
-    className: "left-[16%] bottom-[16%] rotate-6",
+    color: "blue",
+    value: "reverse",
+    className: "left-[14%] bottom-[12%]",
+    rotate: "8deg",
     delay: "1.2s",
     duration: "9s",
   },
   {
-    color: "bg-accent",
-    label: "0",
-    className: "right-[8%] top-[14%] rotate-12",
+    color: "yellow",
+    value: "draw2",
+    className: "right-[6%] top-[12%]",
+    rotate: "12deg",
     delay: "0.6s",
     duration: "7.5s",
   },
   {
-    color: "bg-success",
-    label: "9",
-    className: "right-[18%] bottom-[20%] -rotate-6",
+    color: "green",
+    value: "skip",
+    className: "right-[15%] bottom-[14%]",
+    rotate: "-8deg",
     delay: "1.8s",
     duration: "10s",
   },
   {
-    color: "bg-primary",
-    label: "+4",
-    className: "left-[42%] top-[8%] rotate-3",
+    color: "wild",
+    value: "wild_draw4",
+    className: "left-[26%] top-[5%] hidden xl:block",
+    rotate: "4deg",
     delay: "2.4s",
     duration: "11s",
   },
@@ -45,74 +63,65 @@ const FLOATING_CARDS = [
 
 export function HomeHero() {
   return (
-    <section className="hero relative min-h-[calc(100vh-8rem)] overflow-hidden rounded-box border-3 border-base-300 bg-base-200 bg-rays">
-      {/* Colored glows */}
+    <section className="hero relative min-h-[calc(100vh-8rem)] overflow-hidden">
+      {/* Spotlight behind the title */}
       <div
         aria-hidden="true"
-        className="hero-glow pointer-events-none absolute -left-24 top-1/4 size-96 rounded-full bg-primary/25 blur-3xl"
-      />
-      <div
-        aria-hidden="true"
-        className="hero-glow pointer-events-none absolute -right-24 bottom-1/4 size-96 rounded-full bg-secondary/25 blur-3xl [animation-delay:2s]"
-      />
-      <div
-        aria-hidden="true"
-        className="hero-glow pointer-events-none absolute left-1/2 top-0 size-72 -translate-x-1/2 rounded-full bg-accent/20 blur-3xl [animation-delay:4s]"
+        className="hero-glow pointer-events-none absolute top-1/4 left-1/2 size-[36rem] -translate-x-1/2 rounded-full bg-accent/20 blur-3xl"
       />
 
-      {/* Floating cards */}
+      {/* Floating cards using the real Card & CardFace components */}
       <div aria-hidden="true" className="pointer-events-none absolute inset-0">
         {FLOATING_CARDS.map((card) => (
           <div
-            key={`${card.label}-${card.className}`}
-            className={`hero-float absolute grid size-20 place-items-center rounded-xl border-3 border-base-100/40 text-3xl font-black text-white shadow-2xl ${card.color} ${card.className}`}
-            style={{
-              animationDelay: card.delay,
-              animationDuration: card.duration,
-            }}
+            key={`${card.value}-${card.className}`}
+            className={`hero-float absolute w-20 sm:w-28 ${card.className}`}
+            style={
+              {
+                "--card-rotate": card.rotate,
+                "--card-delay": card.delay,
+                animationDuration: card.duration,
+              } as CSSProperties
+            }
           >
-            {card.label}
+            <Card variant="game">
+              <CardFace color={card.color} value={card.value} />
+            </Card>
           </div>
         ))}
       </div>
 
-      <div className="hero-content relative z-10 flex-col gap-8 px-4 py-16 text-center">
-        <img
-          src={unoLogo}
-          alt="UNO"
-          className="h-24 w-auto drop-shadow-[0_0_25px_rgba(255,85,85,0.45)] sm:h-32"
-        />
+      <div className="hero-content relative z-10 flex-col gap-8 px-4 py-14 text-center">
+        <BrandLogo size="xl" className="animate-pop" />
 
-        <div className="max-w-2xl">
-          <p className="mb-3 text-sm font-semibold uppercase tracking-[0.35em] text-accent">
+        <div className="max-w-3xl">
+          <p className="mb-3 text-lg font-semibold tracking-[0.3em] text-white/70 uppercase sm:text-xl">
             {WEBSITE_NAME}
           </p>
-          <h1 className="mb-5 bg-gradient-to-r from-primary via-accent to-secondary bg-clip-text text-5xl font-black leading-tight text-transparent sm:text-7xl">
-            Play. Bluff. Win.
+          <h1 className="text-display mb-5 text-5xl leading-tight sm:text-7xl">
+            Play. <span className="text-accent">Bluff.</span>{" "}
+            <span className="text-success">Win.</span>
           </h1>
-          <p className="mx-auto max-w-xl text-base text-base-content/70 sm:text-lg">
+          <p className="mx-auto max-w-xl text-base text-white/75 sm:text-lg">
             {WEBSITE_DESCRIPTION}
           </p>
         </div>
 
         <div className="flex flex-wrap items-center justify-center gap-4">
           <StartPlayingButton>Play now</StartPlayingButton>
-          <Link to="/rules" className="btn btn-outline btn-lg">
+          <Link to="/rules" className="btn btn-lg">
             How to play
           </Link>
         </div>
 
-        <ul className="mt-4 flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-sm text-base-content/60">
-          <li className="flex items-center gap-2">
-            <span className="size-2 rounded-full bg-success" />
+        <ul className="mt-2 flex flex-wrap items-center justify-center gap-3 text-sm font-semibold">
+          <li className="rounded-full bg-secondary px-4 py-1.5 text-secondary-content">
             Real-time multiplayer
           </li>
-          <li className="flex items-center gap-2">
-            <span className="size-2 rounded-full bg-accent" />
+          <li className="rounded-full bg-accent px-4 py-1.5 text-accent-content">
             Ranked Elo
           </li>
-          <li className="flex items-center gap-2">
-            <span className="size-2 rounded-full bg-primary" />
+          <li className="rounded-full bg-success px-4 py-1.5 text-success-content">
             Friends &amp; chat
           </li>
         </ul>

@@ -9,7 +9,8 @@ interface Props {
   mine: boolean;
 }
 
-// A short pop-up announcing whose turn begins
+// A short pop-up announcing whose turn begins, in a corner of the board
+// (the board must be positioned)
 export function TurnAnnouncement({ playerId, name, mine }: Props) {
   const [visible, setVisible] = useState(false);
 
@@ -23,11 +24,15 @@ export function TurnAnnouncement({ playerId, name, mine }: Props) {
   if (!visible) return null;
 
   return (
-    <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center">
+    // Top-left corner of the board: always free of seats, so the pop-up hides
+    // neither the table nor a player
+    <div className="pointer-events-none absolute left-4 top-4 z-30 compact:left-2 compact:top-2">
       <div
         role="status"
-        className={`alert px-8 py-6 text-2xl font-bold shadow-2xl ${
-          mine ? "alert-warning" : "alert-info"
+        className={`animate-pop rounded-full px-6 py-3 text-2xl font-bold shadow-2xl compact:px-4 compact:py-1.5 compact:text-lg tiny:px-2 tiny:py-1 tiny:text-sm ${
+          mine
+            ? "bg-accent text-accent-content"
+            : "border border-white/15 bg-black/60 text-white backdrop-blur-sm"
         }`}
       >
         {mine ? "Your turn!" : `${name}'s turn`}
