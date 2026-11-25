@@ -5,6 +5,7 @@ import { GameBoard } from "../../components/game/GameBoard";
 import { GameOverDialog } from "../../components/game/GameOverDialog";
 import { useAuth } from "../../hooks/auth/useAuth";
 import { useGame } from "../../hooks/ws/useGame";
+import { RotateDevice } from "../../components/game/RotateDevice";
 
 const FINISHED = "finished" as GameStatus;
 
@@ -88,6 +89,8 @@ export function GamePage() {
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 short:gap-2">
+      {/* Phone held upright: the game asks for landscape */}
+      <RotateDevice />
       {finished && (
         <GameOverDialog
           title={
