@@ -272,9 +272,14 @@ export function GameProvider({ children }: { children: ReactNode }) {
     },
   });
 
-  // A new socket has joined nothing yet
+  // A new socket has joined nothing yet. The server also takes us out of our
+  // room when the socket closes (and deletes it if we were its only human):
+  // keeping it here would show a dead room and send its code in invites
+  // ("Room not found")
   useEffect(() => {
-    if (status !== "open") joinedOn.current = null;
+    if (status === "open") return;
+    joinedOn.current = null;
+    setRoom(null);
   }, [status]);
 
   const createRoom = useCallback(
