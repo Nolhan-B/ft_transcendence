@@ -97,8 +97,59 @@ export function ActionBursts({ state, myId, board }: Props) {
       switch (action.type) {
         case "card_played": {
           const { card } = action;
-          if (card.value === "skip") callout("⊘ Skip!");
-          if (card.value === "reverse") callout("⇄ Reverse!");
+          if (card.value === "skip") {
+            // Blocked player: the next one still at the table after the one
+            // who played (same walk as advanceToNextPlayer on the server)
+            const from = state.players.findIndex(
+              (p) => p.userId === action.userId,
+            );
+            const count = state.players.length;
+            let skipped: string | undefined;
+            for (let step = 1; from !== -1 && step < count; step++) {
+              const p =
+                state.players[
+                  (from + step * state.direction + count * step) % count
+                ];
+              if (!p.disconnected) {
+                skipped = p.userId;
+                break;
+              }
+            }
+            if (skipped) {
+              const mine = skipped === myId;
+              newBlast = {
+                id: counter.current++,
+                ...boardCenter(),
+                big: "⊘",
+                title: "Blocked!",
+                subtitle: mine
+                  ? "You skip your turn!"
+                  : `${name(skipped)} skips a turn`,
+                mine,
+              };
+            } else callout("⊘ Skip!");
+          }
+          if (card.value === "reverse") {
+            // With two players the direction does not change: the one who
+            // played goes again (the server does not flip state.direction)
+            const duo =
+              state.players.filter((p) => !p.disconnected).length === 2;
+            const clockwise = state.direction === 1;
+            newBlast = {
+              id: counter.current++,
+              ...boardCenter(),
+              big: duo ? "⇄" : clockwise ? "↻" : "↺",
+              title: "Reverse!",
+              subtitle: duo
+                ? action.userId === myId
+                  ? "Your turn again!"
+                  : `${name(action.userId)} plays again`
+                : clockwise
+                  ? "Now clockwise"
+                  : "Now counter-clockwise",
+              mine: false,
+            };
+          }
           if (action.chosenColor)
             callout(
               `${name(action.userId)} chose ${action.chosenColor}`,
