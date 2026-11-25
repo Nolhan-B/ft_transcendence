@@ -50,6 +50,10 @@ import { findMatch } from "../engine/matchmaking.js";
 import { computeEloChanges } from "../engine/elo.js";
 
 const ALIVE_CHECK_MS = Number(process.env.ALIVE_CHECK_MS) || 2000;
+// Ping de chaque socket a cet intervalle. Sans trafic, le gateway (nginx,
+// proxy_read_timeout 600s) coupe la connexion : un joueur qui attend dans
+// une room perdait sa room (elle est supprimee a la fermeture du socket)
+const HEARTBEAT_MS = 30_000;
 
 // true si le socket répond encore, false s'il se ferme ou ne répond pas
 function isStillAlive(ws: WebSocket): Promise<boolean> {
@@ -526,6 +530,9 @@ export default async function gameGateway(fastify: FastifyInstance) {
     if (socket.readyState !== WebSocket.OPEN) return;
 
     connectedUser.set(userId, socket);
+    const heartbeat = setInterval(() => {
+      if (socket.readyState === WebSocket.OPEN) socket.ping();
+    }, HEARTBEAT_MS);
 
     const ctx: GatewayContext = {
       fastify,
@@ -642,6 +649,7 @@ export default async function gameGateway(fastify: FastifyInstance) {
     };
 
     socket.on("close", async () => {
+      clearInterval(heartbeat);
       // L'ancien socket peut se fermer après l'arrivée du nouveau :
       // il ne doit pas effacer ce qui appartient au nouveau
       const isCurrent = connectedUser.get(userId) === socket;
