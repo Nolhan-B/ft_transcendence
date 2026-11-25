@@ -39,6 +39,9 @@ NODE_MAJOR = 22
 # Service whose logs "make log" shows: make log SERVICE=auth
 SERVICE ?=
 
+# Make seed default password for generated test users
+PASSWORD = password123
+
 # **************************************************************************** #
 #                                   .PHONY                                     #
 # **************************************************************************** #

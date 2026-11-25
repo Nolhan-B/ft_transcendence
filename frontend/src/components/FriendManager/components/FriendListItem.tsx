@@ -2,6 +2,7 @@ import { ButtonHTMLAttributes, useRef } from "react";
 import defaultProfilePicture from "../../../assets/images/default-profile-picture.png";
 import { useChat } from "../../../hooks/ws/useChat";
 import { Profile } from "shared";
+import { Link } from "react-router-dom";
 
 // Friend list item
 export type FriendListItemProps = {
@@ -67,12 +68,32 @@ export function FriendListItem({
         )}
       </button>
 
+      {/* Profile button */}
+      <Link
+        className="btn btn-ghost btn-sm btn-circle opacity-60 transition-opacity hover:opacity-100"
+        to={"/users/" + uid}
+      >
+        <svg
+          viewBox="0 0 24 24"
+          className="size-4"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" />
+          <path d="M4 20c0-3.3 3.6-6 8-6s8 2.7 8 6" />
+        </svg>
+      </Link>
+
+      {/* Remove button */}
       <button
         type="button"
         className="btn btn-ghost btn-sm btn-circle text-error opacity-60 transition-opacity hover:opacity-100"
         aria-label={`Remove ${name ?? "friend"}`}
         title="Remove friend"
-        // onClick={() => onRemove}
         onClick={openConfirm}
       >
         <svg

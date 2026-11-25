@@ -5,7 +5,7 @@ import { useAuth } from "../../../hooks/auth/useAuth";
 const LINKS = [
   { to: "/home", label: "Home", auth: false },
   { to: "/play", label: "Play", auth: true },
-  { to: "/leaderboard", label: "Leaderboard", auth: false },
+  { to: "/leaderboard", label: "Leaderboard", auth: true },
   { to: "/rules", label: "Rules", auth: false },
 ];
 

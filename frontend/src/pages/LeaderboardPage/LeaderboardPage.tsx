@@ -2,12 +2,18 @@ import { useEffect, useState } from "react";
 import { MainTitle } from "../../components/texts/MainTitle";
 import type { LeaderboardEntry } from "shared";
 import { useAuth } from "../../hooks/auth/useAuth";
+import { useNavigate } from "react-router-dom";
 
 function Leaderboard() {
   const [error, setError] = useState<string>("");
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [myRank, setMyRank] = useState<LeaderboardEntry | null>(null);
   const { user } = useAuth();
+  const navigate = useNavigate();
+
+  if (!user) {
+    navigate("/home");
+  }
 
   async function fetchLeaderboard() {
     const res = await fetch("/api/user/leaderboard?limit=10", {
@@ -71,7 +77,7 @@ function Leaderboard() {
             leaderboard.map((leader, index) => (
               <tr className={user?.id !== leader.id ? "" : "bg-base-200"}>
                 <th>{index + 1}</th>
-                <td>{user?.id !== leader.id ? leader.username : "You"}</td>
+                <td>{leader.username}</td>
                 <td>{leader.elo}</td>
               </tr>
             ))}

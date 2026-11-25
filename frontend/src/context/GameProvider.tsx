@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import type {
   CardColor,
+  ChatMessageEvent,
   CreateRoomPayload,
   GameSettings,
   GameState,
@@ -11,6 +12,7 @@ import type {
 import { useWebSocket } from "../hooks/ws/useWebSocket";
 import { GameContext } from "./GameContext";
 import type { GameContextValue, RefusedGame, UnoEvent } from "./GameContext";
+import { useAuth } from "../hooks/auth/useAuth";
 
 // The server closes the socket after these refusals. "Already connected" is
 // often only a race (page reload, hot reload: the old socket is not closed yet
@@ -52,6 +54,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const [unoEvent, setUnoEvent] = useState<UnoEvent | null>(null);
   const unoEventId = useRef(0);
   const [error, setError] = useState<string | null>(null);
+  const [chatMessages, setChatMessages] = useState<ChatMessageEvent[]>([]);
   const [refusedGame, setRefusedGame] = useState<RefusedGame | null>(null);
   // Game asked with join_game whose first state has not arrived yet: a
   // refusal now is about it (not about an action in a game in progress)
@@ -66,6 +69,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const joinedOn = useRef<string | null>(null);
   // Stored game we are trying to join back after a reload
   const restoring = useRef<string | null>(null);
+
+  const { refresh } = useAuth();
 
   const { status, send } = useWebSocket({
     path: "/api/game/ws",
@@ -105,6 +110,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
           setWinnerId(null);
           setUnoCalls({});
           setUnoEvent(null);
+          setChatMessages([]);
           // The server removes the room when the game starts
           setRoom(null);
           break;
@@ -156,6 +162,13 @@ export function GameProvider({ children }: { children: ReactNode }) {
           setWinnerId(null);
           setUnoCalls({});
           setUnoEvent(null);
+          setChatMessages([]);
+          break;
+        case "chat_message":
+          setChatMessages((prev) => [...prev, event]);
+          break;
+        case "elo_updated":
+          void refresh();
           break;
         case "error":
           // The stored game is over: forget it without bothering the user
@@ -360,7 +373,16 @@ export function GameProvider({ children }: { children: ReactNode }) {
     setTurnStartedAt(null);
     setUnoCalls({});
     setUnoEvent(null);
+    setChatMessages([]);
   }, []);
+
+  const sendChatMessage = useCallback(
+    (content: string) => {
+      if (!gameId) return;
+      send({ type: "chat_message", gameId, content });
+    },
+    [send, gameId],
+  );
 
   const clearError = useCallback(() => setError(null), []);
 
@@ -397,6 +419,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
       acceptWildDraw4,
       catchUno,
       clearGame,
+      chatMessages,
+      sendChatMessage,
     }),
     [
       status,
@@ -430,6 +454,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
       acceptWildDraw4,
       catchUno,
       clearGame,
+      chatMessages,
+      sendChatMessage,
     ],
   );
 
