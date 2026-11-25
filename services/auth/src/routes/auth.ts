@@ -52,7 +52,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
           password,
         );
         const token = fastify.jwt.sign(
-          { id: user.id, email: user.email },
+          { id: user.id },
           { expiresIn: "7d" },
         );
 
@@ -104,7 +104,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
       }
 
       const token = fastify.jwt.sign(
-        { id: user.id, email: user.email },
+        { id: user.id },
         { expiresIn: "7d" },
       );
 

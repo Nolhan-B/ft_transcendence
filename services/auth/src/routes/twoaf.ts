@@ -118,7 +118,7 @@ export default async function twofaRoutes(fastify: FastifyInstance) {
         if (!user) return reply.code(401).send({ error: "Invalid code" });
 
         const token = fastify.jwt.sign(
-          { id: user.id, email: user.email },
+          { id: user.id },
           { expiresIn: "7d" },
         );
 
