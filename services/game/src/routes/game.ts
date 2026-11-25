@@ -175,12 +175,9 @@ export default async function gameRoutes(fastify: FastifyInstance) {
     }));
   });
 
-  fastify.get("/games/history", async (request, reply) => {
-    await request.jwtVerify();
-    const { id } = request.user as JwtPayload;
-
-    const matches = await fastify.prisma.match.findMany({
-      where: { players: { has: id } },
+  const findHistory = (userId: string) =>
+    fastify.prisma.match.findMany({
+      where: { players: { has: userId } },
       orderBy: { endedAt: "desc" },
       select: {
         id: true,
@@ -193,6 +190,30 @@ export default async function gameRoutes(fastify: FastifyInstance) {
       },
     });
 
-    return reply.send(matches);
+  // Historique du joueur connecte
+  fastify.get("/games/history", async (request, reply) => {
+    await request.jwtVerify();
+    const { id } = request.user as JwtPayload;
+    return reply.send(await findHistory(id));
   });
+
+  // Historique d'un autre joueur (page profil d'un ami, etc.). Il faut etre
+  // connecte, mais les parties ne sont pas privees : c'est le meme niveau
+  // d'info que le classement
+  fastify.get<{ Params: { userId: string } }>(
+    "/games/history/:userId",
+    {
+      schema: {
+        params: {
+          type: "object",
+          required: ["userId"],
+          properties: { userId: { type: "string", minLength: 1 } },
+        },
+      },
+    },
+    async (request, reply) => {
+      await request.jwtVerify();
+      return reply.send(await findHistory(request.params.userId));
+    },
+  );
 }

@@ -6,16 +6,21 @@ interface Result {
   error: string | null;
 }
 
-// Finished games of the connected user, newest first. The server only
-// answers for the user of the cookie: there is no history of another player.
-export function useMatchHistory(enabled: boolean) {
+// Finished games of a player, newest first: mine when isOwn, otherwise
+// the ones of userId (a friend's profile...)
+export function useMatchHistory(userId: string | undefined, isOwn: boolean) {
+  const enabled = userId !== undefined;
   const [result, setResult] = useState<Result | null>(null);
 
   useEffect(() => {
-    if (!enabled) return;
+    if (userId === undefined) return;
     let active = true;
+    setResult(null);
 
-    fetch("/api/game/games/history", { credentials: "include" })
+    const url = isOwn
+      ? "/api/game/games/history"
+      : `/api/game/games/history/${encodeURIComponent(userId)}`;
+    fetch(url, { credentials: "include" })
       .then(async (response) => {
         if (!response.ok) throw new Error("Unable to load the game history.");
         const matches: Match[] = await response.json();
@@ -32,7 +37,7 @@ export function useMatchHistory(enabled: boolean) {
     return () => {
       active = false;
     };
-  }, [enabled]);
+  }, [userId, isOwn]);
 
   return {
     matches: result?.matches ?? [],
