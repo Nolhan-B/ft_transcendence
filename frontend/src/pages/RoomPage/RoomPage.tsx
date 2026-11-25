@@ -16,7 +16,7 @@ export function RoomPage() {
     updateSettings,
     addBot,
     removeBot,
-    winnerId
+    winnerId,
   } = useGame();
   const navigate = useNavigate();
 
