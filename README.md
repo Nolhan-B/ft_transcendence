@@ -116,7 +116,8 @@ The first start builds every image, which takes a few minutes. The database sche
 |---|---|
 | `make` / `make all` | `install` and build the images (nothing is started) |
 | `make install` | create what is missing: `.env`, `secrets/`, TLS certificate |
-| `make up` | build and start the whole project in the background |
+| `make up` | build and start the whole project in the background, **in production mode** |
+| `make dev` | same, in development mode (hot reload). Never on a shared machine: it exposes the source code |
 | `make down` / `make clean` | stop the project |
 | `make ps` | state of the containers |
 | `make logs` | follow the logs of every service |
@@ -130,15 +131,13 @@ The first start builds every image, which takes a few minutes. The database sche
 
 ### Development mode
 
-`docker-compose.override.yml` is loaded automatically by `docker compose`. It builds the `dev` target of each image and mounts the sources, so the services reload on save (`tsx watch` for the backend, Vite for the frontend).
+`make up` always runs the **production** build: the frontend is a static Vite build served by Nginx, without source maps or debug tools, and the services run compiled JavaScript.
 
-For a pure production run, ignore the override:
+`make dev` adds `docker-compose.override.yml`: it builds the `dev` target of each image and mounts the sources, so the services reload on save (`tsx watch` for the backend, Vite for the frontend). The Vite dev server exposes the whole source code, so use it only on your own machine.
 
-```bash
-docker compose -f docker-compose.yml up -d --build
-```
+Plain `docker compose up` also loads the override (it is Docker's default), so prefer the Make commands.
 
-If the frontend keeps showing an old style after switching Git branches, restart it with `docker restart ft_transcendence-frontend-1` (Vite cache inside Docker).
+In development mode, if the frontend keeps showing an old style after switching Git branches, restart it keeps showing an old style after switching Git branches, restart it with `docker restart ft_transcendence-frontend-1` (Vite cache inside Docker).
 
 ### Useful URLs
 

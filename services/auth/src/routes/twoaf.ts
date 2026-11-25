@@ -1,10 +1,15 @@
 import { FastifyInstance } from "fastify";
 import * as twofaService from "../services/twoaf.service.js";
+import {
+  consumeChallenge,
+  isReplayedCode,
+  readChallenge,
+  recordFailedCode,
+} from "../services/challenge.service.js";
 import type {
   TwoFactorVerifyPayload,
   TwoFactorValidatePayload,
   TwoFactorDisablePayload,
-  TempTokenPayload,
   JwtPayload,
 } from "shared";
 
@@ -95,27 +100,30 @@ export default async function twofaRoutes(fastify: FastifyInstance) {
     async (request, reply) => {
       const { tempToken, code } = request.body as TwoFactorValidatePayload;
 
-      // Catch expired or malformed temporary tokens cleanly as 401 instead of 500
-      let payload: TempTokenPayload;
-      try {
-        payload = fastify.jwt.verify<TempTokenPayload>(tempToken);
-      } catch {
+      // Jeton de l'etape 2FA seulement : une session ou un jeton deja
+      // utilise sont refuses (audit F-03)
+      const userId = readChallenge(fastify, tempToken);
+      if (!userId) {
         return reply
           .code(401)
           .send({ error: "Invalid or expired temporary token" });
       }
-
-      if (!payload.requires2FA) {
-        return reply.code(401).send({ error: "Invalid token" });
+      // Code deja utilise pour ouvrir une session : pas de rejeu (audit F-24)
+      if (isReplayedCode(userId, code)) {
+        return reply.code(401).send({ error: "Invalid code" });
       }
 
       try {
         const user = await twofaService.validateTwoFactor(
           fastify.prisma,
-          payload.id,
+          userId,
           code,
         );
-        if (!user) return reply.code(401).send({ error: "Invalid code" });
+        if (!user) {
+          recordFailedCode(fastify, tempToken);
+          return reply.code(401).send({ error: "Invalid code" });
+        }
+        consumeChallenge(fastify, tempToken, userId, code);
 
         const token = fastify.jwt.sign({ id: user.id }, { expiresIn: "7d" });
 
