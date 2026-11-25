@@ -34,12 +34,19 @@ ALICE_EMAIL="alice_${SUFFIX}@test.com"
 BOB_EMAIL="bob_${SUFFIX}@test.com"
 BOB_USERNAME="bob_${SUFFIX}"
 
+
+# The session is only in the HttpOnly cookie (audit F-08): read it from the
+# Set-Cookie header saved by curl -D, like a browser would
+cookie_of() {
+  sed -n 's/^[Ss]et-[Cc]ookie: access_token=\([^;]*\).*/\1/p' "$1" | tr -d '\r' | head -n 1
+}
+
 # Signup Alice
-ALICE_RES=$(curl -k -s -X POST "$BASE_URL/api/auth/signup" \
+ALICE_RES=$(curl -k -s -D "$WORKDIR/alice.headers" -X POST "$BASE_URL/api/auth/signup" \
   -H "Content-Type: application/json" \
   -d "{\"email\":\"$ALICE_EMAIL\",\"username\":\"alice_${SUFFIX}\",\"password\":\"test1234\"}")
 
-ALICE_TOKEN=$(node -e "console.log(JSON.parse(process.argv[1]).token || '')" "$ALICE_RES")
+ALICE_TOKEN=$(cookie_of "$WORKDIR/alice.headers")
 ALICE_ID=$(node -e "console.log(JSON.parse(process.argv[1]).user?.id || '')" "$ALICE_RES")
 
 if [ -z "$ALICE_TOKEN" ] || [ -z "$ALICE_ID" ]; then
@@ -49,11 +56,11 @@ fi
 echo "Alice créée (ID: $ALICE_ID)"
 
 # Signup Bob
-BOB_RES=$(curl -k -s -X POST "$BASE_URL/api/auth/signup" \
+BOB_RES=$(curl -k -s -D "$WORKDIR/bob.headers" -X POST "$BASE_URL/api/auth/signup" \
   -H "Content-Type: application/json" \
   -d "{\"email\":\"$BOB_EMAIL\",\"username\":\"$BOB_USERNAME\",\"password\":\"test1234\"}")
 
-BOB_TOKEN=$(node -e "console.log(JSON.parse(process.argv[1]).token || '')" "$BOB_RES")
+BOB_TOKEN=$(cookie_of "$WORKDIR/bob.headers")
 BOB_ID=$(node -e "console.log(JSON.parse(process.argv[1]).user?.id || '')" "$BOB_RES")
 
 if [ -z "$BOB_TOKEN" ] || [ -z "$BOB_ID" ]; then
@@ -128,25 +135,28 @@ echo "Sans authentification : 401"
 # La recherche est sensible à la casse
 echo "Recherche avec une casse différente..."
 UPPER_USERNAME=$(echo "$BOB_USERNAME" | tr '[:lower:]' '[:upper:]')
-CASE_STATUS=$(curl -k -s -o /dev/null -w "%{http_code}" \
+CASE_STATUS=$(curl -k -s -o "$WORKDIR/case.json" -w "%{http_code}" \
   "$BASE_URL/api/user/users/by-username/$UPPER_USERNAME" \
   -H "Authorization: Bearer $ALICE_TOKEN")
+CASE_ID=$(node -e "console.log(JSON.parse(require('fs').readFileSync(process.argv[1])).id || '')" "$WORKDIR/case.json")
 
-if [ "$CASE_STATUS" -ne 404 ]; then
-  echo "La recherche doit être sensible à la casse (code HTTP $CASE_STATUS)"
+# Les pseudos sont uniques sans tenir compte de la casse (audit F-17) :
+# "BOB" trouve "bob"
+if [ "$CASE_STATUS" -ne 200 ] || [ "$CASE_ID" != "$BOB_ID" ]; then
+  echo "La recherche doit ignorer la casse et trouver Bob (code HTTP $CASE_STATUS)"
   exit 1
 fi
-echo "Casse différente : 404"
+echo "Casse différente : Bob trouvé"
 
 echo ""
 echo "=== 4. Activation de la 2FA ==="
 CAROL_EMAIL="carol_${SUFFIX}@test.com"
 
-CAROL_RES=$(curl -k -s -X POST "$BASE_URL/api/auth/signup" \
+CAROL_RES=$(curl -k -s -D "$WORKDIR/carol.headers" -X POST "$BASE_URL/api/auth/signup" \
   -H "Content-Type: application/json" \
   -d "{\"email\":\"$CAROL_EMAIL\",\"username\":\"carol_${SUFFIX}\",\"password\":\"test1234\"}")
 
-CAROL_TOKEN=$(node -e "console.log(JSON.parse(process.argv[1]).token || '')" "$CAROL_RES")
+CAROL_TOKEN=$(cookie_of "$WORKDIR/carol.headers")
 CAROL_ID=$(node -e "console.log(JSON.parse(process.argv[1]).user?.id || '')" "$CAROL_RES")
 
 if [ -z "$CAROL_TOKEN" ] || [ -z "$CAROL_ID" ]; then

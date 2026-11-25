@@ -1,6 +1,13 @@
 import { FastifyInstance } from "fastify";
 import { WebSocket } from "ws";
-import { GameMode, GameStatus, type ServerEvent } from "shared";
+import {
+  isSessionCurrent,
+  GameMode,
+  GameStatus,
+  type ServerEvent,
+  isSameOrigin,
+  createMessageLimiter,
+} from "shared";
 import { RawData } from "ws";
 import { InternalGameState } from "../engine/game-state.js";
 import {
@@ -495,6 +502,16 @@ export default async function gameGateway(fastify: FastifyInstance) {
   fastify.addHook("onClose", async () => clearInterval(matchmakingInterval));
 
   fastify.get("/ws", { websocket: true }, async (socket, request) => {
+    // Handshake from a page of another website: refused (audit F-23)
+    if (!isSameOrigin(request.headers.origin, request.headers.host)) {
+      sendError(socket, "Unauthorized");
+      socket.close();
+      return;
+    }
+    // Flood protection on this socket: bursts of 200 messages, then 50 per
+    // second (audit F-10)
+    const allowMessage = createMessageLimiter(50, 200);
+
     const token = request.cookies.access_token;
     if (!token) {
       sendError(socket, "Unauthorized");
@@ -503,9 +520,11 @@ export default async function gameGateway(fastify: FastifyInstance) {
     }
 
     let userId: string;
+    let tokenVersion: number | undefined;
     try {
-      const payload = fastify.jwt.verify(token) as { id: string };
+      const payload = fastify.jwt.verify(token) as { id: string; v?: number };
       userId = payload.id;
+      tokenVersion = payload.v;
     } catch {
       sendError(socket, "Invalid token");
       socket.close();
@@ -516,6 +535,23 @@ export default async function gameGateway(fastify: FastifyInstance) {
     const pending: RawData[] = [];
     const buffer = (data: RawData) => pending.push(data);
     socket.on("message", buffer);
+
+    // Revoked session (logout, password or 2FA change): refused like an
+    // invalid token (security audit F-07)
+    let current = false;
+    try {
+      current = await isSessionCurrent(fastify.prisma, {
+        id: userId,
+        v: tokenVersion,
+      });
+    } catch (err) {
+      fastify.log.error({ err, userId }, "Session check failed");
+    }
+    if (!current) {
+      sendError(socket, "Invalid token");
+      socket.close();
+      return;
+    }
 
     // Refresh : l'ancien socket est mort ou en train de se fermer → on accepte
     // Deuxième onglet : l'ancien répond au ping → on refuse
@@ -563,6 +599,10 @@ export default async function gameGateway(fastify: FastifyInstance) {
     };
 
     const onMessage = async (data: RawData) => {
+      if (!allowMessage()) {
+        sendError(socket, "Too many messages");
+        return;
+      }
       let parsed: unknown;
       try {
         parsed = JSON.parse(data.toString());

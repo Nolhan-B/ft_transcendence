@@ -19,7 +19,31 @@ const uuidParamSchema = {
 // Usernames: 3 to 20 letters (any language), digits, "_", "." or "-". No
 // spaces, so a name can never be blank or look empty. Same rule in the
 // frontend forms (USERNAME_PATTERN) and in the other service.
-const USERNAME_PATTERN = "^[\\p{L}\\p{N}_.\\-]{3,20}$";
+const USERNAME_PATTERN =
+  "^[\\p{L}\\p{N}][\\p{L}\\p{N}_.\\-]{1,18}[\\p{L}\\p{N}]$";
+
+// Signatures (magic bytes) of the accepted image formats
+async function isImageOfType(filepath: string, ext: string): Promise<boolean> {
+  const handle = await fs.promises.open(filepath, "r");
+  try {
+    const head = Buffer.alloc(12);
+    const { bytesRead } = await handle.read(head, 0, 12, 0);
+    if (bytesRead < 12) return false;
+    const isPng = head
+      .subarray(0, 8)
+      .equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+    const isJpeg = head[0] === 0xff && head[1] === 0xd8 && head[2] === 0xff;
+    const isWebp =
+      head.toString("ascii", 0, 4) === "RIFF" &&
+      head.toString("ascii", 8, 12) === "WEBP";
+    if (ext === ".png") return isPng;
+    if (ext === ".jpg" || ext === ".jpeg") return isJpeg;
+    if (ext === ".webp") return isWebp;
+    return false;
+  } finally {
+    await handle.close();
+  }
+}
 
 export default async function profileRoutes(fastify: FastifyInstance) {
   fastify.get(
@@ -140,6 +164,14 @@ export default async function profileRoutes(fastify: FastifyInstance) {
       if (file.file.truncated) {
         await fs.promises.unlink(filepath).catch(() => {});
         return reply.code(413).send({ error: "File too large" });
+      }
+
+      // The extension proves nothing: an HTML or SVG file renamed .png was
+      // accepted (security audit F-19). The first bytes must be a real PNG,
+      // JPEG or WebP image, of the type the extension announces.
+      if (!(await isImageOfType(filepath, ext))) {
+        await fs.promises.unlink(filepath).catch(() => {});
+        return reply.code(400).send({ error: "Invalid file type" });
       }
 
       const profile = await profileService.updateAvatar(

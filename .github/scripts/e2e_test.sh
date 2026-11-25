@@ -60,7 +60,7 @@ if [ "$INVALID_LOGIN_STATUS" -ne 401 ]; then
 fi
 
 echo "=== 5. Testing Valid User Login (Positive: 200) ==="
-LOGIN_STATUS=$(curl -k -s -o "$WORKDIR/login.json" -w "%{http_code}" -X POST "$BASE_URL/api/auth/login" \
+LOGIN_STATUS=$(curl -k -s -D "$WORKDIR/login.headers" -o "$WORKDIR/login.json" -w "%{http_code}" -X POST "$BASE_URL/api/auth/login" \
   -H "Content-Type: application/json" \
   -d "{\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\"}")
 echo "Login HTTP Status: $LOGIN_STATUS"
@@ -71,7 +71,9 @@ if [ "$LOGIN_STATUS" -ne 200 ]; then
   exit 1
 fi
 
-TOKEN=$(node -e "console.log(JSON.parse(require('fs').readFileSync(process.argv[1])).token)" "$WORKDIR/login.json")
+# The session is only in the HttpOnly cookie (audit F-08): read it from the
+# Set-Cookie header, like a browser would
+TOKEN=$(sed -n 's/^[Ss]et-[Cc]ookie: access_token=\([^;]*\).*/\1/p' "$WORKDIR/login.headers" | tr -d '\r' | head -n 1)
 
 echo "=== 6. Testing Protected Route /me (Positive: 200) ==="
 ME_STATUS=$(curl -k -s -o "$WORKDIR/me.json" -w "%{http_code}" -X GET "$BASE_URL/api/auth/me" \

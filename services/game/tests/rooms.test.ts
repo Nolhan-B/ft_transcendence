@@ -30,8 +30,13 @@ async function post(path: string, body: object, token?: string) {
     signal: AbortSignal.timeout(5000),
   });
   const text = await res.text();
+  // The session is only in the HttpOnly cookie (audit F-08): the tests read
+  // it from Set-Cookie, like a browser, and keep it as "token"
+  const cookie = res.headers.get("set-cookie")?.match(/access_token=([^;]+)/);
   try {
-    return JSON.parse(text);
+    const data = JSON.parse(text);
+    if (cookie && data && typeof data === "object") data.token = cookie[1];
+    return data;
   } catch {
     throw new Error(
       `Invalid JSON on POST ${path} (HTTP ${res.status}): ${text.slice(0, 120)}`,

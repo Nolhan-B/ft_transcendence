@@ -28,12 +28,18 @@ async function post(path: string, body: object, token?: string) {
     headers,
     body: JSON.stringify(body),
   });
-  return res.json();
+  const data = await res.json();
+  // The session is only in the HttpOnly cookie (audit F-08): the tests read
+  // it from Set-Cookie, like a browser, and keep it as "token"
+  const cookie = res.headers.get("set-cookie")?.match(/access_token=([^;]+)/);
+  if (cookie && data && typeof data === "object") data.token = cookie[1];
+  return data;
 }
 
 function createClient(token: string): Promise<{
   ws: WebSocket;
   waitFor: (type: string, timeout?: number) => Promise<any>;
+  latest: (type: string, timeout?: number) => Promise<any>;
   send: (msg: object) => void;
 }> {
   return new Promise((resolve, reject) => {
@@ -60,35 +66,65 @@ function createClient(token: string): Promise<{
     });
 
     ws.on("open", () => {
+      // The newest queued message of this type (older ones dropped), or the
+      // next one. The server may send an extra state with no player action
+      // (end of the UNO window...): reading the oldest one made the test
+      // play on a stale state, out of turn, and wait forever.
+      const latest = async (type: string, timeout = 5000) => {
+        const first = await waitFor(type, timeout);
+        let last = first;
+        for (
+          let i = pending.findIndex((m) => m.type === type);
+          i !== -1;
+          i = pending.findIndex((m) => m.type === type)
+        ) {
+          last = pending[i];
+          pending.splice(i, 1);
+        }
+        return last;
+      };
+      const waitFor = (type: string, timeout = 5000): Promise<any> => {
+        const idx = pending.findIndex((m) => m.type === type);
+        if (idx !== -1) {
+          const msg = pending[idx];
+          pending.splice(idx, 1);
+          return Promise.resolve(msg);
+        }
+        return new Promise((res, rej) => {
+          const timer = setTimeout(() => {
+            const i = waiters.findIndex((w) => w.resolve === res);
+            if (i !== -1) waiters.splice(i, 1);
+            // Say what the server answered instead, if anything
+            const errors = pending
+              .filter((m) => m.type === "error")
+              .map((m) => m.message);
+            rej(
+              new Error(
+                `Timeout waiting for ${type}` +
+                  (errors.length
+                    ? ` (server errors: ${errors.join(", ")})`
+                    : ""),
+              ),
+            );
+          }, timeout);
+          waiters.push({
+            type,
+            resolve: (msg) => {
+              clearTimeout(timer);
+              res(msg);
+            },
+            reject: (err) => {
+              clearTimeout(timer);
+              rej(err);
+            },
+          });
+        });
+      };
       resolve({
         ws,
         send: (msg: object) => ws.send(JSON.stringify(msg)),
-        waitFor: (type: string, timeout = 5000) => {
-          const idx = pending.findIndex((m) => m.type === type);
-          if (idx !== -1) {
-            const msg = pending[idx];
-            pending.splice(idx, 1);
-            return Promise.resolve(msg);
-          }
-          return new Promise((res, rej) => {
-            const timer = setTimeout(() => {
-              const i = waiters.findIndex((w) => w.resolve === res);
-              if (i !== -1) waiters.splice(i, 1);
-              rej(new Error(`Timeout waiting for ${type}`));
-            }, timeout);
-            waiters.push({
-              type,
-              resolve: (msg) => {
-                clearTimeout(timer);
-                res(msg);
-              },
-              reject: (err) => {
-                clearTimeout(timer);
-                rej(err);
-              },
-            });
-          });
-        },
+        waitFor,
+        latest,
       });
     });
 
@@ -165,9 +201,9 @@ async function playFullGame(
       client.send({ type: "draw_card", gameId });
     }
 
-    // Wait for all to get update
+    // Wait for all to get update (the newest state, see latest())
     for (const { client: c, id: cId } of clients) {
-      const msg = await c.waitFor("game_updated");
+      const msg = await c.latest("game_updated");
       states.set(cId, msg.state);
     }
   }

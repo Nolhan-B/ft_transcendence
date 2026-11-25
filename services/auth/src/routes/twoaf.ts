@@ -12,14 +12,7 @@ import type {
   TwoFactorDisablePayload,
   JwtPayload,
 } from "shared";
-
-const COOKIE_OPTIONS = {
-  path: "/",
-  httpOnly: true,
-  secure: true,
-  sameSite: "lax" as const,
-  maxAge: 7 * 24 * 60 * 60,
-};
+import { openSession, revokeSessions } from "../services/session.service.js";
 
 export default async function twofaRoutes(fastify: FastifyInstance) {
   fastify.post("/2fa/enable", async (request, reply) => {
@@ -71,6 +64,10 @@ export default async function twofaRoutes(fastify: FastifyInstance) {
         );
         if (!user) return reply.code(401).send({ error: "Invalid code" });
 
+        // 2FA on: sessions opened without it are revoked, this browser keeps
+        // a fresh one (audit F-07)
+        await revokeSessions(fastify, id);
+        await openSession(fastify, reply, id);
         return reply.send({ message: "2FA enabled", user });
       } catch (err: unknown) {
         const prismaError = err as { code?: string };
@@ -125,11 +122,10 @@ export default async function twofaRoutes(fastify: FastifyInstance) {
         }
         consumeChallenge(fastify, tempToken, userId, code);
 
-        const token = fastify.jwt.sign({ id: user.id }, { expiresIn: "7d" });
+        await openSession(fastify, reply, user.id);
 
-        reply.setCookie("access_token", token, COOKIE_OPTIONS);
-
-        return reply.send({ token, user });
+        // Session in the HttpOnly cookie only, never in the body (audit F-08)
+        return reply.send({ user });
       } catch (err: unknown) {
         const prismaError = err as { code?: string };
         if (prismaError.code === "P2025") {
@@ -173,6 +169,9 @@ export default async function twofaRoutes(fastify: FastifyInstance) {
             .send({ error: "Invalid password or TOTP code" });
         }
 
+        // 2FA off: every other session is revoked (audit F-07)
+        await revokeSessions(fastify, id);
+        await openSession(fastify, reply, id);
         return reply.send({ message: "2FA disabled", user });
       } catch (err: unknown) {
         const prismaError = err as { code?: string };

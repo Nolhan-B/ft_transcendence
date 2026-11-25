@@ -99,6 +99,7 @@ export function ChangePasswordSettings() {
               type="password"
               required
               minLength={8}
+              maxLength={72}
               autoComplete="new-password"
               className="input validator w-full"
               value={newPassword}
@@ -113,6 +114,7 @@ export function ChangePasswordSettings() {
               type="password"
               required
               minLength={8}
+              maxLength={72}
               autoComplete="new-password"
               className="input validator w-full"
               value={confirmPassword}

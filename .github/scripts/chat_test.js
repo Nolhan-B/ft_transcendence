@@ -28,7 +28,12 @@ const createAccount = async (prefix) => {
   if (!res.ok) {
     throw new Error(`Erreur création compte ${prefix}: ${res.statusText}`);
   }
-  return res.json();
+  const data = await res.json();
+  // La session n'est que dans le cookie HttpOnly (audit F-08) : on la lit
+  // dans Set-Cookie, comme un navigateur
+  const cookie = res.headers.get("set-cookie")?.match(/access_token=([^;]+)/);
+  if (!cookie) throw new Error(`Pas de cookie de session pour ${prefix}`);
+  return { ...data, token: cookie[1] };
 };
 
 const withTimeout = (promise, ms = 5000) => {
