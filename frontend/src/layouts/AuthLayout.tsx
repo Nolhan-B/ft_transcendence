@@ -7,7 +7,10 @@ export function AuthLayout() {
     <div className="isolate flex flex-col min-h-screen flex text-base-content">
       {/* Red card table behind every page */}
       <TableBackground />
-      <DebugHeader />
+      {/* Dev-only, like the other layouts: the prod build strips it */}
+      {import.meta.env.DEV && import.meta.env.VITE_DEBUG_HEADER !== "false" && (
+        <DebugHeader />
+      )}
       <Outlet />
     </div>
   );

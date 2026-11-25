@@ -200,7 +200,7 @@ await test("GET /games/rooms lists rooms", async () => {
     { name: "Visible Room", mode: "classic", maxPlayers: 3 },
     aliceToken,
   );
-  const rooms = await get("/game/games/rooms");
+  const rooms = await get("/game/games/rooms", aliceToken);
   assert(Array.isArray(rooms), "Should return array");
   assert(rooms.length > 0, "Should have at least one room");
   const room = rooms.find((r: any) => r.name === "Visible Room");
@@ -221,7 +221,7 @@ await test("GET /games/rooms hides password", async () => {
     },
     aliceToken,
   );
-  const rooms = await get("/game/games/rooms");
+  const rooms = await get("/game/games/rooms", aliceToken);
   const room = rooms.find((r: any) => r.name === "Secret Room");
   assert(room, "Should find secret room");
   assert(room.hasPassword === true, "Should have password flag");
@@ -421,7 +421,7 @@ await test("update_room rejects non-leader", async () => {
       unoCallout: false,
     },
   });
-  const rooms = await get("/game/games/rooms");
+  const rooms = await get("/game/games/rooms", aliceToken);
   const room = rooms.find((r: any) => r.code === res.roomCode);
   assert(room.settings.stacking === "none", "Settings should not change");
   log("Non-leader rejected");
@@ -455,7 +455,7 @@ await test("start_game creates game and broadcasts", async () => {
   log(`Game started: ${aliceStart.gameId}`);
 
   // Room should be gone
-  const rooms = await get("/game/games/rooms");
+  const rooms = await get("/game/games/rooms", aliceToken);
   const room = rooms.find((r: any) => r.code === res.roomCode);
   assert(!room, "Room should be deleted after start");
   log("Room cleaned up");
@@ -548,7 +548,7 @@ await test("last player leaves, room is deleted", async () => {
   aliceClient.send({ type: "leave_room", roomCode: res.roomCode });
   await new Promise((r) => setTimeout(r, 200));
 
-  const rooms = await get("/game/games/rooms");
+  const rooms = await get("/game/games/rooms", aliceToken);
   const room = rooms.find((r: any) => r.code === res.roomCode);
   assert(!room, "Room should be deleted");
   log("Room deleted when empty");
@@ -709,7 +709,7 @@ await test("WebSocket disconnect removes player from room", async () => {
   bobClient.ws.close();
   await new Promise((r) => setTimeout(r, 500));
 
-  const rooms = await get("/game/games/rooms");
+  const rooms = await get("/game/games/rooms", aliceToken);
   const room = rooms.find((r: any) => r.code === res.roomCode);
   assert(room, "Room should still exist");
   assert(room.players.length === 1, "Should have 1 player after disconnect");

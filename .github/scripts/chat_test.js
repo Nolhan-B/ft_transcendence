@@ -47,6 +47,40 @@ const withTimeout = (promise, ms = 5000) => {
     const bob = await createAccount("ci_bob");
     console.log("✅ Comptes de test créés avec succès.");
 
+    // Les messages directs sont reserves aux amis (audit F-11) : Alice et
+    // Bob deviennent amis avant les tests
+    const request = await fetch(`${API_URL}/api/user/friends/request/${bob.user.id}`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${alice.token}` },
+    });
+    assert(request.ok, `Demande d'ami refusee (${request.status})`);
+    const accept = await fetch(`${API_URL}/api/user/friends/accept/${alice.user.id}`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${bob.token}` },
+    });
+    assert(accept.ok, `Acceptation de l'ami refusee (${accept.status})`);
+    console.log("✅ Alice et Bob sont amis.");
+
+    // Un inconnu ne peut pas leur ecrire
+    const carol = await createAccount("ci_carol");
+    await withTimeout(new Promise((resolve, reject) => {
+      const wsCarol = new WebSocket(`${WS_URL}?token=${carol.token}`);
+      wsCarol.addEventListener("open", () => {
+        wsCarol.send(JSON.stringify({
+          type: "direct_message",
+          receiverId: alice.user.id,
+          content: "Hello stranger",
+        }));
+      });
+      wsCarol.addEventListener("message", (event) => {
+        const data = JSON.parse(event.data);
+        wsCarol.close();
+        if (data.type === "error" && /not friends/.test(data.message)) resolve();
+        else reject(new Error(`Message d'un inconnu accepte : ${event.data}`));
+      });
+    }));
+    console.log("✅ Message d'un non-ami refusé.");
+
     // ==========================================
     // TEST 1 : Envoi temps réel & Historique REST
     // ==========================================

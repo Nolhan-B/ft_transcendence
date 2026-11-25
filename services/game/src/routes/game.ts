@@ -146,7 +146,9 @@ export default async function gameRoutes(fastify: FastifyInstance) {
     },
   );
 
-  fastify.get("/games/rooms", async () => {
+  // Lobby: connected users only (security audit F-20)
+  fastify.get("/games/rooms", async (request) => {
+    await request.jwtVerify();
     const rooms = fastify.roomManager.listRooms();
     return rooms.map((r) => ({
       code: r.code,
@@ -162,7 +164,8 @@ export default async function gameRoutes(fastify: FastifyInstance) {
 
   // Parties en cours que l'on peut regarder en spectateur. Aucune carte : juste
   // les joueurs, leur nombre de cartes et a qui c'est le tour
-  fastify.get("/games/live", async () => {
+  fastify.get("/games/live", async (request) => {
+    await request.jwtVerify();
     return fastify.gameManager.listLiveGames().map((game) => ({
       id: game.id,
       mode: game.mode,
