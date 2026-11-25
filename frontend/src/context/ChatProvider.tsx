@@ -132,6 +132,17 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     [send],
   );
 
+  const forgetUser = useCallback((userId: string) => {
+    setFriends((all) => all.filter((f) => f.id !== userId));
+    setFriendRequests((all) => all.filter((f) => f.id !== userId));
+    setUnreadSenders((all) => all.filter((id) => id !== userId));
+    setConversations((all) => {
+      const rest = { ...all };
+      delete rest[userId];
+      return rest;
+    });
+  }, []);
+
   const loadHistory = useCallback(
     async (otherUserId: string) => {
       const response = await fetch(
@@ -161,6 +172,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       error,
       clearError,
       sendMessage,
+      forgetUser,
       loadHistory,
     }),
     [
@@ -174,6 +186,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       error,
       clearError,
       sendMessage,
+      forgetUser,
       loadHistory,
     ],
   );

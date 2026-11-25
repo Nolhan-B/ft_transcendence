@@ -4,6 +4,7 @@ import { ChangePasswordSettings } from "../../components/user/ChangePasswordsSet
 import { TableColorSettings } from "../../components/user/TableColorSettings";
 import { DeleteAccountSettings } from "../../components/user/DeleteAccountSettings";
 import { TwoFactorSettings } from "../../components/user/TwoFactorSettings";
+import { BlockedUsersSettings } from "../../components/user/BlockedUsersSettings";
 
 export function SettingsPage() {
   return (
@@ -13,6 +14,7 @@ export function SettingsPage() {
       <CardSkinSettings />
       <ChangePasswordSettings />
       <TwoFactorSettings />
+      <BlockedUsersSettings />
       <DeleteAccountSettings />
     </div>
   );
