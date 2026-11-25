@@ -7,8 +7,25 @@ import { USERNAME_HINT, USERNAME_PATTERN } from "../../constants";
 
 const FALLBACK_ERROR = "Unable to save the profile.";
 
-// The servers answer { error } or { message } depending on who rejects
+// Same limits as the server (user service and Nginx): checked here first, so
+// a wrong file is refused at once, without sending it
+const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
+const AVATAR_EXTENSIONS = [".png", ".jpg", ".jpeg", ".webp"];
+const TOO_LARGE = "The picture is too large: 5 MB at most.";
+
+// Why this file cannot be an avatar, or null if it can
+function avatarError(file: File): string | null {
+  const name = file.name.toLowerCase();
+  if (!AVATAR_EXTENSIONS.some((ext) => name.endsWith(ext)))
+    return "Only PNG, JPG or WebP pictures.";
+  if (file.size > MAX_AVATAR_BYTES) return TOO_LARGE;
+  return null;
+}
+
+// The servers answer { error } or { message } depending on who rejects. A
+// 413 may come from Nginx, as an HTML page: give its meaning directly.
 async function errorOf(response: Response): Promise<string> {
+  if (response.status === 413) return TOO_LARGE;
   const data = await response.json().catch(() => null);
   return data?.error ?? data?.message ?? FALLBACK_ERROR;
 }
@@ -104,9 +121,21 @@ export function EditProfile({ profile, onSaved }: Props) {
                 type="file"
                 className="file-input w-full"
                 accept=".png,.jpg,.jpeg,.webp"
-                onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+                onChange={(event) => {
+                  const picked = event.target.files?.[0] ?? null;
+                  const problem = picked ? avatarError(picked) : null;
+                  if (problem) {
+                    // Refused here: the field is emptied, nothing is sent
+                    event.target.value = "";
+                    setFile(null);
+                    setError(problem);
+                    return;
+                  }
+                  setError(null);
+                  setFile(picked);
+                }}
               />
-              <p className="label">PNG, JPG or WebP</p>
+              <p className="label">PNG, JPG or WebP, 5 MB at most</p>
             </fieldset>
 
             {error && <ErrorAlert message={error} />}
