@@ -6,6 +6,7 @@ import type {
   CreateRoomPayload,
   GameSettings,
   GameState,
+  PlayerLeftReason,
   RoomInfo,
   ServerEvent,
 } from "shared";
@@ -56,11 +57,26 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessageEvent[]>([]);
   const [refusedGame, setRefusedGame] = useState<RefusedGame | null>(null);
+  const [leftReasons, setLeftReasons] = useState<
+    Record<string, PlayerLeftReason>
+  >({});
   // Game asked with join_game whose first state has not arrived yet: a
   // refusal now is about it (not about an action in a game in progress)
   const joining = useRef<string | null>(null);
   // Game asked with spectate_game, until its first state arrives
   const watching = useRef<string | null>(null);
+  // The game I play, and the game I watch as a spectator. Only the state of
+  // the followed game is shown (the watched one first): the socket may still
+  // get the updates of another game (an old game I was removed from, my own
+  // game while I watch another), and showing them made the screen jump from
+  // one game to the other.
+  const myGame = useRef<string | null>(null);
+  const spectated = useRef<string | null>(null);
+  // The game I really play right now: I am one of its players, not removed,
+  // and it is in progress. When I leave another game (back to the lobby
+  // after being removed, end of spectating), the provider follows this one
+  // again, so "Back to game" and the reconnection keep working.
+  const activeGame = useRef<string | null>(null);
 
   // Consecutive "Already connected" answers (reset once the server accepts us)
   const refusals = useRef(0);
@@ -70,7 +86,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
   // Stored game we are trying to join back after a reload
   const restoring = useRef<string | null>(null);
 
-  const { refresh } = useAuth();
+  const { refresh, user } = useAuth();
+  // My id, for the message handler (it is not rebuilt when the user changes)
+  const myId = useRef<string | undefined>(user?.id);
+  myId.current = user?.id;
 
   const { status, send } = useWebSocket({
     path: "/api/game/ws",
@@ -93,6 +112,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         if (stored && joinedOn.current === null) {
           restoring.current = stored;
           joinedOn.current = stored;
+          myGame.current = stored;
           send({ type: "join_game", gameId: stored });
         }
         return;
@@ -105,21 +125,47 @@ export function GameProvider({ children }: { children: ReactNode }) {
         case "game_started":
           setGameId(event.gameId);
           storeGame(event.gameId);
+          myGame.current = event.gameId;
           // New game: forget the previous one
           setGameState(null);
           setWinnerId(null);
           setUnoCalls({});
           setUnoEvent(null);
           setChatMessages([]);
+          setLeftReasons({});
           // The server removes the room when the game starts
           setRoom(null);
           break;
+        case "player_left":
+          setLeftReasons((reasons) => ({
+            ...reasons,
+            [event.userId]: event.reason,
+          }));
+          break;
+        case "player_joined":
+          // Back in the game: forget why the player had left
+          setLeftReasons((reasons) => {
+            if (!(event.userId in reasons)) return reasons;
+            const rest = { ...reasons };
+            delete rest[event.userId];
+            return rest;
+          });
+          break;
         case "spectate_started":
+          if (spectated.current !== event.state.id) break;
           if (watching.current === event.state.id) watching.current = null;
           setGameState(event.state);
           setTurnStartedAt(Date.now());
           break;
-        case "game_updated":
+        case "game_updated": {
+          // Keep track of the game I really play, even when it is not shown
+          const me = event.state.players.find((p) => p.userId === myId.current);
+          if (me && !me.disconnected && event.state.status === "in_progress")
+            activeGame.current = event.state.id;
+          else if (activeGame.current === event.state.id)
+            activeGame.current = null;
+          // Not the game on screen: ignore it
+          if (event.state.id !== (spectated.current ?? myGame.current)) break;
           if (joining.current === event.state.id) joining.current = null;
           if (restoring.current === event.state.id) {
             restoring.current = null;
@@ -128,6 +174,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
           setGameState(event.state);
           setTurnStartedAt(Date.now());
           break;
+        }
         case "uno_called":
           setUnoCalls((calls) => ({ ...calls, [event.userId]: Date.now() }));
           setUnoEvent({
@@ -158,11 +205,13 @@ export function GameProvider({ children }: { children: ReactNode }) {
           setInQueue(false);
           setGameId(event.gameId);
           storeGame(event.gameId);
+          myGame.current = event.gameId;
           setGameState(null);
           setWinnerId(null);
           setUnoCalls({});
           setUnoEvent(null);
           setChatMessages([]);
+          setLeftReasons({});
           break;
         case "chat_message":
           setChatMessages((prev) => [...prev, event]);
@@ -290,6 +339,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       // Opened from the URL (reload, link): the actions need the game id too
       setGameId(id);
       storeGame(id);
+      myGame.current = id;
       if (joinedOn.current === id) return;
       joinedOn.current = id;
       joining.current = id;
@@ -299,9 +349,25 @@ export function GameProvider({ children }: { children: ReactNode }) {
     [send],
   );
 
+  // Follow again the game I really play, if any (not `leaving`): its state
+  // comes back with join_game, the server also subscribes the socket again
+  const followActiveGame = useCallback(
+    (leaving: string | null) => {
+      const id = activeGame.current;
+      if (!id || id === leaving) return;
+      myGame.current = id;
+      joinedOn.current = id;
+      setGameId(id);
+      storeGame(id);
+      send({ type: "join_game", gameId: id });
+    },
+    [send],
+  );
+
   const spectateGame = useCallback(
     (id: string) => {
       watching.current = id;
+      spectated.current = id;
       setRefusedGame(null);
       setGameState((state) => (state?.id === id ? state : null));
       setWinnerId(null);
@@ -315,12 +381,14 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const leaveSpectate = useCallback(
     (id: string) => {
       watching.current = null;
+      if (spectated.current === id) spectated.current = null;
       send({ type: "leave_spectate", gameId: id });
       // Forget the watched game (not my own game, if I have one)
       setGameState((state) => (state?.id === id ? null : state));
       setWinnerId(null);
+      followActiveGame(id);
     },
-    [send],
+    [send, followActiveGame],
   );
 
   const playCard = useCallback(
@@ -365,6 +433,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
   );
 
   const clearGame = useCallback(() => {
+    const leaving = myGame.current;
+    myGame.current = null;
     setGameId(null);
     setRefusedGame(null);
     storeGame(null);
@@ -374,7 +444,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
     setUnoCalls({});
     setUnoEvent(null);
     setChatMessages([]);
-  }, []);
+    setLeftReasons({});
+    // Leaving a game I was removed from: back to the one I still play
+    followActiveGame(leaving);
+  }, [followActiveGame]);
 
   const sendChatMessage = useCallback(
     (content: string) => {
@@ -398,6 +471,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       unoEvent,
       inQueue,
       refusedGame,
+      leftReasons,
       error,
       clearError,
       createRoom,
@@ -433,6 +507,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       unoEvent,
       inQueue,
       refusedGame,
+      leftReasons,
       error,
       clearError,
       createRoom,

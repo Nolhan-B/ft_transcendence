@@ -1,3 +1,4 @@
+import { createPortal } from "react-dom";
 import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 import { useCountdown } from "../../hooks/game/useCountdown";
@@ -27,7 +28,9 @@ export function GameOverDialog({ title, onLeave }: Props) {
     if (left === 0) onLeave();
   }, [left, onLeave]);
 
-  return (
+  // In <body>, like the game effects (CardFlights, ActionBursts): inside the
+  // game layout (isolate) the pop-up was drawn under them
+  return createPortal(
     <dialog className="modal modal-open">
       {/* Confetti falling over the whole screen */}
       <div
@@ -70,6 +73,7 @@ export function GameOverDialog({ title, onLeave }: Props) {
           </button>
         </div>
       </div>
-    </dialog>
+    </dialog>,
+    document.body,
   );
 }

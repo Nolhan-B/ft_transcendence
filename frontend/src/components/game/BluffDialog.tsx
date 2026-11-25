@@ -1,3 +1,4 @@
+import { createPortal } from "react-dom";
 import { useState } from "react";
 import type { CSSProperties } from "react";
 import type { GameState } from "shared";
@@ -48,7 +49,9 @@ export function BluffDialog({ state, myId, onChallenge, onAccept }: Props) {
     else onAccept();
   }
 
-  return (
+  // In <body>, like the game effects (CardFlights, ActionBursts): inside the
+  // game layout (isolate) the pop-up was drawn under them
+  return createPortal(
     <dialog className="modal modal-open" aria-labelledby="bluff-title">
       <div className="modal-box animate-pop max-w-md text-center">
         <div className="mx-auto w-24 -rotate-6" aria-hidden="true">
@@ -105,6 +108,7 @@ export function BluffDialog({ state, myId, onChallenge, onAccept }: Props) {
           </button>
         </div>
       </div>
-    </dialog>
+    </dialog>,
+    document.body,
   );
 }

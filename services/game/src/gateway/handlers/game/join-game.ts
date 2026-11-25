@@ -1,5 +1,6 @@
 import { GatewayContext } from "../../types.js";
 import { filterStateForPlayer } from "../../utils.js";
+import { leaveOtherGames } from "./leave-other-games.js";
 
 export async function handleJoinGame(
   ctx: GatewayContext,
@@ -22,10 +23,19 @@ export async function handleJoinGame(
     ctx.disconnectTimers.delete(key);
   }
 
+  // Plus d'etats d'une autre partie sur ce socket (ancienne partie, spectateur)
+  leaveOtherGames(ctx, msg.gameId);
+
   if (!ctx.rooms.has(msg.gameId)) {
     ctx.rooms.set(msg.gameId, new Set());
   }
-  ctx.rooms.get(msg.gameId)!.add({ socket: ctx.socket, userId: ctx.userId });
+  // Un meme socket peut renvoyer join_game (retour sur sa partie apres une
+  // autre) : une seule entree, sinon chaque evenement arriverait en double
+  const clients = ctx.rooms.get(msg.gameId)!;
+  for (const client of clients) {
+    if (client.socket === ctx.socket) clients.delete(client);
+  }
+  clients.add({ socket: ctx.socket, userId: ctx.userId });
 
   ctx.broadCastToRoom(
     msg.gameId,
