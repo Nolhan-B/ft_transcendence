@@ -28,8 +28,10 @@ interface Props {
   fullRounded?: boolean;
 }
 
-// Round avatar with a white edge: the picture, or the first letter of the
-// username on a UNO color when the user has no picture
+// Avatar: the picture, or the first letter of the username on a UNO color
+// when the user has no picture. Round with a white edge, or a rounded square
+// with fullRounded={false} (same shape with or without a picture, so it fits
+// the frame drawn around it)
 export function UserAvatar({
   username,
   avatarUrl,
@@ -37,13 +39,16 @@ export function UserAvatar({
   fullRounded = true,
 }: Props) {
   const { box, letter } = SIZES[size];
+  // Round: white edge. Rounded square: no edge, the frame around it (header
+  // menu) already outlines it
+  const shape = fullRounded
+    ? "rounded-full border-2 border-white"
+    : "rounded-[30%]";
 
   if (avatarUrl) {
     return (
       <div className="avatar">
-        <div
-          className={`${fullRounded ? "rounded-full" : "rounded-[30%]"} border-2 border-white ${box}`}
-        >
+        <div className={`${shape} ${box}`}>
           <img src={avatarUrl} alt={`Avatar of ${username}`} />
         </div>
       </div>
@@ -52,9 +57,7 @@ export function UserAvatar({
 
   return (
     <div className="avatar avatar-placeholder">
-      <div
-        className={`rounded-full border-2 border-white ${colorOf(username)} ${box}`}
-      >
+      <div className={`${shape} ${colorOf(username)} ${box}`}>
         <span className={`font-bold ${letter}`}>
           {username.charAt(0).toUpperCase()}
         </span>
