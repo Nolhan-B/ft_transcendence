@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { GameStatus } from "shared";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { GameBoard } from "../../components/game/GameBoard";
@@ -6,14 +6,24 @@ import { GameOverDialog } from "../../components/game/GameOverDialog";
 import { useAuth } from "../../hooks/auth/useAuth";
 import { useGame } from "../../hooks/ws/useGame";
 import { RotateDevice } from "../../components/game/RotateDevice";
+import { OutOfGameScreen } from "../../components/game/OutOfGameScreen";
 
 const FINISHED = "finished" as GameStatus;
 
 export function GamePage() {
   const { id } = useParams();
   const { user } = useAuth();
-  const { gameState, winnerId, status, refusedGame, joinGame, clearGame } =
-    useGame();
+  const {
+    gameState,
+    winnerId,
+    status,
+    refusedGame,
+    leftReasons,
+    joinGame,
+    clearGame,
+  } = useGame();
+  // Out of the game, I chose to watch the end: the screen stays closed
+  const [watching, setWatching] = useState<string | null>(null);
   const navigate = useNavigate();
   // The game to join once per connection (StrictMode runs effects twice)
   const joined = useRef<string | null>(null);
@@ -36,6 +46,27 @@ export function GamePage() {
 
   const state = gameState?.id === id ? gameState : null;
   const finished = !!state && (winnerId !== null || state.status === FINISHED);
+
+  // Leaving the page (navbar, link, browser back...) while this game is no
+  // longer mine (I was removed, or it is over): release it, so the provider
+  // goes back to the game I still play, if any. Refs: the cleanup must see
+  // the last values, and must only run when the page goes away.
+  const released =
+    !!state &&
+    (finished ||
+      (state.players.find((player) => player.userId === user?.id)
+        ?.disconnected ??
+        false));
+  const releasedRef = useRef(released);
+  releasedRef.current = released;
+  const clearGameRef = useRef(clearGame);
+  clearGameRef.current = clearGame;
+  useEffect(
+    () => () => {
+      if (releasedRef.current) clearGameRef.current();
+    },
+    [id],
+  );
   const winner = state?.players.find(
     (player) => player.userId === (winnerId ?? state.winnerId),
   );
@@ -87,6 +118,11 @@ export function GamePage() {
     );
   }
 
+  // Out of the game while it goes on: removed (AFK, away too long) or done
+  // in ranked. I can leave or watch the end, but can no longer play.
+  const me = state.players.find((player) => player.userId === user.id);
+  const outOfGame = !finished && (me?.disconnected ?? false);
+
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 short:gap-2">
       {/* Phone held upright: the game asks for landscape */}
@@ -101,7 +137,17 @@ export function GamePage() {
           onLeave={backToLobby}
         />
       )}
-      <GameBoard state={state} myId={user.id} />
+      {outOfGame && watching !== state.id && (
+        <OutOfGameScreen
+          state={state}
+          myId={user.id}
+          reason={leftReasons[user.id]}
+          onWatch={() => setWatching(state.id)}
+          onLeave={backToLobby}
+        />
+      )}
+      {/* Out of the game: the board only shows, like for a spectator */}
+      <GameBoard state={state} myId={user.id} spectator={outOfGame} />
     </div>
   );
 }

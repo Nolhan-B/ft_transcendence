@@ -1,3 +1,4 @@
+import { createPortal } from "react-dom";
 import type { ReactNode } from "react";
 
 interface Props {
@@ -9,7 +10,9 @@ interface Props {
 
 // A modal opened by the parent (open prop): used to ask a color or a target
 export function ChoiceDialog({ open, title, onClose, children }: Props) {
-  return (
+  // In <body>, like the game effects (CardFlights, ActionBursts): inside the
+  // game layout (isolate) the pop-up was drawn under them
+  return createPortal(
     <dialog className={`modal ${open ? "modal-open" : ""}`}>
       <div className="modal-box animate-pop">
         <h3 className="text-display text-center text-2xl">{title}</h3>
@@ -21,6 +24,7 @@ export function ChoiceDialog({ open, title, onClose, children }: Props) {
         </div>
       </div>
       <div className="modal-backdrop" onClick={onClose} />
-    </dialog>
+    </dialog>,
+    document.body,
   );
 }

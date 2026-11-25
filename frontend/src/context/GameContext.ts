@@ -5,6 +5,7 @@ import type {
   CreateRoomPayload,
   GameSettings,
   GameState,
+  PlayerLeftReason,
   RoomInfo,
 } from "shared";
 import type { Status } from "../hooks/ws/useWebSocket";
@@ -45,6 +46,9 @@ export interface GameContextValue {
   inQueue: boolean;
   // Set when join_game is refused (the game page shows it instead of the board)
   refusedGame: RefusedGame | null;
+  // Why each player left the current game (player_left), by user id:
+  // "disconnected" (may come back), "afk" or "abandoned" (removed)
+  leftReasons: Record<string, PlayerLeftReason>;
   error: string | null;
   clearError: () => void;
   createRoom: (payload: CreateRoomPayload) => void;

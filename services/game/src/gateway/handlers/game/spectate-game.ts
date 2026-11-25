@@ -1,6 +1,7 @@
 import { GameStatus } from "shared";
 import { GatewayContext } from "../../types.js";
 import { filterStateForSpectator } from "../../utils.js";
+import { leaveOtherGames } from "./leave-other-games.js";
 
 export function handleSpectateGame(
   ctx: GatewayContext,
@@ -17,6 +18,9 @@ export function handleSpectateGame(
     ctx.sendError(ctx.socket, "You are a player in this game");
     return;
   }
+
+  // Plus d'etats d'une autre partie sur ce socket (ancienne partie, spectateur)
+  leaveOtherGames(ctx, msg.gameId);
 
   if (!ctx.spectators.has(msg.gameId)) {
     ctx.spectators.set(msg.gameId, new Set());
