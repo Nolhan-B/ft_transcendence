@@ -119,13 +119,13 @@ export function HomeHero() {
         </div>
 
         <ul className="mt-2 flex flex-wrap items-center justify-center gap-3 text-sm font-semibold">
-          <li className="rounded-full bg-secondary px-4 py-1.5 text-secondary-content">
+          <li className="rounded-full border-2 bg-secondary px-4 py-1.5 text-secondary-content">
             Real-time multiplayer
           </li>
-          <li className="rounded-full bg-accent px-4 py-1.5 text-accent-content">
+          <li className="rounded-full border-2 bg-accent px-4 py-1.5 text-accent-content">
             Ranked Elo
           </li>
-          <li className="rounded-full bg-success px-4 py-1.5 text-success-content">
+          <li className="rounded-full border-2 bg-success px-4 py-1.5 text-success-content">
             Friends &amp; chat
           </li>
         </ul>
