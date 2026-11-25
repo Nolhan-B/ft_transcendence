@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { FriendManager } from "../FriendManager/FriendManager";
 import FriendChat from "../FriendManager/components/FriendChat";
 import { Profile } from "shared";
@@ -27,6 +28,17 @@ export function SideButton() {
     .join(", ");
 
   function closeMenu() {
+    setOpen(false);
+    setCurrentOpenedFriendChat(null);
+  }
+
+  // Going to another page (a friend's profile...) closes the drawer and the
+  // chat. Done while rendering, not in an effect: no frame with the drawer
+  // still open over the new page
+  const { pathname } = useLocation();
+  const [lastPathname, setLastPathname] = useState(pathname);
+  if (pathname !== lastPathname) {
+    setLastPathname(pathname);
     setOpen(false);
     setCurrentOpenedFriendChat(null);
   }
