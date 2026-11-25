@@ -16,11 +16,13 @@ export function RoomPage() {
     updateSettings,
     addBot,
     removeBot,
+    winnerId,
   } = useGame();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (gameId) navigate(`/games/${gameId}`);
+    const finished = winnerId !== null;
+    if (gameId && !finished) navigate(`/games/${gameId}`);
     // No room (page reloaded, room closed): back to the lobby
     else if (!room) navigate("/play");
   }, [gameId, room, navigate]);

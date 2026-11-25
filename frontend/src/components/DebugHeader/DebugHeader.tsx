@@ -60,8 +60,28 @@ const DEBUG_ROUTES: { path: string; title: string; access: string }[] = [
 const SEED_USERS = ["alice", "bob", "charlie"];
 
 const MAX_EVENTS = 50;
+const MAX_ISSUES = 50;
 
-type Section = "routes" | "events" | "friends" | "actions" | "state";
+type Section = "routes" | "errors" | "events" | "friends" | "actions" | "state";
+
+// An error caught while the page runs: console.error/warn, a window error, an
+// unhandled rejection, or an answer of the API that is not ok.
+type Issue = {
+  id: number;
+  kind: "error" | "warn" | "http";
+  message: string;
+  at: string;
+  // Where it comes from when the browser gives it (window.onerror, fetch)
+  source?: string;
+  // Full detail, shown when the issue is opened
+  detail?: string;
+};
+
+const ISSUE_CLASS: Record<Issue["kind"], string> = {
+  error: "text-error",
+  warn: "text-warning",
+  http: "text-error",
+};
 
 type WsEvent = {
   id: number;
@@ -103,6 +123,29 @@ function short(value: string, max = 120): string {
 
 function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : "failed";
+}
+
+// Turn the arguments of console.error/warn into one line + a detail block.
+// Strings stay as they are, the rest goes through JSON when it can.
+function describeArgs(args: unknown[]): { message: string; detail: string } {
+  const text = (value: unknown): string => {
+    if (typeof value === "string") return value;
+    if (value instanceof Error) return `${value.name}: ${value.message}`;
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return String(value);
+    }
+  };
+  const lines = args.map(text);
+  return {
+    message: short(lines.join(" "), 200),
+    detail: args
+      .map((value) =>
+        value instanceof Error && value.stack ? value.stack : text(value),
+      )
+      .join("\n"),
+  };
 }
 
 // ============================================================
@@ -147,10 +190,117 @@ function SectionPanel({ children }: { children: ReactNode }) {
 // 4. HOOKS
 // ============================================================
 
+// Everything that goes wrong while the page runs, without keeping the browser
+// console open: console.error/warn, window errors, unhandled rejections, and
+// failed API answers (wrapped in useWsEventLog below). The console itself is
+// untouched: the original method is called right after, devtools keep working.
+function useErrorLog() {
+  const [issues, setIssues] = useState<Issue[]>([]);
+  const nextIssueId = useRef(0);
+
+  const push = useCallback(
+    (kind: Issue["kind"], issue: Omit<Issue, "id" | "kind" | "at">) => {
+      setIssues((all) =>
+        [
+          {
+            id: nextIssueId.current++,
+            kind,
+            at: new Date().toLocaleTimeString(),
+            ...issue,
+          },
+          ...all,
+        ].slice(0, MAX_ISSUES),
+      );
+    },
+    [],
+  );
+
+  useEffect(() => {
+    const originalError = console.error;
+    const originalWarn = console.warn;
+
+    console.error = (...args: unknown[]) => {
+      const { message, detail } = describeArgs(args);
+      push("error", { message, detail });
+      originalError.apply(console, args);
+    };
+    console.warn = (...args: unknown[]) => {
+      const { message, detail } = describeArgs(args);
+      push("warn", { message, detail });
+      originalWarn.apply(console, args);
+    };
+
+    function onError(event: ErrorEvent) {
+      // Cross-origin scripts give "Script error." with no useful detail
+      push("error", {
+        message: event.message || "window error",
+        source: event.filename
+          ? `${event.filename}:${event.lineno}:${event.colno}`
+          : undefined,
+        detail: event.error instanceof Error ? event.error.stack : undefined,
+      });
+    }
+    function onRejection(event: PromiseRejectionEvent) {
+      const reason: unknown = event.reason;
+      push("error", {
+        message:
+          reason instanceof Error
+            ? `Unhandled rejection: ${reason.message}`
+            : `Unhandled rejection: ${short(String(reason))}`,
+        detail: reason instanceof Error ? reason.stack : undefined,
+      });
+    }
+
+    window.addEventListener("error", onError);
+    window.addEventListener("unhandledrejection", onRejection);
+    return () => {
+      console.error = originalError;
+      console.warn = originalWarn;
+      window.removeEventListener("error", onError);
+      window.removeEventListener("unhandledrejection", onRejection);
+    };
+  }, [push]);
+
+  return { issues, clearIssues: () => setIssues([]), log: push };
+}
+
+// Wraps window.fetch to record the answers that are not ok (4xx/5xx), the
+// usual silent failure of this app. Network failures land in the "error" log
+// above, through the unhandled rejection of the caller.
+function useFetchErrorLog(
+  log: (kind: Issue["kind"], issue: Omit<Issue, "id" | "kind" | "at">) => void,
+) {
+  useEffect(() => {
+    const original = window.fetch;
+    window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+      const response = await original(input, init);
+      if (!response.ok) {
+        const url =
+          typeof input === "string"
+            ? input
+            : input instanceof URL
+              ? input.href
+              : input.url;
+        log("http", {
+          message: `${init?.method ?? "GET"} ${url} → HTTP ${response.status}`,
+          source: "fetch",
+          detail: response.statusText || undefined,
+        });
+      }
+      return response;
+    };
+    return () => {
+      window.fetch = original;
+    };
+  }, [log]);
+}
+
 // The sockets live in a ref inside useWebSocket, which this file must not
 // touch. In dev we wrap window.WebSocket to observe them instead. Only
 // "/api/" sockets are recorded, so Vite's HMR socket stays out of the log.
-function useWsEventLog() {
+function useWsEventLog(
+  log: (kind: Issue["kind"], issue: Omit<Issue, "id" | "kind" | "at">) => void,
+) {
   const [events, setEvents] = useState<WsEvent[]>([]);
   const socketsRef = useRef<TrackedSocket[]>([]);
   const nextEventId = useRef(0);
@@ -169,6 +319,30 @@ function useWsEventLog() {
     [],
   );
 
+  // An answer of the game/chat server with type "error" is logged like the
+  // console ones: it is the usual reason a screen stays empty.
+  const incoming = useCallback(
+    (url: string, payload: string) => {
+      if (!payload.includes('"error"')) return;
+      try {
+        const message = JSON.parse(payload) as {
+          type?: string;
+          message?: string;
+        };
+        if (message.type === "error") {
+          log("error", {
+            message: `ws error: ${message.message ?? payload}`,
+            source: url,
+            detail: payload,
+          });
+        }
+      } catch {
+        // not JSON: nothing to report here
+      }
+    },
+    [log],
+  );
+
   useEffect(() => {
     const Original = window.WebSocket;
     const sockets = socketsRef.current;
@@ -183,7 +357,9 @@ function useWsEventLog() {
       if (href.includes("/api/")) {
         sockets.push({ url: href, socket });
         socket.addEventListener("message", (event) => {
-          pushEvent("in", href, String(event.data));
+          const payload = String(event.data);
+          pushEvent("in", href, payload);
+          incoming(href, payload);
         });
         const send = socket.send.bind(socket);
         socket.send = (data: Parameters<WebSocket["send"]>[0]) => {
@@ -208,7 +384,7 @@ function useWsEventLog() {
       window.WebSocket = Original;
       socketsRef.current = [];
     };
-  }, [pushEvent]);
+  }, [pushEvent, incoming]);
 
   return {
     events,
@@ -310,6 +486,66 @@ function RoutesSection({
           );
         })}
       </div>
+    </SectionPanel>
+  );
+}
+
+// The errors caught while the page runs, newest first. A line is red (error,
+// failed HTTP) or orange (warning); clicking it shows the stack or the payload.
+function ErrorsSection({
+  issues,
+  clearIssues,
+}: {
+  issues: Issue[];
+  clearIssues: () => void;
+}) {
+  const [opened, setOpened] = useState<number | null>(null);
+  return (
+    <SectionPanel>
+      <div className="flex items-center gap-2">
+        <span className="opacity-60">
+          errors and warnings (last {MAX_ISSUES})
+        </span>
+        <button type="button" className="btn btn-xs" onClick={clearIssues}>
+          clear
+        </button>
+      </div>
+      {issues.length === 0 ? (
+        <p className="opacity-60">nothing went wrong yet</p>
+      ) : (
+        <ul className="max-h-56 overflow-y-auto font-mono">
+          {issues.map((issue) => (
+            <li key={issue.id}>
+              <button
+                type="button"
+                className="flex w-full gap-2 text-left hover:bg-base-300"
+                aria-expanded={opened === issue.id}
+                onClick={() =>
+                  setOpened((id) => (id === issue.id ? null : issue.id))
+                }
+              >
+                <span className="opacity-50">{issue.at}</span>
+                <span className={`font-bold ${ISSUE_CLASS[issue.kind]}`}>
+                  {issue.kind}
+                </span>
+                <span className={`truncate ${ISSUE_CLASS[issue.kind]}`}>
+                  {issue.message}
+                </span>
+                {issue.source && (
+                  <span className="ml-auto shrink-0 opacity-40">
+                    {short(issue.source, 40)}
+                  </span>
+                )}
+              </button>
+              {opened === issue.id && issue.detail && (
+                <pre className="mt-1 mb-2 max-h-40 overflow-auto whitespace-pre-wrap text-[10px] opacity-70">
+                  {issue.detail}
+                </pre>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
     </SectionPanel>
   );
 }
@@ -600,13 +836,16 @@ export function DebugHeader() {
   // Each section opens independently: several can be expanded at once.
   const [openSections, setOpenSections] = useState<Record<Section, boolean>>({
     routes: false,
+    errors: false,
     events: false,
     friends: false,
     actions: false,
     state: false,
   });
 
-  const { events, clearEvents, socketsRef } = useWsEventLog();
+  const { issues, clearIssues, log } = useErrorLog();
+  useFetchErrorLog(log);
+  const { events, clearEvents, socketsRef } = useWsEventLog(log);
   const viewport = useViewport();
   const renders = useRenderCount();
 
@@ -716,6 +955,21 @@ export function DebugHeader() {
         </button>
 
         {sectionButton("routes", "routes")}
+        <button
+          type="button"
+          className={`btn btn-xs ${
+            openSections.errors
+              ? "btn-primary"
+              : issues.length > 0
+                ? "btn-error"
+                : ""
+          }`}
+          aria-expanded={openSections.errors}
+          onClick={() => toggleSection("errors")}
+        >
+          {issues.length > 0 ? `errors (${issues.length})` : "errors"}{" "}
+          {openSections.errors ? "▴" : "▾"}
+        </button>
         {sectionButton(
           "events",
           events.length > 0 ? `events (${events.length})` : "events",
@@ -796,6 +1050,9 @@ export function DebugHeader() {
           goTo={goTo}
           currentPath={currentRoute?.path}
         />
+      )}
+      {openSections.errors && (
+        <ErrorsSection issues={issues} clearIssues={clearIssues} />
       )}
       {openSections.events && (
         <EventsSection events={events} clearEvents={clearEvents} />
