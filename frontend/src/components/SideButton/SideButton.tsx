@@ -31,6 +31,18 @@ export function SideButton() {
     setCurrentOpenedFriendChat(null);
   }
 
+  // The page under the drawer must not scroll while it is open (the wheel
+  // over the title, the input or a short chat would scroll it)
+  useEffect(() => {
+    if (!open) return;
+    const root = document.documentElement;
+    const previous = root.style.overflow;
+    root.style.overflow = "hidden";
+    return () => {
+      root.style.overflow = previous;
+    };
+  }, [open]);
+
   // Escape closes the chat first, then the drawer
   useEffect(() => {
     if (!open) return;

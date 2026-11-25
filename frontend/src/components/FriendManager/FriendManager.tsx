@@ -110,7 +110,7 @@ export function FriendManager({
         )}
       </div>
       <div className="divider"></div>
-      <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
+      <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto overscroll-contain">
         Your friends
         {error ? (
           <p className="text-error text-sm">Could not load friends: {error}</p>

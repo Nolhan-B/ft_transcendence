@@ -39,7 +39,7 @@ export default function FriendChat({ profile }: FriendChatProps) {
     <div className="flex min-h-0 flex-1 flex-col gap-3">
       <div
         ref={bottomRef}
-        className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto"
+        className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain"
       >
         {chatHistory.length === 0 && (
           <p className="my-auto text-center text-sm opacity-50">
