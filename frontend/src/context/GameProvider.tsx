@@ -440,6 +440,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const clearGame = useCallback(() => {
     const leaving = myGame.current;
     myGame.current = null;
+    joinedOn.current = null;
     setGameId(null);
     setRefusedGame(null);
     storeGame(null);
