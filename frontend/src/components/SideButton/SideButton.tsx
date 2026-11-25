@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useLocation } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { FriendManager } from "../FriendManager/FriendManager";
 import FriendChat from "../FriendManager/components/FriendChat";
 import { Profile } from "shared";
@@ -141,6 +141,29 @@ export function SideButton() {
               currentOpenedFriendChat={currentOpenedFriendChat}
             />
           </div>
+          {/* Blocked users leave the friends list: this is the way back to
+              them (to unblock). Closes the drawer itself: already on the
+              settings page, the page does not change */}
+          <Link
+            to="/settings#blocked-users"
+            onClick={closeMenu}
+            tabIndex={open ? 0 : -1}
+            className="mt-3 flex shrink-0 items-center gap-2 self-start rounded-box px-2 py-1 text-xs font-semibold opacity-60 transition-opacity hover:opacity-100"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              className="size-3.5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              aria-hidden="true"
+            >
+              <circle cx="12" cy="12" r="9" />
+              <path d="M5.6 5.6l12.8 12.8" />
+            </svg>
+            Blocked users
+          </Link>
         </aside>
       </div>
     </>
