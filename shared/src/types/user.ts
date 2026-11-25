@@ -45,9 +45,10 @@ export interface TempTokenPayload {
   requires2FA: true;
 }
 
+// Only the id: a JWT is readable by anyone who has it (base64, not
+// encrypted), so nothing personal goes in it
 export interface JwtPayload {
   id: string;
-  email: string;
 }
 
 export interface UpdateProfilePayload {

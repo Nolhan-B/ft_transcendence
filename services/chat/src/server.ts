@@ -133,7 +133,7 @@ fastify.register(async function (fastify) {
 
     let userId: string;
     try {
-      const decoded = fastify.jwt.verify<{ id: string; email: string }>(token);
+      const decoded = fastify.jwt.verify<{ id: string }>(token);
       userId = decoded.id;
     } catch (err) {
       fastify.log.warn({ err }, "WS connection rejected: invalid token");

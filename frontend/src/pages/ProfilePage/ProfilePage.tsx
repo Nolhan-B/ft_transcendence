@@ -13,9 +13,8 @@ export function ProfilePage() {
   const { user } = useAuth();
   const id = paramId ?? user?.id;
   const { profile, loading, error, reload } = useProfile(id);
-  // The server only gives the history of the connected user
   const isOwn = id !== undefined && id === user?.id;
-  const history = useMatchHistory(isOwn);
+  const history = useMatchHistory(id, isOwn);
 
   if (loading) {
     return (
@@ -96,21 +95,17 @@ export function ProfilePage() {
         </div>
       </div>
 
-      {isOwn && (
+      {history.loading ? (
+        <div className="skeleton h-40 w-full" />
+      ) : history.error ? (
+        <div role="alert" className="alert alert-error">
+          <span>{history.error}</span>
+        </div>
+      ) : (
         <>
-          {history.loading ? (
-            <div className="skeleton h-40 w-full" />
-          ) : history.error ? (
-            <div role="alert" className="alert alert-error">
-              <span>{history.error}</span>
-            </div>
-          ) : (
-            <>
-              <MatchStats matches={history.matches} userId={profile.id} />
-              <h2 className="text-2xl font-bold">Game history</h2>
-              <MatchHistory matches={history.matches} userId={profile.id} />
-            </>
-          )}
+          <MatchStats matches={history.matches} userId={profile.id} />
+          <h2 className="text-2xl font-bold">Game history</h2>
+          <MatchHistory matches={history.matches} userId={profile.id} />
         </>
       )}
     </div>

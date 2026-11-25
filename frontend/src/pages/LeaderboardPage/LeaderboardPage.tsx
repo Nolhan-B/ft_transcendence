@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { MainTitle } from "../../components/texts/MainTitle";
 import type { LeaderboardEntry } from "shared";
 import { useAuth } from "../../hooks/auth/useAuth";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 function Leaderboard() {
   const [error, setError] = useState<string>("");
@@ -75,16 +75,30 @@ function Leaderboard() {
           {/* row 1 */}
           {!error &&
             leaderboard.map((leader, index) => (
-              <tr className={user?.id !== leader.id ? "" : "bg-base-200"}>
+              <tr
+                key={leader.id}
+                className={user?.id !== leader.id ? "" : "bg-base-200"}
+              >
                 <th>{index + 1}</th>
-                <td>{leader.username}</td>
+                <td>
+                  <Link
+                    to={`/users/${leader.id}`}
+                    className="link link-hover font-semibold"
+                  >
+                    {leader.username}
+                  </Link>
+                </td>
                 <td>{leader.elo}</td>
               </tr>
             ))}
           {myRank && myRank.rank > 10 && (
             <tr className="bg-base-200">
               <th>{myRank.rank}</th>
-              <td>You</td>
+              <td>
+                <Link to="/profile" className="link link-hover font-semibold">
+                  You
+                </Link>
+              </td>
               <td>{myRank.elo}</td>
             </tr>
           )}
