@@ -203,4 +203,70 @@ export default async function friendsRoutes(fastify: FastifyInstance) {
       }
     },
   );
+
+  ////// Blocking
+
+  fastify.get("/blocks", async (request, reply) => {
+    await request.jwtVerify();
+    const { id } = request.user as JwtPayload;
+    const blocked = await friendsService.getBlockedUsers(fastify.prisma, id);
+    return reply.send({ blocked });
+  });
+
+  fastify.post(
+    "/blocks/:id",
+    { schema: uuidParamSchema },
+    async (request, reply) => {
+      await request.jwtVerify();
+      const { id: userId } = request.user as JwtPayload;
+      const { id: targetId } = request.params as { id: string };
+
+      try {
+        const done = await friendsService.blockUser(
+          fastify.prisma,
+          userId,
+          targetId,
+        );
+        if (!done)
+          return reply.code(400).send({ error: "You cannot block yourself" });
+
+        // The blocked user loses me from their friends list (and from their
+        // pending requests) right away. They are not told why.
+        await notifyChatUser(fastify, targetId, {
+          type: "friend_removed",
+          userId,
+        });
+        return reply.send({ message: "User blocked" });
+      } catch (err: unknown) {
+        const prismaError = err as { code?: string };
+        if (prismaError.code === "P2003") {
+          return reply.code(404).send({ error: "Target user not found" });
+        }
+        if (prismaError.code === "P2002" || prismaError.code === "P2034") {
+          // Two blocks at the same time: the other one won, same result
+          return reply.send({ message: "User blocked" });
+        }
+        request.log.error(err);
+        return reply.code(500).send({ error: "Internal server error" });
+      }
+    },
+  );
+
+  fastify.delete(
+    "/blocks/:id",
+    { schema: uuidParamSchema },
+    async (request, reply) => {
+      await request.jwtVerify();
+      const { id: userId } = request.user as JwtPayload;
+      const { id: targetId } = request.params as { id: string };
+
+      const done = await friendsService.unblockUser(
+        fastify.prisma,
+        userId,
+        targetId,
+      );
+      if (!done) return reply.code(404).send({ error: "User is not blocked" });
+      return reply.send({ message: "User unblocked" });
+    },
+  );
 }

@@ -132,6 +132,32 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     [send],
   );
 
+  const sendGameInvite = useCallback(
+    (receiverId: string, roomCode: string) => {
+      setError(null);
+      send({
+        type: "direct_message",
+        receiverId,
+        // Readable as is where invites are not rendered (old clients...)
+        content: `Join my UNO room #${roomCode}!`,
+        messageType: "game_invite",
+        gameRoomId: roomCode,
+      });
+    },
+    [send],
+  );
+
+  const forgetUser = useCallback((userId: string) => {
+    setFriends((all) => all.filter((f) => f.id !== userId));
+    setFriendRequests((all) => all.filter((f) => f.id !== userId));
+    setUnreadSenders((all) => all.filter((id) => id !== userId));
+    setConversations((all) => {
+      const rest = { ...all };
+      delete rest[userId];
+      return rest;
+    });
+  }, []);
+
   const loadHistory = useCallback(
     async (otherUserId: string) => {
       const response = await fetch(
@@ -161,6 +187,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       error,
       clearError,
       sendMessage,
+      sendGameInvite,
+      forgetUser,
       loadHistory,
     }),
     [
@@ -174,6 +202,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       error,
       clearError,
       sendMessage,
+      sendGameInvite,
+      forgetUser,
       loadHistory,
     ],
   );

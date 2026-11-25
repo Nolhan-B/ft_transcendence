@@ -2,6 +2,7 @@ import { Link, useParams } from "react-router-dom";
 import { UserAvatar } from "../../components/user/UserAvatar";
 import { useAuth } from "../../hooks/auth/useAuth";
 import { EditProfile } from "../../components/user/EditProfile";
+import { BlockUserButton } from "../../components/user/BlockUserButton";
 import { MatchHistory } from "../../components/user/MatchHistory";
 import { MatchStats } from "../../components/user/MatchStats";
 import { useMatchHistory } from "../../hooks/game/useMatchHistory";
@@ -83,6 +84,12 @@ export function ProfilePage() {
           {isOwn && (
             <div className="ml-auto self-start">
               <EditProfile profile={profile} onSaved={reload} />
+            </div>
+          )}
+          {/* Someone else's profile, while connected */}
+          {!isOwn && user && (
+            <div className="ml-auto self-start">
+              <BlockUserButton profile={profile} />
             </div>
           )}
         </div>

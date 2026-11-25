@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { FriendManager } from "../FriendManager/FriendManager";
 import FriendChat from "../FriendManager/components/FriendChat";
 import { Profile } from "shared";
@@ -14,13 +15,45 @@ export function SideButton() {
   const isMobile = useIsMobile();
   const chatReplacesDrawer = isMobile && currentOpenedFriendChat !== null;
   const { friendRequests, unreadSenders } = useChat();
-  const showNotification =
-    friendRequests.length !== 0 || unreadSenders.length !== 0;
+  const notificationCount = friendRequests.length + unreadSenders.length;
+  // Read by screen readers instead of the badge
+  const notificationLabel = [
+    "Friends",
+    friendRequests.length > 0 &&
+      `${friendRequests.length} friend ${friendRequests.length === 1 ? "request" : "requests"}`,
+    unreadSenders.length > 0 &&
+      `unread messages from ${unreadSenders.length} ${unreadSenders.length === 1 ? "friend" : "friends"}`,
+  ]
+    .filter(Boolean)
+    .join(", ");
 
   function closeMenu() {
     setOpen(false);
     setCurrentOpenedFriendChat(null);
   }
+
+  // Going to another page (a friend's profile...) closes the drawer and the
+  // chat. Done while rendering, not in an effect: no frame with the drawer
+  // still open over the new page
+  const { pathname } = useLocation();
+  const [lastPathname, setLastPathname] = useState(pathname);
+  if (pathname !== lastPathname) {
+    setLastPathname(pathname);
+    setOpen(false);
+    setCurrentOpenedFriendChat(null);
+  }
+
+  // The page under the drawer must not scroll while it is open (the wheel
+  // over the title, the input or a short chat would scroll it)
+  useEffect(() => {
+    if (!open) return;
+    const root = document.documentElement;
+    const previous = root.style.overflow;
+    root.style.overflow = "hidden";
+    return () => {
+      root.style.overflow = previous;
+    };
+  }, [open]);
 
   // Escape closes the chat first, then the drawer
   useEffect(() => {
@@ -39,17 +72,22 @@ export function SideButton() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        aria-label="Open menu"
+        aria-label={notificationLabel}
         aria-expanded={open}
-        className={
-          !showNotification
-            ? "btn btn-secondary font-cyber fixed right-0 top-1/2 z-20 h-auto -translate-y-1/2 rounded-r-none px-2 py-4 text-xs font-bold uppercase tracking-wider [writing-mode:vertical-rl]"
-            : "btn btn-warning font-cyber fixed right-0 top-1/2 z-20 h-auto -translate-y-1/2 rounded-r-none px-2 py-4 text-xs font-bold uppercase tracking-wider [writing-mode:vertical-rl]"
-        }
+        className="btn btn-secondary font-cyber fixed right-0 top-1/2 z-20 h-auto -translate-y-1/2 overflow-visible rounded-r-none px-2 py-4 text-xs font-bold uppercase tracking-wider [writing-mode:vertical-rl]"
       >
-        <div className="flex gap-1 items-center">
-          Friends {showNotification ? "(!)" : ""}
-        </div>
+        Friends
+        {/* Number of things waiting: friend requests + friends with unread
+            messages. The key replays the pop each time the number grows */}
+        {notificationCount > 0 && (
+          <span
+            key={notificationCount}
+            aria-hidden="true"
+            className="animate-pop absolute -top-2 -left-2 grid h-5 min-w-5 place-items-center rounded-full border-2 border-base-100 bg-primary px-1 font-sans text-[0.7rem] leading-none text-primary-content shadow-[0_0_10px_var(--color-primary)] [writing-mode:horizontal-tb]"
+          >
+            {notificationCount > 9 ? "9+" : notificationCount}
+          </span>
+        )}
       </button>
 
       <div

@@ -14,6 +14,11 @@ export interface ChatContextValue {
   error: string | null;
   clearError: () => void;
   sendMessage: (receiverId: string, content: string) => void;
+  // A message holding the code of a game room, shown with a "Join" button
+  sendGameInvite: (receiverId: string, roomCode: string) => void;
+  // Removes a user from my friends, requests, unread list and chats (after
+  // I blocked them)
+  forgetUser: (userId: string) => void;
   loadHistory: (otherUserId: string) => Promise<void>;
 }
 
