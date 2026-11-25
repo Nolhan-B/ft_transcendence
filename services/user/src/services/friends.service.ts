@@ -133,6 +133,75 @@ export async function deleteFriendRequest(
   return deleted.count > 0;
 }
 
+////// Blocking
+
+// Users I blocked (not the ones who blocked me: that stays private)
+export async function getBlockedUsers(
+  prisma: PrismaClient,
+  userId: string,
+): Promise<Profile[]> {
+  const results = await prisma.blockedFriendship.findMany({
+    where: { blockerId: userId },
+    orderBy: { createdAt: "desc" },
+    include: {
+      blocked: {
+        select: {
+          id: true,
+          username: true,
+          avatarUrl: true,
+          createdAt: true,
+          elo: true,
+        },
+      },
+    },
+  });
+  return results.map((b) => mapToProfile(b.blocked));
+}
+
+// Blocks targetId. Also ends the friendship or the pending request between
+// the two, in either direction (the existing checks refuse new ones while
+// the block lasts). Returns false for self-blocking. Blocking someone
+// already blocked is fine (nothing changes). Throws P2003 if targetId
+// does not exist.
+export async function blockUser(
+  prisma: PrismaClient,
+  userId: string,
+  targetId: string,
+): Promise<boolean> {
+  if (!userId || !targetId || userId === targetId) return false;
+
+  await prisma.$transaction([
+    prisma.blockedFriendship.upsert({
+      where: {
+        blockerId_blockedId: { blockerId: userId, blockedId: targetId },
+      },
+      create: { blockerId: userId, blockedId: targetId },
+      update: {},
+    }),
+    prisma.friendship.deleteMany({
+      where: {
+        OR: [
+          { userId, friendId: targetId },
+          { userId: targetId, friendId: userId },
+        ],
+      },
+    }),
+  ]);
+  return true;
+}
+
+// Returns false if targetId was not blocked by userId
+export async function unblockUser(
+  prisma: PrismaClient,
+  userId: string,
+  targetId: string,
+): Promise<boolean> {
+  const deleted = await prisma.blockedFriendship.deleteMany({
+    where: { blockerId: userId, blockedId: targetId },
+  });
+  return deleted.count > 0;
+}
+
 ////// Helper functions
 
 async function getSent(
