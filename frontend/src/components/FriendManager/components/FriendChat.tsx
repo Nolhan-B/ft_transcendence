@@ -137,7 +137,9 @@ export default function FriendChat({ profile }: FriendChatProps) {
                 onJoin={() => join(message.gameRoomId)}
               />
             ) : (
-              <div className="chat-bubble text-sm">{message.content}</div>
+              <div className="chat-bubble text-sm whitespace-pre-wrap wrap-anywhere">
+                {message.content}
+              </div>
             )}
           </div>
         ))}

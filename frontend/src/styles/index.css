@@ -185,28 +185,63 @@ body {
 /* Buttons: chunky, they sink when pressed (a darker "edge" under them) */
 @layer components {
   .btn:not(.btn-ghost):not(.btn-link):not(.btn-outline):not(.btn-soft) {
-    --btn-shadow: 0 4px 0
+    --btn-edge: 0 4px 0
       color-mix(in oklab, var(--btn-color, var(--color-base-200)) 55%, black);
-    box-shadow: var(--btn-shadow);
     border-color: transparent;
+  }
+  /* The "edge" is a pseudo-element so it does not move with the button
+     (otherwise it leaves the cursor and the hover flickers on the border).
+     Radio/checkbox buttons keep their ::after: daisyUI paints the label in it. */
+  .btn:not(.btn-ghost):not(.btn-link):not(.btn-outline):not(.btn-soft):not(
+      :is([type="checkbox"], [type="radio"])
+    )::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    box-shadow: var(--btn-edge);
+    transition: box-shadow 0.12s;
   }
   .btn:not(.btn-ghost):not(.btn-link):not(.btn-outline):not(
       .btn-soft
     ):active:not(:disabled) {
     translate: 0 3px;
+  }
+  .btn:not(.btn-ghost):not(.btn-link):not(.btn-outline):not(
+      .btn-soft
+    ):active:not(:disabled):not(:is([type="checkbox"], [type="radio"]))::after {
     box-shadow: 0 1px 0
       color-mix(in oklab, var(--btn-color, var(--color-base-200)) 55%, black);
   }
   .btn {
+    position: relative;
+    isolation: isolate;
     font-weight: 600;
     transition:
       translate 0.12s,
-      box-shadow 0.12s,
       background-color 0.2s;
   }
   .btn:hover:not(:disabled):not(:active) {
     translate: 0 -2px;
   }
+}
+
+/* Disabled buttons stay grey even with a "bg-*" utility (those utilities win
+   over daisyUI's own disabled rule). Unlayered on purpose: it beats every
+   layer, and it only ever targets a disabled button. */
+.btn:disabled:not(.btn-ghost):not(.btn-link) {
+  background-color: color-mix(
+    in oklab,
+    var(--color-base-content) 10%,
+    transparent
+  );
+  color: color-mix(in oklch, var(--color-base-content) 20%, transparent);
+  border-color: transparent;
+  cursor: not-allowed;
+}
+.btn:disabled::after {
+  box-shadow: none;
 }
 
 /* ------------------------------------------------------------------ */

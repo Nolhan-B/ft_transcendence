@@ -25,17 +25,25 @@ interface Props {
   username: string;
   avatarUrl?: string | null;
   size?: AvatarSize;
+  fullRounded?: boolean;
 }
 
 // Round avatar with a white edge: the picture, or the first letter of the
 // username on a UNO color when the user has no picture
-export function UserAvatar({ username, avatarUrl, size = "md" }: Props) {
+export function UserAvatar({
+  username,
+  avatarUrl,
+  size = "md",
+  fullRounded = true,
+}: Props) {
   const { box, letter } = SIZES[size];
 
   if (avatarUrl) {
     return (
       <div className="avatar">
-        <div className={`rounded-full border-2 border-white ${box}`}>
+        <div
+          className={`${fullRounded ? "rounded-full" : "rounded-[30%]"} border-2 border-white ${box}`}
+        >
           <img src={avatarUrl} alt={`Avatar of ${username}`} />
         </div>
       </div>

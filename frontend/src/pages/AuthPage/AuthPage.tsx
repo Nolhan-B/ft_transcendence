@@ -98,14 +98,14 @@ export function AuthPage() {
           </div>
 
           <ul className="flex flex-wrap items-center justify-center gap-2 text-xs font-semibold lg:text-sm">
-            <li className="rounded-full bg-secondary px-3 py-1 text-secondary-content">
+            <li className="rounded-full border-2 bg-secondary px-4 py-1.5 text-secondary-content">
               Real-time multiplayer
             </li>
-            <li className="rounded-full bg-accent px-3 py-1 text-accent-content">
+            <li className="rounded-full border-2 bg-accent px-4 py-1.5 text-accent-content">
               Ranked Elo
             </li>
-            <li className="rounded-full bg-success px-3 py-1 text-success-content">
-              Friends & chat
+            <li className="rounded-full border-2 bg-success px-4 py-1.5 text-success-content">
+              Friends &amp; chat
             </li>
           </ul>
         </div>

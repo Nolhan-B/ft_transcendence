@@ -52,6 +52,7 @@ export function UserMenu() {
             username={user.username}
             avatarUrl={user.avatarUrl}
             size="sm"
+            fullRounded={false}
           />
         </span>
         <span className="font-cyber hidden max-w-32 truncate text-sm font-bold tracking-wide sm:inline">
