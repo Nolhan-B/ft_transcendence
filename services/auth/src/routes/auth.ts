@@ -6,6 +6,7 @@ import type {
   TwoFactorRequiredResponse,
   JwtPayload,
 } from "shared";
+import { signChallenge } from "../services/challenge.service.js";
 
 const COOKIE_OPTIONS = {
   path: "/",
@@ -90,10 +91,8 @@ export default async function authRoutes(fastify: FastifyInstance) {
       if (!user) return reply.code(401).send({ error: "Invalid credentials" });
 
       if (user.twoFactorSecretEnabled) {
-        const tempToken = fastify.jwt.sign(
-          { id: user.id, requires2FA: true },
-          { expiresIn: "10m" },
-        );
+        // Jeton de l'etape 2FA : refuse partout ailleurs (audit F-03)
+        const tempToken = signChallenge(fastify, user.id);
         return reply.send({
           requiresTwoFactor: true,
           tempToken,

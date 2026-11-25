@@ -19,7 +19,11 @@ ECHO    := echo -e
 #                                  VARIABLES                                   #
 # **************************************************************************** #
 
-COMPOSE  = docker compose
+# Production by default: `-f docker-compose.yml` alone stops docker compose
+# from loading docker-compose.override.yml (Vite dev server, tsx watch). The
+# dev server must never be what the gateway serves (security audit F-02).
+COMPOSE     = docker compose -f docker-compose.yml
+COMPOSE_DEV = docker compose -f docker-compose.yml -f docker-compose.override.yml
 
 # Database identifiers used by `make seed`; keep in sync with .env
 DB_USER ?= transcendence_user
@@ -46,7 +50,7 @@ PASSWORD = password123
 #                                   .PHONY                                     #
 # **************************************************************************** #
 
-.PHONY: all install build up down logs log ps clean fclean re lint lint-fix test seed seed-leaderboard help
+.PHONY: all install build up dev down logs log ps clean fclean re lint lint-fix test seed seed-leaderboard help
 
 .DEFAULT_GOAL := all
 
@@ -61,7 +65,8 @@ help:
 	$(ECHO) "  $(CYAN)make$(RESET) / $(CYAN)make all$(RESET)   install (.env, secrets, certificate) and build the images (nothing is started)"
 	$(ECHO) "  $(CYAN)make install$(RESET)        create what is missing: .env, secrets and TLS certificate (nothing is overwritten)"
 	$(ECHO) "  $(CYAN)make build$(RESET)          build the Docker images"
-	$(ECHO) "  $(CYAN)make up$(RESET)             build and start the whole project in the background"
+	$(ECHO) "  $(CYAN)make up$(RESET)             build and start the whole project in the background (production)"
+	$(ECHO) "  $(CYAN)make dev$(RESET)            same, in development mode (hot reload; never on a shared machine)"
 	$(ECHO) "  $(CYAN)make down$(RESET)           stop the project"
 	$(ECHO) "  $(CYAN)make logs$(RESET)           follow the logs of all the services"
 	$(ECHO) "  $(CYAN)make log SERVICE=<name>$(RESET) follow the logs of one service (auth, user, chat, game, frontend, gateway...)"
@@ -115,6 +120,12 @@ build: install
 up: install
 	$(COMPOSE) up -d --build
 	$(ECHO) "$(GREEN)✓ Application : https://localhost:$$(sed -n 's/^HTTPS_PORT=//p' .env | tail -n 1 | grep . || echo 8443)$(RESET)"
+
+# Development: hot reload (Vite dev server, tsx watch), sources mounted.
+# Never on a shared machine: it exposes the source code (audit F-02)
+dev: install
+	$(COMPOSE_DEV) up -d --build
+	$(ECHO) "$(YELLOW)⚠ Mode développement (hot reload) : jamais sur une machine partagée$(RESET)"
 
 down:
 	$(COMPOSE) down

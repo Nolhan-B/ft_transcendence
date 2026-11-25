@@ -8,6 +8,7 @@ import twofaRoutes from "./routes/twoaf.js";
 import fs from "node:fs";
 import process from "node:process";
 import { setupMetrics } from "shared";
+import { initChallengeKey } from "./services/challenge.service.js";
 
 if (fs.existsSync("/run/secrets/db_url")) {
   process.env.DATABASE_URL = fs
@@ -19,6 +20,8 @@ let jwtSecret = process.env.JWT_SECRET ?? "dev-secret";
 if (fs.existsSync("/run/secrets/jwt_secret")) {
   jwtSecret = fs.readFileSync("/run/secrets/jwt_secret", "utf-8").trim();
 }
+// Cle distincte pour le jeton de l'etape 2FA (audit F-03)
+initChallengeKey(jwtSecret);
 
 const app = Fastify({ logger: true });
 

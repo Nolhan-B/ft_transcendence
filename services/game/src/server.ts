@@ -82,7 +82,18 @@ fastify.register(jwt, {
 });
 
 fastify.register(prismaPlugin);
-fastify.register(websocket);
+// Trames bornees : les messages du jeu font quelques centaines d'octets
+// (audit F-22)
+fastify.register(websocket, { options: { maxPayload: 16 * 1024 } });
+
+// Derniere ligne de defense : une erreur oubliee est journalisee au lieu
+// d'arreter le service et toutes les parties en cours (audit F-01)
+process.on("unhandledRejection", (reason) => {
+  fastify.log.error({ reason }, "Unhandled promise rejection");
+});
+process.on("uncaughtException", (err) => {
+  fastify.log.error({ err }, "Uncaught exception");
+});
 fastify.register(gameManager);
 fastify.register(roomManager);
 fastify.register(queueManager);

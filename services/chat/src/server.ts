@@ -77,7 +77,8 @@ fastify.register(jwt, {
     signed: false,
   },
 });
-fastify.register(websocket);
+// Trames bornees : un message fait 2000 caracteres au plus (audit F-22)
+fastify.register(websocket, { options: { maxPayload: 16 * 1024 } });
 fastify.register(prismaPlugin);
 fastify.register(messageHistoryRoutes);
 
@@ -193,8 +194,22 @@ fastify.register(async function (fastify) {
       }
     })();
 
-    socket.on("message", async (rawMessage: Buffer) => {
-      let parsed: Record<string, unknown>;
+    socket.on("message", (rawMessage: Buffer) => {
+      // Filet de securite : aucune erreur d'un message ne doit tuer le service
+      handleMessage(rawMessage).catch((err) => {
+        fastify.log.error({ err, userId }, "Chat message handler failed");
+        if (socket.readyState === 1)
+          socket.send(
+            JSON.stringify({
+              type: "error",
+              message: "Failed to send message",
+            }),
+          );
+      });
+    });
+
+    async function handleMessage(rawMessage: Buffer): Promise<void> {
+      let parsed: unknown;
       try {
         parsed = JSON.parse(rawMessage.toString());
       } catch {
@@ -204,7 +219,21 @@ fastify.register(async function (fastify) {
         return;
       }
 
-      const { type, receiverId, content, messageType, gameRoomId } = parsed;
+      // JSON valide mais pas un objet (null, tableau, nombre...) : avant ce
+      // test, "null" faisait planter tout le service (audit F-01)
+      if (
+        parsed === null ||
+        typeof parsed !== "object" ||
+        Array.isArray(parsed)
+      ) {
+        socket.send(
+          JSON.stringify({ type: "error", message: "Invalid message payload" }),
+        );
+        return;
+      }
+
+      const { type, receiverId, content, messageType, gameRoomId } =
+        parsed as Record<string, unknown>;
       if (
         type !== "direct_message" ||
         typeof receiverId !== "string" ||
@@ -277,6 +306,28 @@ fastify.register(async function (fastify) {
           return;
         }
 
+        // Messages directs entre amis seulement : l'interface ne propose le
+        // chat qu'aux amis, le serveur doit l'imposer aussi (audit F-11)
+        const friendship = await fastify.prisma.friendship.findFirst({
+          where: {
+            status: "accepted",
+            OR: [
+              { userId, friendId: payload.receiverId },
+              { userId: payload.receiverId, friendId: userId },
+            ],
+          },
+          select: { id: true },
+        });
+        if (!friendship) {
+          socket.send(
+            JSON.stringify({
+              type: "error",
+              message: "Cannot send message: you are not friends",
+            }),
+          );
+          return;
+        }
+
         const recipientSocket = connectedClients.get(payload.receiverId);
         const isRecipientOnline =
           recipientSocket !== undefined && recipientSocket.readyState === 1;
@@ -333,7 +384,7 @@ fastify.register(async function (fastify) {
           JSON.stringify({ type: "error", message: "Failed to send message" }),
         );
       }
-    });
+    }
 
     socket.on("close", () => {
       if (connectedClients.get(userId) === socket) {
@@ -342,6 +393,15 @@ fastify.register(async function (fastify) {
       fastify.log.info(`User disconnected: ${userId}`);
     });
   });
+});
+
+// Derniere ligne de defense : une erreur oubliee est journalisee au lieu
+// d'arreter le service (audit F-01)
+process.on("unhandledRejection", (reason) => {
+  fastify.log.error({ reason }, "Unhandled promise rejection");
+});
+process.on("uncaughtException", (err) => {
+  fastify.log.error({ err }, "Uncaught exception");
 });
 
 const start = async () => {
