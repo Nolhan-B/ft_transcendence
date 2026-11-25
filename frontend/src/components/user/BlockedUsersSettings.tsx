@@ -1,13 +1,27 @@
-import { Link } from "react-router-dom";
+import { useEffect, useRef } from "react";
+import { Link, useLocation } from "react-router-dom";
 import { useBlocks } from "../../hooks/user/useBlocks";
 import { UserAvatar } from "./UserAvatar";
 
 // The users I blocked, each with an "Unblock" button
 export function BlockedUsersSettings() {
   const { blocked, loading, busy, error, unblock } = useBlocks();
+  const { hash } = useLocation();
+  const card = useRef<HTMLDivElement>(null);
+
+  // Opened from the "Blocked users" link of the friends drawer: scroll down
+  // to this section once its list is there
+  useEffect(() => {
+    if (hash === "#blocked-users" && !loading)
+      card.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [hash, loading]);
 
   return (
-    <div className="card bg-base-200 shadow-xl">
+    <div
+      ref={card}
+      id="blocked-users"
+      className="card scroll-mt-24 bg-base-200 shadow-xl"
+    >
       <div className="card-body gap-4">
         <h2 className="card-title">Blocked users</h2>
         <p className="text-sm opacity-70">
