@@ -224,6 +224,23 @@ body {
   }
 }
 
+/* Disabled buttons stay grey even with a "bg-*" utility (those utilities win
+   over daisyUI's own disabled rule). Unlayered on purpose: it beats every
+   layer, and it only ever targets a disabled button. */
+.btn:disabled:not(.btn-ghost):not(.btn-link) {
+  background-color: color-mix(
+    in oklab,
+    var(--color-base-content) 10%,
+    transparent
+  );
+  color: color-mix(in oklch, var(--color-base-content) 20%, transparent);
+  border-color: transparent;
+  cursor: not-allowed;
+}
+.btn:disabled::after {
+  box-shadow: none;
+}
+
 /* ------------------------------------------------------------------ */
 /* Animations of the UNO design                                        */
 /* ------------------------------------------------------------------ */
