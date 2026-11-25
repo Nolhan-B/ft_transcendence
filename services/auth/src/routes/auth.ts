@@ -51,10 +51,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
           username,
           password,
         );
-        const token = fastify.jwt.sign(
-          { id: user.id },
-          { expiresIn: "7d" },
-        );
+        const token = fastify.jwt.sign({ id: user.id }, { expiresIn: "7d" });
 
         reply.setCookie("access_token", token, COOKIE_OPTIONS);
 
@@ -103,10 +100,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
         } as TwoFactorRequiredResponse);
       }
 
-      const token = fastify.jwt.sign(
-        { id: user.id },
-        { expiresIn: "7d" },
-      );
+      const token = fastify.jwt.sign({ id: user.id }, { expiresIn: "7d" });
 
       reply.setCookie("access_token", token, COOKIE_OPTIONS);
 
