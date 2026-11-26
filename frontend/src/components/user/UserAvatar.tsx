@@ -53,7 +53,7 @@ export function UserAvatar({
   return (
     <div className="avatar avatar-placeholder">
       <div
-        className={`rounded-full border-2 border-white ${colorOf(username)} ${box}`}
+        className={`rounded-[30%] border-2 border-white ${colorOf(username)} ${box}`}
       >
         <span className={`font-bold ${letter}`}>
           {username.charAt(0).toUpperCase()}
