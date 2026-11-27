@@ -1,4 +1,8 @@
 import { Link } from "react-router-dom";
+import type { CardColor, CardValue } from "shared";
+import { Card } from "../../components/cards/Card";
+import { CardFace } from "../../components/game/CardFace";
+import { themeColor } from "../../components/game/cards";
 import { MainTitle } from "../../components/texts/MainTitle";
 
 // Static rules page. Every rule below mirrors the game engine
@@ -7,34 +11,40 @@ import { MainTitle } from "../../components/texts/MainTitle";
 
 type RuleCard = {
   label: string;
-  color: string;
+  color: CardColor;
+  value: CardValue;
   text: string;
 };
 
 const ACTION_CARDS: RuleCard[] = [
   {
     label: "Skip",
-    color: "bg-primary text-primary-content",
+    color: "red",
+    value: "skip",
     text: "The next player loses their turn.",
   },
   {
-    label: "Rev",
-    color: "bg-secondary text-secondary-content",
+    label: "Reverse",
+    color: "blue",
+    value: "reverse",
     text: "Reverses the direction of play. With two players left, it acts as a Skip.",
   },
   {
     label: "+2",
-    color: "bg-accent text-accent-content",
+    color: "yellow",
+    value: "draw2",
     text: "The next player draws 2 cards and loses their turn.",
   },
   {
     label: "Wild",
-    color: "bg-neutral text-neutral-content",
+    color: "wild",
+    value: "wild",
     text: "Playable on anything. You choose the next color.",
   },
   {
-    label: "+4",
-    color: "bg-neutral text-neutral-content",
+    label: "Wild +4",
+    color: "wild",
+    value: "wild_draw4",
     text: "Playable on anything. You choose the color and the next player draws 4.",
   },
 ];
@@ -114,15 +124,21 @@ export function RulesPage() {
         <div className="grid gap-3 sm:grid-cols-2">
           {ACTION_CARDS.map((card) => (
             <div
-              key={card.label}
-              className="flex items-start gap-3 rounded-box border-3 border-base-300 bg-base-100 p-3"
+              key={card.value}
+              className="flex items-center gap-3 rounded-box border-3 border-base-300 bg-base-100 p-3"
             >
-              <span
-                className={`grid size-12 shrink-0 place-items-center rounded-lg text-lg font-black ${card.color}`}
+              <Card
+                color={themeColor(card.color)}
+                variant="game"
+                className="w-16 shrink-0"
+                aria-hidden="true"
               >
-                {card.label}
-              </span>
-              <p className="text-sm">{card.text}</p>
+                <CardFace color={card.color} value={card.value} />
+              </Card>
+              <p className="text-sm">
+                <strong className="block">{card.label}</strong>
+                {card.text}
+              </p>
             </div>
           ))}
         </div>
