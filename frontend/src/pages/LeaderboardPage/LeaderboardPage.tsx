@@ -69,12 +69,12 @@ function Leaderboard() {
         <tbody>
           {/* row 1 */}
           {!error &&
-            leaderboard.map((leader, index) => (
+            leaderboard.map((leader) => (
               <tr
                 key={leader.id}
                 className={user?.id !== leader.id ? "" : "bg-base-200"}
               >
-                <th>{index + 1}</th>
+                <th>{leader.rank}</th>
                 <td>
                   <Link
                     to={`/users/${leader.id}`}
@@ -86,7 +86,7 @@ function Leaderboard() {
                 <td>{leader.elo}</td>
               </tr>
             ))}
-          {myRank && myRank.rank > 10 && (
+          {myRank && leaderboard.at(-1)?.rank && (
             <tr className="bg-base-200">
               <th>{myRank.rank}</th>
               <td>
