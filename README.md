@@ -934,13 +934,13 @@ The subject asks for **14 points** (Major = 2, Minor = 1); bonus modules count u
 - **Challenges**: _to complete._
 
 ### gtourdia
-- **Friends drawer**: friend list, requests with accept and decline, confirm-before-remove, real-time friend events.
-- **Chat UI**: chat view inside the drawer, unread and request badges.
-- **Pages and navigation**: home hero, Rules page content, leaderboard page connected to the API, navbar drawer menu, footer sections.
-- **Debug header**: a development tool.
-- **Minor frontend fixes**: testing and fixing frontend functionnalities.
-- **Makefile rules**: `install`, `up`/`down`, `seed` (debug users and conversation), `seed-leaderboard`.
-- **Challenges**: Implementation of new functionnalities in the ChatProvider, learning how to use react hooks.
+- **Friends drawer and direct chat**: the right-side tab and drawer, friend requests and list (accept, decline, remove), the chat panel with unread badges, and the real-time friend and message events (`useChat`).
+- **In-game chat**: the floating chat bubble on the game pages, over the game WebSocket.
+- **Pages**: home hero, the whole Rules page, the leaderboard wired to the API, the sign-in / sign-up forms, navbar drawer menu and footer.
+- **Debug header**: a development-only panel for console errors, failed requests and WebSocket events.
+- **Frontend fixes**: the profile behind `RequireAuth`, the infinite "Joining the game..." screen, avatar shape and button glitches.
+- **Makefile**: `seed` and `seed-leaderboard` debug rules, and the macOS compatibility fixes.
+- **Challenges**: keeping the chat state consistent across providers and reconnections; making the drawer work on phones and desktop, keyboard and scroll included.
 
 ### kebertra
 - **Frontend architecture**:
@@ -961,7 +961,7 @@ The subject asks for **14 points** (Major = 2, Minor = 1); bonus modules count u
 ## Known limitations
 
 - **No online status for friends**: the friends list does not show who is connected. The "Standard user management" module requires it, which is why that module is not claimed above.
-- **In-game chat**: the server supports `chat_message` during a game and saves it with the match, but the in-game chat bubble (`FloatingMessageBox`) is not shown in the game screen yet.
+- **In-game chat**: messages sent during a game are shown live and saved with the match, but a player who reloads or joins late does not get the messages already sent.
 - **Game state in memory**: restarting the game service ends the games in progress (finished matches are safely stored).
 - **Match history** is only visible on my own profile (`/games/history` returns the connected user's games).
 - **Self-signed certificate**: the browser shows a warning on the first visit.
