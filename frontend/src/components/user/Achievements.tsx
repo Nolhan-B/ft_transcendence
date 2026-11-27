@@ -11,64 +11,105 @@ const ICONS: Record<AchievementId, string> = {
   beat_a_bot: "🤖",
 };
 
-function unlockedOn(achievement: Achievement): string {
-  if (!achievement.unlockedAt) return "Unlocked";
-  return `Unlocked on ${new Date(achievement.unlockedAt).toLocaleDateString(
-    "en-US",
-    { year: "numeric", month: "short", day: "numeric" },
-  )}`;
+// Short date of the unlock ("Mar 3"), or nothing (unlocked outside a game)
+function shortDate(iso: string | null): string {
+  if (!iso) return "";
+  return new Date(iso).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
 }
 
-// Grid of badges: colored when unlocked, grey with the progress otherwise
+function Tile({ achievement: a }: { achievement: Achievement }) {
+  const date = shortDate(a.unlockedAt);
+  return (
+    <li
+      className={`flex items-center gap-3 rounded-box p-3 ${
+        a.unlocked
+          ? "bg-base-200 ring-1 ring-accent/40"
+          : "bg-base-200/40 ring-1 ring-base-content/5"
+      }`}
+    >
+      <span
+        aria-hidden="true"
+        className={`grid size-11 shrink-0 place-items-center rounded-full text-2xl ${
+          a.unlocked ? "bg-accent/20" : "bg-base-300 opacity-40 grayscale"
+        }`}
+      >
+        {ICONS[a.id]}
+      </span>
+
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <div className="flex items-baseline justify-between gap-2">
+          <span
+            className={`truncate font-semibold ${a.unlocked ? "" : "opacity-50"}`}
+          >
+            {a.title}
+          </span>
+          {a.unlocked ? (
+            <span
+              className="shrink-0 text-xs text-accent"
+              title={
+                a.unlockedAt
+                  ? new Date(a.unlockedAt).toLocaleString()
+                  : undefined
+              }
+            >
+              ✓{date && ` ${date}`}
+            </span>
+          ) : (
+            <span className="shrink-0 text-xs tabular-nums opacity-50">
+              {a.progress}/{a.goal}
+            </span>
+          )}
+        </div>
+        <span
+          className={`truncate text-xs ${a.unlocked ? "opacity-70" : "opacity-40"}`}
+        >
+          {a.description}
+        </span>
+        {!a.unlocked && (
+          <div
+            className="mt-1 h-1 overflow-hidden rounded-full bg-base-300"
+            role="progressbar"
+            aria-valuenow={a.progress}
+            aria-valuemax={a.goal}
+            aria-label={`${a.title}: ${a.progress} of ${a.goal}`}
+          >
+            <div
+              className="h-full rounded-full bg-accent/60"
+              style={{ width: `${(a.progress / a.goal) * 100}%` }}
+            />
+          </div>
+        )}
+      </div>
+    </li>
+  );
+}
+
+// Badges, the unlocked ones first
 export function Achievements({
   achievements,
 }: {
   achievements: Achievement[];
 }) {
   const count = achievements.filter((a) => a.unlocked).length;
+  const sorted = [
+    ...achievements.filter((a) => a.unlocked),
+    ...achievements.filter((a) => !a.unlocked),
+  ];
 
   return (
     <section className="flex flex-col gap-3">
-      <h2 className="text-2xl font-bold">
+      <h2 className="flex items-baseline gap-2 text-2xl font-bold">
         Achievements
-        <span className="ml-2 align-middle text-base font-semibold opacity-60">
-          {count} / {achievements.length}
+        <span className="text-sm font-semibold opacity-50">
+          {count} of {achievements.length}
         </span>
       </h2>
-      <ul className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-3">
-        {achievements.map((a) => (
-          <li
-            key={a.id}
-            className={`flex flex-col items-center gap-1 rounded-box border p-3 text-center ${
-              a.unlocked
-                ? "border-accent/60 bg-base-200 shadow"
-                : "border-base-content/10 bg-base-200/50"
-            }`}
-            title={a.unlocked ? unlockedOn(a) : `${a.progress} / ${a.goal}`}
-          >
-            <span
-              aria-hidden="true"
-              className={`text-3xl ${a.unlocked ? "" : "opacity-30 grayscale"}`}
-            >
-              {ICONS[a.id]}
-            </span>
-            <span className={`font-semibold ${a.unlocked ? "" : "opacity-60"}`}>
-              {a.title}
-            </span>
-            <span className="text-xs opacity-60">{a.description}</span>
-            {a.unlocked ? (
-              <span className="badge badge-accent badge-sm mt-1">
-                {unlockedOn(a)}
-              </span>
-            ) : (
-              <progress
-                className="progress progress-accent mt-1 w-full"
-                value={a.progress}
-                max={a.goal}
-                aria-label={`${a.progress} of ${a.goal}`}
-              />
-            )}
-          </li>
+      <ul className="grid grid-cols-[repeat(auto-fill,minmax(230px,1fr))] gap-2">
+        {sorted.map((a) => (
+          <Tile key={a.id} achievement={a} />
         ))}
       </ul>
     </section>

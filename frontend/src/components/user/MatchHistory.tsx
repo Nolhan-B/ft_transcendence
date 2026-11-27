@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import type { Match, MatchParticipant } from "shared";
-import { UserAvatar } from "./UserAvatar";
+import type { Match } from "shared";
 
 const PAGE_SIZE = 10;
 
@@ -23,53 +22,50 @@ function duration(match: Match): string {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
-// The players of a game, the profile owner first. A real account links to its
-// profile; a bot or a deleted account is shown but not clickable.
-function Players({
-  participants,
-  userId,
-}: {
-  participants: MatchParticipant[];
-  userId: string;
-}) {
-  const ordered = [
-    ...participants.filter((p) => p.id === userId),
-    ...participants.filter((p) => p.id !== userId),
-  ];
+// The players of a game in finishing order (the winner first, then the ones
+// who finished, then the others), small and quiet. The profile owner is in
+// bold; a real account links to its profile, a bot or a deleted one does not.
+function Players({ match, userId }: { match: Match; userId: string }) {
+  const place = (id: string) => {
+    const index = match.ranking.indexOf(id);
+    return index === -1 ? match.ranking.length : index;
+  };
+  const ordered = [...match.participants].sort(
+    (a, b) => place(a.id) - place(b.id),
+  );
+
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      {ordered.map((p) => {
-        const label = p.isBot ? `${p.username} (bot)` : p.username;
-        const content = (
-          <span className="flex items-center gap-1.5">
-            <UserAvatar
-              username={p.username}
-              avatarUrl={p.avatarUrl}
-              size="sm"
-            />
-            <span
-              className={`max-w-28 truncate text-sm ${p.deleted ? "italic opacity-60" : ""}`}
-            >
-              {label}
-            </span>
+    <ol className="flex flex-col text-xs leading-5 opacity-80">
+      {ordered.map((p, i) => {
+        const me = p.id === userId;
+        const name = (
+          <span
+            className={`truncate ${me ? "font-semibold" : ""} ${p.deleted ? "italic opacity-60" : ""}`}
+          >
+            {p.username}
           </span>
         );
-        return p.isBot || p.deleted ? (
-          <span key={p.id} title={label}>
-            {content}
-          </span>
-        ) : (
-          <Link
-            key={p.id}
-            to={`/users/${p.id}`}
-            title={`${p.username}'s profile`}
-            className="link-hover"
-          >
-            {content}
-          </Link>
+        return (
+          <li key={p.id} className="flex max-w-40 items-baseline gap-1.5">
+            <span className="w-3 shrink-0 text-right tabular-nums opacity-50">
+              {i + 1}
+            </span>
+            {p.isBot || p.deleted || me ? (
+              name
+            ) : (
+              <Link
+                to={`/users/${p.id}`}
+                className="link-hover truncate"
+                title={`${p.username}'s profile`}
+              >
+                {name}
+              </Link>
+            )}
+            {p.isBot && <span className="shrink-0 opacity-50">bot</span>}
+          </li>
         );
       })}
-    </div>
+    </ol>
   );
 }
 
@@ -145,10 +141,7 @@ export function MatchHistory({ matches, userId }: Props) {
                     {place > 0 ? `${place} / ${match.players.length}` : "-"}
                   </td>
                   <td>
-                    <Players
-                      participants={match.participants}
-                      userId={userId}
-                    />
+                    <Players match={match} userId={userId} />
                   </td>
                   <td>
                     <EloChange match={match} userId={userId} />
