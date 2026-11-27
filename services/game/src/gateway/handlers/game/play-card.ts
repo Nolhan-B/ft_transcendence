@@ -5,7 +5,7 @@ import {
   drawAndRecord,
   recordAction,
 } from "../../../engine/game-state.js";
-import { continueTurn } from "./bot-turn.js";
+import { continueTurn, scheduleBotReactions } from "./bot-turn.js";
 import { unoKey } from "../../utils.js";
 
 // Delai pour accepter ou contester un +4 avant qu'il soit accepte d'office
@@ -104,6 +104,8 @@ export async function handlePlayCard(
   // ainsi le chrono du joueur suivant. Ne fait rien si la partie est finie
   continueTurn(ctx, updatedState);
   ctx.broadCastStateToRoom(updatedState.id, updatedState);
+  // Bots react out of their turn: jump-in, catch a missed UNO
+  scheduleBotReactions(ctx, updatedState, ctx.userId);
 
   if (updatedState.status === GameStatus.FINISHED) {
     await ctx.endGame(updatedState.id, updatedState);

@@ -209,6 +209,57 @@ async function setupBotGameWithUno(ws: WebSocket): Promise<string> {
   return gameId;
 }
 
+// Room with the given house rules and bots, game started and joined
+async function setupBotGameWithRules(
+  ws: WebSocket,
+  rules: Partial<{ jumpIn: boolean; unoCallout: boolean }>,
+  bots: number,
+): Promise<string> {
+  const roomCode = await createRoom(ws, bots + 1, "Bot rules");
+  send(ws, {
+    type: "update_room",
+    roomCode,
+    settings: {
+      stacking: "none",
+      sevenZeroRule: false,
+      jumpIn: false,
+      bluffChallenge: false,
+      unoCallout: false,
+      ...rules,
+    },
+  });
+  await waitForMessage(ws, "room_updated");
+  for (let i = 0; i < bots; i++) {
+    send(ws, { type: "add_bot", roomCode });
+    await waitForMessage(ws, "room_updated");
+  }
+  send(ws, { type: "start_game", roomCode });
+  const { gameId } = await waitForMessage(ws, "game_started");
+  send(ws, { type: "join_game", gameId });
+  await waitForMessage(ws, "game_updated");
+  return gameId;
+}
+
+// Every message received by a socket from now on
+function collect(ws: WebSocket): any[] {
+  const msgs: any[] = [];
+  ws.on("message", (data) => msgs.push(JSON.parse(data.toString())));
+  return msgs;
+}
+
+async function waitUntil(check: () => boolean, timeoutMs: number) {
+  for (let t = 0; t < timeoutMs; t += 50) {
+    if (check()) return;
+    await sleep(50);
+  }
+  throw new Error(`Timeout (${timeoutMs} ms)`);
+}
+
+// Gives the turn to this player (the others lose it)
+function giveTurn(game: any, userId: string) {
+  for (const p of game.players) p.isCurrentTurn = p.userId === userId;
+}
+
 // Donne au bot deux cartes, dont une seule jouable : après son coup, il en aura une
 function prepareBotForLastCard(game: any, bot: any) {
   game.topCard = { id: "top", color: "red", value: "5" };
@@ -644,6 +695,246 @@ const tests = [
       await waitForMessage(ws, "error");
       assert(bot.hand.length === 1, "Le bot ne doit pas piocher");
     });
+  }),
+
+  test("e2e: un bot attrape un joueur qui oublie de dire UNO", async () => {
+    await withClient(async ({ ws, gameManager, userId }) => {
+      const gameId = await setupBotGameWithRules(ws, { unoCallout: true }, 1);
+      const game = gameManager.getGame(gameId)!;
+      const me = game.players.find((p) => p.userId === userId)!;
+      const bot = game.players.find((p) => p.userId.startsWith("bot_"))!;
+      giveTurn(game, userId);
+      game.topCard = { id: "top", color: "red", value: "5" };
+      game.currentColor = "red";
+      me.hand = [
+        { id: "me-red3", color: "red", value: "3" },
+        { id: "me-blue9", color: "blue", value: "9" },
+      ];
+      // Nothing to play on a red 3: the bot draws, my hand does not change
+      bot.hand = [
+        { id: "bot-g2", color: "green", value: "2" },
+        { id: "bot-g4", color: "green", value: "4" },
+      ];
+
+      const msgs = collect(ws);
+      // Math.random at 0: the bot sees the chance (70 % normally)
+      const origRandom = Math.random;
+      Math.random = () => 0;
+      try {
+        send(ws, { type: "play_card", gameId, cardId: "me-red3" });
+        await waitForMessage(ws, "game_updated");
+      } finally {
+        Math.random = origRandom;
+      }
+
+      // I do not say UNO: caught within the 5 s window
+      await waitUntil(() => msgs.some((m) => m.type === "uno_caught"), 5000);
+      const caught = msgs.find((m) => m.type === "uno_caught");
+      assert(caught.catcherUserId === bot.userId, "Le bot doit m'attraper");
+      assert(caught.targetUserId === userId, "C'est moi qui dois être attrapé");
+      assert(me.hand.length === 3, `Je dois piocher 2, j'ai ${me.hand.length}`);
+    });
+  }),
+
+  test("e2e: un bot n'attrape pas un joueur qui a dit UNO", async () => {
+    await withClient(async ({ ws, gameManager, userId }) => {
+      const gameId = await setupBotGameWithRules(ws, { unoCallout: true }, 1);
+      const game = gameManager.getGame(gameId)!;
+      const me = game.players.find((p) => p.userId === userId)!;
+      const bot = game.players.find((p) => p.userId.startsWith("bot_"))!;
+      giveTurn(game, userId);
+      game.topCard = { id: "top", color: "red", value: "5" };
+      game.currentColor = "red";
+      me.hand = [
+        { id: "me-red3", color: "red", value: "3" },
+        { id: "me-blue9", color: "blue", value: "9" },
+      ];
+      bot.hand = [
+        { id: "bot-g2", color: "green", value: "2" },
+        { id: "bot-g4", color: "green", value: "4" },
+      ];
+
+      const msgs = collect(ws);
+      const origRandom = Math.random;
+      Math.random = () => 0;
+      try {
+        send(ws, { type: "play_card", gameId, cardId: "me-red3" });
+        await waitForMessage(ws, "game_updated");
+      } finally {
+        Math.random = origRandom;
+      }
+      send(ws, { type: "call_uno", gameId });
+
+      await sleep(4000);
+      assert(
+        !msgs.some((m) => m.type === "uno_caught"),
+        "Le bot ne doit pas m'attraper après UNO",
+      );
+      assert(
+        me.hand.length === 1,
+        `Je dois garder 1 carte, j'ai ${me.hand.length}`,
+      );
+    });
+  }),
+
+  test("e2e: un bot n'attrape personne si la règle UNO est désactivée", async () => {
+    await withClient(async ({ ws, gameManager, userId }) => {
+      const gameId = await setupBotGameWithRules(ws, {}, 1);
+      const game = gameManager.getGame(gameId)!;
+      const me = game.players.find((p) => p.userId === userId)!;
+      const bot = game.players.find((p) => p.userId.startsWith("bot_"))!;
+      giveTurn(game, userId);
+      game.topCard = { id: "top", color: "red", value: "5" };
+      game.currentColor = "red";
+      me.hand = [
+        { id: "me-red3", color: "red", value: "3" },
+        { id: "me-blue9", color: "blue", value: "9" },
+      ];
+      bot.hand = [
+        { id: "bot-g2", color: "green", value: "2" },
+        { id: "bot-g4", color: "green", value: "4" },
+      ];
+
+      const msgs = collect(ws);
+      const origRandom = Math.random;
+      Math.random = () => 0;
+      try {
+        send(ws, { type: "play_card", gameId, cardId: "me-red3" });
+        await waitForMessage(ws, "game_updated");
+      } finally {
+        Math.random = origRandom;
+      }
+
+      // No UNO said, but the rule is off: nobody can catch me
+      await sleep(4000);
+      assert(
+        !msgs.some((m) => m.type === "uno_caught"),
+        "Sans la règle, le bot ne doit pas m'attraper",
+      );
+      assert(
+        me.hand.length === 1,
+        `Je dois garder 1 carte, j'ai ${me.hand.length}`,
+      );
+    });
+  }),
+
+  test("e2e: un bot fait un jump-in avec la même carte", async () => {
+    // Normal bot turns as slow as in a real game (2.5 s+): the jump-in
+    // (0.5 to 1.5 s) must come before the other bot's own turn
+    const savedDelay = process.env.BOT_MIN_DELAY_MS;
+    process.env.BOT_MIN_DELAY_MS = "3000";
+    try {
+      await withClient(async ({ ws, gameManager, userId }) => {
+        const gameId = await setupBotGameWithRules(ws, { jumpIn: true }, 2);
+        const game = gameManager.getGame(gameId)!;
+        const me = game.players.find((p) => p.userId === userId)!;
+        giveTurn(game, userId);
+        game.direction = 1;
+        // The bot that plays after me, and the other one
+        const mine = game.players.findIndex((p) => p.userId === userId);
+        const next = game.players[(mine + 1) % game.players.length];
+        const other = game.players.find(
+          (p) => p.userId !== userId && p.userId !== next.userId,
+        )!;
+        game.topCard = { id: "top", color: "red", value: "2" };
+        game.currentColor = "red";
+        me.hand = [
+          { id: "me-red5", color: "red", value: "5" },
+          { id: "me-blue9", color: "blue", value: "9" },
+        ];
+        // The next bot has nothing for a red 5 (it draws); the other one holds
+        // the same red 5 and is not playing: it can jump in
+        next.hand = [
+          { id: "n-g2", color: "green", value: "2" },
+          { id: "n-g4", color: "green", value: "4" },
+        ];
+        other.hand = [
+          { id: "o-red5", color: "red", value: "5" },
+          { id: "o-y1", color: "yellow", value: "1" },
+        ];
+
+        const msgs = collect(ws);
+        const origRandom = Math.random;
+        Math.random = () => 0;
+        try {
+          send(ws, { type: "play_card", gameId, cardId: "me-red5" });
+          await waitForMessage(ws, "game_updated");
+        } finally {
+          Math.random = origRandom;
+        }
+
+        const jumpedIn = () =>
+          msgs.some(
+            (m) =>
+              m.type === "game_updated" &&
+              m.state.lastActions.some(
+                (a: any) =>
+                  a.type === "card_played" &&
+                  a.jumpIn &&
+                  a.userId === other.userId,
+              ),
+          );
+        await waitUntil(jumpedIn, 3000);
+        assert(
+          !other.hand.some((c) => c.id === "o-red5"),
+          "Le bot doit avoir posé son 5 rouge",
+        );
+      });
+    } finally {
+      process.env.BOT_MIN_DELAY_MS = savedDelay;
+    }
+  }),
+
+  test("e2e: un bot ne fait pas de jump-in si la règle est désactivée", async () => {
+    // Normal bot turns as slow as in a real game (2.5 s+): the jump-in
+    // (0.5 to 1.5 s) must come before the other bot's own turn
+    const savedDelay = process.env.BOT_MIN_DELAY_MS;
+    process.env.BOT_MIN_DELAY_MS = "3000";
+    try {
+      await withClient(async ({ ws, gameManager, userId }) => {
+        const gameId = await setupBotGameWithRules(ws, {}, 2);
+        const game = gameManager.getGame(gameId)!;
+        const me = game.players.find((p) => p.userId === userId)!;
+        giveTurn(game, userId);
+        game.direction = 1;
+        // The bot that plays after me, and the other one
+        const mine = game.players.findIndex((p) => p.userId === userId);
+        const next = game.players[(mine + 1) % game.players.length];
+        const other = game.players.find(
+          (p) => p.userId !== userId && p.userId !== next.userId,
+        )!;
+        game.topCard = { id: "top", color: "red", value: "2" };
+        game.currentColor = "red";
+        me.hand = [
+          { id: "me-red5", color: "red", value: "5" },
+          { id: "me-blue9", color: "blue", value: "9" },
+        ];
+        next.hand = [
+          { id: "n-g2", color: "green", value: "2" },
+          { id: "n-g4", color: "green", value: "4" },
+        ];
+        other.hand = [
+          { id: "o-red5", color: "red", value: "5" },
+          { id: "o-y1", color: "yellow", value: "1" },
+        ];
+
+        const origRandom = Math.random;
+        Math.random = () => 0;
+        try {
+          send(ws, { type: "play_card", gameId, cardId: "me-red5" });
+          await waitForMessage(ws, "game_updated");
+        } finally {
+          Math.random = origRandom;
+        }
+        await sleep(2000);
+        assert(
+          other.hand.some((c) => c.id === "o-red5"),
+          "Sans la règle, le bot garde son 5 rouge",
+        );
+      });
+    } finally {
+      process.env.BOT_MIN_DELAY_MS = savedDelay;
+    }
   }),
 
   // B11: the host adds a bot, a friend joins, the host leaves, the friend
