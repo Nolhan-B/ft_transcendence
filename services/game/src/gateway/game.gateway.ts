@@ -654,7 +654,7 @@ export default async function gameGateway(fastify: FastifyInstance) {
             handleLeaveRoom(ctx, message);
             break;
           case "invite_to_room":
-            handleInviteToRoom(ctx, message);
+            await handleInviteToRoom(ctx, message);
             break;
           case "update_room":
             handleUpdateRoom(ctx, message);

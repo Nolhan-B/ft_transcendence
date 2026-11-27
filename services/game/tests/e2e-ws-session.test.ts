@@ -80,6 +80,8 @@ async function buildServer() {
       findMany: async () => [],
       update: async () => ({}),
     },
+    // No block between test users (invite_to_room checks it)
+    blockedFriendship: { findFirst: async () => null },
     $transaction: async () => [],
   } as any);
 
