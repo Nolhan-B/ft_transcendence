@@ -50,15 +50,19 @@ export function FriendListItem({
           </div>
         </div>
 
-        <span className="min-w-0 flex-1 truncate font-medium gap-2 flex items-center">
-          {name}
+        {/* Only the name is cut with "...": the unread dot stays visible
+            next to a long name */}
+        <span className="flex min-w-0 flex-1 items-center gap-2 font-medium">
+          <span className="min-w-0 truncate">{name}</span>
           {uid &&
-          unreadSenders.includes(uid) &&
-          currentOpenedChat?.id != uid ? (
-            <div aria-label="warning" className="status status-warning"></div>
-          ) : (
-            ""
-          )}
+            unreadSenders.includes(uid) &&
+            currentOpenedChat?.id !== uid && (
+              <span
+                role="status"
+                aria-label="New message"
+                className="status status-warning shrink-0"
+              />
+            )}
         </span>
 
         {typeof elo === "number" && (

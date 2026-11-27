@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Profile } from "shared";
 import { AddFriendField } from "./components/AddFriendField";
 import { FriendListItem } from "./components/FriendListItem";
@@ -16,6 +16,7 @@ export function FriendManager({
 }: FriendManagerProps) {
   const {
     friends,
+    conversations,
     friendRequests,
     setFriendRequests,
     error,
@@ -26,6 +27,25 @@ export function FriendManager({
   const [friendRequestsError, setFriendRequestsError] = useState<string | null>(
     null,
   );
+
+  // Friends with a new message first, then the latest conversations (a
+  // message sent or received moves the friend up), then the others in
+  // their usual order
+  const sortedFriends = useMemo(() => {
+    const lastMessageAt = (id: string) => {
+      const messages = conversations[id];
+      return messages?.[messages.length - 1]?.createdAt ?? "";
+    };
+    const usual = new Map(friends.map((f, i) => [f.id, i]));
+    return [...friends].sort((a, b) => {
+      const unreadA = unreadSenders.includes(a.id);
+      const unreadB = unreadSenders.includes(b.id);
+      if (unreadA !== unreadB) return unreadA ? -1 : 1;
+      const latest = lastMessageAt(b.id).localeCompare(lastMessageAt(a.id));
+      if (latest !== 0) return latest;
+      return (usual.get(a.id) ?? 0) - (usual.get(b.id) ?? 0);
+    });
+  }, [friends, conversations, unreadSenders]);
 
   function removeNotification(uid: string) {
     if (!uid) return;
@@ -117,7 +137,7 @@ export function FriendManager({
         ) : friends.length === 0 ? (
           <p className="text-sm opacity-60">You have no friends :(</p>
         ) : (
-          friends.map((friend) => (
+          sortedFriends.map((friend) => (
             <FriendListItem
               key={friend.id}
               name={friend.username}
@@ -125,13 +145,12 @@ export function FriendManager({
               uid={friend.id}
               onRemove={() => handleDeclineFriendRequest(friend.id)}
               currentOpenedChat={currentOpenedFriendChat}
-              onClick={() => {
-                if (currentOpenedFriendChat) {
-                  setCurrentOpenedFriendChat(null);
-                } else {
-                  setCurrentOpenedFriendChat(friend);
-                }
-              }}
+              // Another friend replaces the open chat; the open one closes it
+              onClick={() =>
+                setCurrentOpenedFriendChat(
+                  currentOpenedFriendChat?.id === friend.id ? null : friend,
+                )
+              }
             />
           ))
         )}
