@@ -1,0 +1,63 @@
+services:
+  auth:
+    build:
+      target: dev
+    volumes:
+      - ./services/auth/src:/app/services/auth/src
+    environment:
+      NODE_ENV: development
+    # Allow extra startup time in dev for Prisma generation and tsx cold boot
+    healthcheck:
+      start_period: 40s
+      retries: 10
+
+  game:
+    build:
+      target: dev
+    volumes:
+      - ./services/game/src:/app/services/game/src
+    environment:
+      NODE_ENV: development
+    # Allow extra startup time in dev for Prisma generation and tsx cold boot
+    healthcheck:
+      start_period: 40s
+      retries: 10
+
+  chat:
+    build:
+      target: dev
+    volumes:
+      - ./services/chat/src:/app/services/chat/src
+    environment:
+      NODE_ENV: development
+    # Allow extra startup time in dev for tsx cold boot
+    healthcheck:
+      start_period: 40s
+      retries: 10
+
+  user:
+    build:
+      target: dev
+    volumes:
+      - ./services/user/src:/app/services/user/src
+    environment:
+      NODE_ENV: development
+    # Allow extra startup time in dev for tsx cold boot
+    healthcheck:
+      start_period: 40s
+      retries: 10
+
+  frontend:
+    build:
+      target: dev
+    volumes:
+      - ./frontend/src:/app/frontend/src
+      - ./frontend/public:/app/frontend/public
+      - ./frontend/index.html:/app/frontend/index.html
+      - ./frontend/vite.config.ts:/app/frontend/vite.config.ts
+    environment:
+      NODE_ENV: development
+    # Allow extra startup time in dev for Vite cold boot
+    healthcheck:
+      start_period: 40s
+      retries: 10

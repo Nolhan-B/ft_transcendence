@@ -1,1 +1,44 @@
-   "workspaces": ["services/*", "frontend", "shared"]
+{
+  "name": "ft_transcendence",
+  "private": true,
+  "scripts": {
+    "lint": "eslint . --max-warnings=0 && npx prettier --check .",
+    "test-game": "npx tsx services/game/tests/engine.test.ts",
+    "test-game-integration": "npx tsx services/game/tests/integration.test.ts",
+    "test-rooms": "npx tsx services/game/tests/rooms.test.ts",
+    "test-ai": "npx tsx services/game/tests/ai.test.ts",
+    "test-ai-e2e": "npx tsx services/game/tests/e2e-bot.test.ts",
+    "test-ws-session": "npx tsx services/game/tests/e2e-ws-session.test.ts",
+    "test-reconnect": "npx tsx services/game/tests/e2e-reconnect.test.ts",
+    "test-spectator": "npx tsx services/game/tests/e2e-spectator.test.ts",
+    "test-game-actions": "npx tsx services/game/tests/e2e-game-actions.test.ts",
+    "test-matchmaking": "npx tsx services/game/tests/matchmaking.test.ts",
+    "test-matchmaking-e2e": "npx tsx services/game/tests/matchmaking-e2e.test.ts",
+    "test-elo": "npx tsx services/game/tests/elo.test.ts",
+    "test-queue": "npx tsx services/game/tests/queue.test.ts",
+    "test-game-all": "npm run test-game && npm run test-game-integration && npm run test-rooms && npm run test-ai && npm run test-ai-e2e && npm run test-reconnect && npm run test-ws-session && npm run test-spectator && npm run test-game-actions && npm run test-matchmaking && npm run test-matchmaking-e2e && npm run test-elo && npm run test-queue",
+    "test-api": "bash ./.github/scripts/api_test.sh",
+    "test-e2e": "bash ./.github/scripts/e2e_test.sh",
+    "test-chat": "node ./.github/scripts/chat_test.js",
+    "test-all": "npm run lint && npm run test-game-all && npm run test-chat && npm run test-api && npm run test-e2e"
+  },
+  "workspaces": [
+    "services/*",
+    "frontend",
+    "shared"
+  ],
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/ws": "^8.18.2",
+    "eslint": "^10.11.0",
+    "prettier": "^3.9.9",
+    "tsx": "^4.23.15",
+    "typescript-eslint": "^8.71.0",
+    "ws": "^8.22.0"
+  },
+  "dependencies": {
+    "@fastify/cookie": "^11.1.3",
+    "prom-client": "^15.1.3",
+    "tdigest": "^0.1.3"
+  }
+}

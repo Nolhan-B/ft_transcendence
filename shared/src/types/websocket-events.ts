@@ -1,0 +1,268 @@
+import type {
+  CardColor,
+  GameState,
+  GameMode,
+  GameSettings,
+  KickReason,
+} from "./game.js";
+
+// ============================================================
+// ROOM - Client -> Server
+// ============================================================
+
+export interface CreateRoomPayload {
+  name: string;
+  mode: GameMode;
+  maxPlayers: number;
+  password?: string;
+}
+
+export interface JoinRoomPayload {
+  roomCode: string;
+  password?: string;
+}
+
+// A member of the room invites a player: he can join without the password
+export interface InviteToRoomPayload {
+  roomCode: string;
+  userId: string;
+}
+
+export interface LeaveRoomPayload {
+  roomCode: string;
+}
+
+export interface UpdateRoomPayload {
+  roomCode: string;
+  settings: GameSettings;
+}
+
+export interface StartGamePayload {
+  roomCode: string;
+}
+
+export interface AddBotPayload {
+  roomCode: string;
+}
+export interface RemoveBotPayload {
+  roomCode: string;
+  botId: string;
+}
+
+// ============================================================
+// GAME - Client -> Server
+// ============================================================
+
+export interface JoinGamePayload {
+  gameId: string;
+}
+
+export interface PlayCardPayload {
+  gameId: string;
+  cardId: string;
+  chosenColor?: CardColor;
+  targetUserId?: string;
+}
+
+export interface ChallengeBluffPayload {
+  gameId: string;
+}
+
+export interface AcceptWildDraw4Payload {
+  gameId: string;
+}
+
+export interface DrawCardPayload {
+  gameId: string;
+}
+
+export interface ChatMessagePayload {
+  gameId: string;
+  content: string;
+}
+
+export interface CallUnoPayload {
+  gameId: string;
+}
+
+export interface CatchUnoPayload {
+  gameId: string;
+  targetUserId: string;
+}
+
+export interface SpectateGamePayload {
+  gameId: string;
+}
+
+export interface LeaveSpectatePayload {
+  gameId: string;
+}
+
+// ============================================================
+// ROOM - Server -> Client
+// ============================================================
+
+export interface RoomInfo {
+  code: string;
+  name: string;
+  hasPassword: boolean;
+  leaderId: string;
+  maxPlayers: number;
+  players: { id: string; username: string }[];
+  mode: GameMode;
+  settings: GameSettings;
+}
+
+export interface RoomUpdatedEvent {
+  type: "room_updated";
+  room: RoomInfo;
+}
+
+// Sent to the sockets of a player who is no longer in the room (left from
+// another tab, or moved to another room): they stop showing it
+export interface RoomLeftEvent {
+  type: "room_left";
+  roomCode: string;
+}
+
+export interface GameStartedEvent {
+  type: "game_started";
+  gameId: string;
+}
+
+// ============================================================
+// GAME - Server -> Client
+// ============================================================
+
+export interface GameUpdatedEvent {
+  type: "game_updated";
+  state: GameState;
+}
+
+export interface PlayerJoinedEvent {
+  type: "player_joined";
+  userId: string;
+}
+
+// disconnected : socket ferme, le joueur peut encore revenir (voir
+// GameState.reconnecting). afk / abandoned : il est exclu de la partie
+export type PlayerLeftReason = "disconnected" | KickReason;
+
+export interface PlayerLeftEvent {
+  type: "player_left";
+  userId: string;
+  reason: PlayerLeftReason;
+}
+
+export interface GameEndedEvent {
+  type: "game_ended";
+  winnerId: string;
+  // Classement final, du premier au dernier : en classic le gagnant seul,
+  // en ranked l'ordre d'arrivee. Les joueurs exclus n'y figurent pas
+  ranking: string[];
+}
+
+export interface ErrorEvent {
+  type: "error";
+  message: string;
+}
+
+export interface ChatMessageEvent {
+  type: "chat_message";
+  userId: string;
+  username: string;
+  content: string;
+}
+
+export interface UnoCaughtEvent {
+  type: "uno_caught";
+  targetUserId: string;
+  catcherUserId: string;
+}
+
+export interface BluffResultEvent {
+  type: "bluff_result";
+  challengerUserId: string;
+  targetUserId: string;
+  wasBluff: boolean;
+  penaltyCount: number;
+}
+
+export interface UnoCalledEvent {
+  type: "uno_called";
+  userId: string;
+}
+
+export interface SpectateStartedEvent {
+  type: "spectate_started";
+  state: GameState;
+}
+
+// ============================================================
+// MATCHMAKING - Server -> Client
+// ============================================================
+
+export interface QueueJoinedEvent {
+  type: "queue_joined";
+  elo: number;
+}
+
+export interface QueueLeftEvent {
+  type: "queue_left";
+}
+
+export interface MatchFoundEvent {
+  type: "match_found";
+  gameId: string;
+  players: { id: string; username: string; elo: number }[];
+}
+
+export interface EloUpdatedEvent {
+  type: "elo_updated";
+  changes: { userId: string; oldElo: number; newElo: number }[];
+}
+
+// ============================================================
+// UNIONS
+// ============================================================
+
+export type ServerEvent =
+  | RoomUpdatedEvent
+  | RoomLeftEvent
+  | GameStartedEvent
+  | GameUpdatedEvent
+  | PlayerJoinedEvent
+  | PlayerLeftEvent
+  | GameEndedEvent
+  | ChatMessageEvent
+  | ErrorEvent
+  | UnoCaughtEvent
+  | UnoCalledEvent
+  | BluffResultEvent
+  | SpectateStartedEvent
+  | QueueJoinedEvent
+  | QueueLeftEvent
+  | MatchFoundEvent
+  | EloUpdatedEvent;
+
+export type ClientMessage =
+  | ({ type: "create_room" } & CreateRoomPayload)
+  | ({ type: "join_room" } & JoinRoomPayload)
+  | ({ type: "leave_room" } & LeaveRoomPayload)
+  | ({ type: "invite_to_room" } & InviteToRoomPayload)
+  | ({ type: "update_room" } & UpdateRoomPayload)
+  | ({ type: "start_game" } & StartGamePayload)
+  | ({ type: "join_game" } & JoinGamePayload)
+  | ({ type: "play_card" } & PlayCardPayload)
+  | ({ type: "draw_card" } & DrawCardPayload)
+  | ({ type: "chat_message" } & ChatMessagePayload)
+  | ({ type: "call_uno" } & CallUnoPayload)
+  | ({ type: "catch_uno" } & CatchUnoPayload)
+  | ({ type: "challenge_bluff" } & ChallengeBluffPayload)
+  | ({ type: "accept_wild_draw4" } & AcceptWildDraw4Payload)
+  | ({ type: "add_bot" } & AddBotPayload)
+  | ({ type: "remove_bot" } & RemoveBotPayload)
+  | ({ type: "spectate_game" } & SpectateGamePayload)
+  | ({ type: "leave_spectate" } & LeaveSpectatePayload)
+  | { type: "join_queue" }
+  | { type: "leave_queue" };
