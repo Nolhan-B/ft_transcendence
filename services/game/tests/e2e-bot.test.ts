@@ -678,12 +678,16 @@ const tests = [
         `Le bot doit commencer, c'est ${first.userId}`,
       );
 
-      // The bot plays within its delay (0.5 to 1.5 s in tests)
+      // The bot acts within its delay (0.5 to 1.5 s in tests). Only check
+      // that it did something: who plays next depends on the dealt cards (a
+      // skip, a reverse or a +2 gives the turn back to the bot with 2 players)
       const moved = await waitForMessage(friend.ws, "game_updated", 3000);
-      const now = moved.state.players.find((p: any) => p.isCurrentTurn);
+      const botActed = moved.state.lastActions.some(
+        (a: any) => a.userId === first.userId,
+      );
       assert(
-        now.userId === friendId,
-        `Après le coup du bot, c'est à l'ami de jouer (c'est ${now.userId})`,
+        botActed,
+        `Le bot doit avoir joué ou pioché, actions reçues : ${JSON.stringify(moved.state.lastActions)}`,
       );
     } finally {
       host.ws.close();
