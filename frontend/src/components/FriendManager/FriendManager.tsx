@@ -125,13 +125,12 @@ export function FriendManager({
               uid={friend.id}
               onRemove={() => handleDeclineFriendRequest(friend.id)}
               currentOpenedChat={currentOpenedFriendChat}
-              onClick={() => {
-                if (currentOpenedFriendChat) {
-                  setCurrentOpenedFriendChat(null);
-                } else {
-                  setCurrentOpenedFriendChat(friend);
-                }
-              }}
+              // Another friend replaces the open chat; the open one closes it
+              onClick={() =>
+                setCurrentOpenedFriendChat(
+                  currentOpenedFriendChat?.id === friend.id ? null : friend,
+                )
+              }
             />
           ))
         )}

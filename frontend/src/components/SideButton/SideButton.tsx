@@ -123,7 +123,12 @@ export function SideButton() {
                   ← Friends
                 </button>
               )}
-              <FriendChat profile={currentOpenedFriendChat}></FriendChat>
+              {/* One chat per friend: switching friends starts a fresh one
+                  (no draft typed for someone else) */}
+              <FriendChat
+                key={currentOpenedFriendChat.id}
+                profile={currentOpenedFriendChat}
+              ></FriendChat>
             </div>
           </div>
         )}
