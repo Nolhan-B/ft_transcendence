@@ -321,7 +321,11 @@ export default async function gameGateway(fastify: FastifyInstance) {
     turnDeadlines.set(gameId, Date.now() + TURN_TIMEOUT_MS);
   }
 
-  async function updateElo(game: InternalGameState): Promise<void> {
+  // Met a jour l'ELO des joueurs d'une partie ranked, et renvoie les
+  // changements pour l'historique
+  async function updateElo(
+    game: InternalGameState,
+  ): Promise<{ userId: string; oldElo: number; newElo: number }[]> {
     const ranked = [...game.ranking];
     for (const p of game.players) {
       if (!ranked.includes(p.userId) && !p.disconnected) ranked.push(p.userId);
@@ -357,6 +361,7 @@ export default async function gameGateway(fastify: FastifyInstance) {
     );
 
     broadCastToRoom(game.id, { type: "elo_updated", changes });
+    return changes;
   }
 
   async function endGame(
@@ -414,13 +419,14 @@ export default async function gameGateway(fastify: FastifyInstance) {
     // Une erreur de base de donnees ne doit ni faire planter le service
     // (endGame est souvent appele depuis un setTimeout), ni laisser la partie en memoire
     try {
-      if (game.mode === GameMode.RANKED) {
-        await updateElo(game);
-      }
+      const eloChanges =
+        game.mode === GameMode.RANKED ? await updateElo(game) : [];
       await fastify.prisma.match.create({
         data: {
           mode: game.mode,
           players: game.players.map((p) => p.userId),
+          playerNames: game.players.map((p) => p.username),
+          eloChanges,
           ranking: game.ranking,
           winnerId: game.winnerId ?? "",
           chatLog: chatLogs.get(gameId) ?? [],

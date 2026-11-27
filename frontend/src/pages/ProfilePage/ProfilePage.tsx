@@ -6,6 +6,9 @@ import { BlockUserButton } from "../../components/user/BlockUserButton";
 import { MatchHistory } from "../../components/user/MatchHistory";
 import { MatchStats } from "../../components/user/MatchStats";
 import { useMatchHistory } from "../../hooks/game/useMatchHistory";
+import { Achievements } from "../../components/user/Achievements";
+import { EloChart } from "../../components/user/EloChart";
+import { useAchievements } from "../../hooks/game/useAchievements";
 import { useProfile } from "../../hooks/user/useProfile";
 
 // One page for both routes: /profile (my own) and /users/:id (anyone)
@@ -16,6 +19,7 @@ export function ProfilePage() {
   const { profile, loading, error, reload } = useProfile(id);
   const isOwn = id !== undefined && id === user?.id;
   const history = useMatchHistory(id, isOwn);
+  const achievements = useAchievements(id);
 
   if (loading) {
     return (
@@ -111,6 +115,15 @@ export function ProfilePage() {
       ) : (
         <>
           <MatchStats matches={history.matches} userId={profile.id} />
+          <EloChart matches={history.matches} userId={profile.id} />
+          {achievements.achievements && (
+            <Achievements achievements={achievements.achievements} />
+          )}
+          {achievements.error && (
+            <div role="alert" className="alert alert-warning">
+              <span>{achievements.error}</span>
+            </div>
+          )}
           <h2 className="text-2xl font-bold">Game history</h2>
           <MatchHistory matches={history.matches} userId={profile.id} />
         </>

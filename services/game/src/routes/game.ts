@@ -5,6 +5,7 @@ import {
   MIN_PLAYERS,
   ROOM_NAME_MAX_LENGTH,
 } from "../gateway/utils.js";
+import { computeAchievements, humanIds, toMatch } from "../engine/stats.js";
 
 export default async function gameRoutes(fastify: FastifyInstance) {
   fastify.post(
@@ -104,20 +105,39 @@ export default async function gameRoutes(fastify: FastifyInstance) {
     }));
   });
 
-  const findHistory = (userId: string) =>
-    fastify.prisma.match.findMany({
+  // Parties terminees d'un joueur, les plus recentes d'abord, avec le pseudo
+  // et l'avatar actuels de chaque joueur
+  async function findHistory(userId: string) {
+    const rows = await fastify.prisma.match.findMany({
       where: { players: { has: userId } },
       orderBy: { endedAt: "desc" },
       select: {
         id: true,
         mode: true,
         players: true,
+        playerNames: true,
         ranking: true,
         winnerId: true,
+        eloChanges: true,
         startedAt: true,
         endedAt: true,
       },
     });
+    const users = await fastify.prisma.user.findMany({
+      where: { id: { in: humanIds(rows) } },
+      select: { id: true, username: true, avatarUrl: true },
+    });
+    const byId = new Map(users.map((u) => [u.id, u]));
+    return rows.map((row) => toMatch(row, byId));
+  }
+
+  const userIdParams = {
+    params: {
+      type: "object",
+      required: ["userId"],
+      properties: { userId: { type: "string", minLength: 1, maxLength: 64 } },
+    },
+  };
 
   // Historique du joueur connecte
   fastify.get("/games/history", async (request, reply) => {
@@ -131,18 +151,29 @@ export default async function gameRoutes(fastify: FastifyInstance) {
   // d'info que le classement
   fastify.get<{ Params: { userId: string } }>(
     "/games/history/:userId",
-    {
-      schema: {
-        params: {
-          type: "object",
-          required: ["userId"],
-          properties: { userId: { type: "string", minLength: 1 } },
-        },
-      },
-    },
+    { schema: userIdParams },
     async (request, reply) => {
       await request.jwtVerify();
       return reply.send(await findHistory(request.params.userId));
+    },
+  );
+
+  // Succes d'un joueur, calcules a partir de son historique et de son ELO
+  fastify.get<{ Params: { userId: string } }>(
+    "/games/achievements/:userId",
+    { schema: userIdParams },
+    async (request, reply) => {
+      await request.jwtVerify();
+      const { userId } = request.params;
+      const user = await fastify.prisma.user.findUnique({
+        where: { id: userId },
+        select: { elo: true },
+      });
+      if (!user) return reply.code(404).send({ error: "User not found" });
+      const history = await findHistory(userId);
+      return reply.send({
+        achievements: computeAchievements(history, userId, user.elo),
+      });
     },
   );
 }

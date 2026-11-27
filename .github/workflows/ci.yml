@@ -66,6 +66,9 @@ jobs:
       - name: Run queue unit tests
         run: npm run test-queue
 
+      - name: Run match history and achievements unit tests
+        run: npm run test-stats
+
       - name: Run game actions integration tests
         run: npm run test-game-actions
 

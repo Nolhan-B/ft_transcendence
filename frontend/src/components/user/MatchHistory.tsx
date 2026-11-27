@@ -1,5 +1,7 @@
 import { useState } from "react";
-import type { Match } from "shared";
+import { Link } from "react-router-dom";
+import type { Match, MatchParticipant } from "shared";
+import { UserAvatar } from "./UserAvatar";
 
 const PAGE_SIZE = 10;
 
@@ -21,7 +23,71 @@ function duration(match: Match): string {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
-// Opponents are not named: the server only sends their ids
+// The players of a game, the profile owner first. A real account links to its
+// profile; a bot or a deleted account is shown but not clickable.
+function Players({
+  participants,
+  userId,
+}: {
+  participants: MatchParticipant[];
+  userId: string;
+}) {
+  const ordered = [
+    ...participants.filter((p) => p.id === userId),
+    ...participants.filter((p) => p.id !== userId),
+  ];
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      {ordered.map((p) => {
+        const label = p.isBot ? `${p.username} (bot)` : p.username;
+        const content = (
+          <span className="flex items-center gap-1.5">
+            <UserAvatar
+              username={p.username}
+              avatarUrl={p.avatarUrl}
+              size="sm"
+            />
+            <span
+              className={`max-w-28 truncate text-sm ${p.deleted ? "italic opacity-60" : ""}`}
+            >
+              {label}
+            </span>
+          </span>
+        );
+        return p.isBot || p.deleted ? (
+          <span key={p.id} title={label}>
+            {content}
+          </span>
+        ) : (
+          <Link
+            key={p.id}
+            to={`/users/${p.id}`}
+            title={`${p.username}'s profile`}
+            className="link-hover"
+          >
+            {content}
+          </Link>
+        );
+      })}
+    </div>
+  );
+}
+
+// ELO won or lost in a ranked game, "-" in classic
+function EloChange({ match, userId }: { match: Match; userId: string }) {
+  const me = match.participants.find((p) => p.id === userId);
+  if (me?.oldElo == null || me.newElo == null) return <>-</>;
+  const delta = me.newElo - me.oldElo;
+  return (
+    <span
+      className={`font-semibold ${delta >= 0 ? "text-success" : "text-error"}`}
+      title={`${me.oldElo} → ${me.newElo}`}
+    >
+      {delta >= 0 ? `+${delta}` : delta}
+    </span>
+  );
+}
+
 export function MatchHistory({ matches, userId }: Props) {
   const [showAll, setShowAll] = useState(false);
 
@@ -45,6 +111,8 @@ export function MatchHistory({ matches, userId }: Props) {
               <th>Mode</th>
               <th>Result</th>
               <th>Place</th>
+              <th>Players</th>
+              <th>ELO</th>
               <th>Duration</th>
             </tr>
           </thead>
@@ -75,6 +143,15 @@ export function MatchHistory({ matches, userId }: Props) {
                   </td>
                   <td>
                     {place > 0 ? `${place} / ${match.players.length}` : "-"}
+                  </td>
+                  <td>
+                    <Players
+                      participants={match.participants}
+                      userId={userId}
+                    />
+                  </td>
+                  <td>
+                    <EloChange match={match} userId={userId} />
                   </td>
                   <td>{duration(match)}</td>
                 </tr>
