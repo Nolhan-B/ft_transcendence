@@ -170,13 +170,13 @@ export async function blockUser(
 ): Promise<boolean> {
   if (!userId || !targetId || userId === targetId) return false;
 
+  // createMany + skipDuplicates (INSERT ... ON CONFLICT DO NOTHING), not an
+  // upsert: an unblock running at the same time could delete the row between
+  // the upsert's read and its update, which failed with P2025 (500)
   await prisma.$transaction([
-    prisma.blockedFriendship.upsert({
-      where: {
-        blockerId_blockedId: { blockerId: userId, blockedId: targetId },
-      },
-      create: { blockerId: userId, blockedId: targetId },
-      update: {},
+    prisma.blockedFriendship.createMany({
+      data: [{ blockerId: userId, blockedId: targetId }],
+      skipDuplicates: true,
     }),
     prisma.friendship.deleteMany({
       where: {
