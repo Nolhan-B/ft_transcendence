@@ -57,7 +57,11 @@ export function OpponentSeat({ player, canCatchUno, onCatchUno }: Props) {
         {/* No avatar on smaller screens: the padding is then the same on
             both sides and the text is centered */}
         <div className="shrink-0 compact:hidden">
-          <UserAvatar username={player.username} size="sm" />
+          <UserAvatar
+            username={player.username}
+            avatarUrl={player.avatarUrl}
+            size="sm"
+          />
         </div>
         <div className="flex min-w-0 flex-col leading-tight compact:items-center compact:text-center">
           <span className="truncate font-semibold compact:text-sm tiny:text-xs">

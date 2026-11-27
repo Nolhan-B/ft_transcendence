@@ -73,6 +73,7 @@ async function buildServer() {
         return {
           id: where.id,
           username: `user_${where.id}`,
+          avatarUrl: `/avatars/${where.id}.png`,
           elo: 1000,
           tokenVersion: where.id.startsWith("revoked") ? 1 : 0,
         };
@@ -1047,6 +1048,35 @@ const tests = [
         isError("Invalid message format"),
         "Invalid message format",
       );
+      a.ws.close();
+    });
+  }),
+
+  // ---------------- Avatars ----------------
+
+  test("avatar: dans la room puis dans la partie, null pour un bot", async () => {
+    await withServer(async (server) => {
+      const userId = uniqueUserId();
+      const a = await connect(server, userId);
+      const before = a.messages.length;
+      const gameId = await startGameWithBot(a);
+      const room = a.messages
+        .slice(before)
+        .find((m) => m.type === "room_updated");
+      assert(
+        room.room.players[0].avatarUrl === `/avatars/${userId}.png`,
+        `avatar dans la room, reçu ${room.room.players[0].avatarUrl}`,
+      );
+      const state = [...a.messages]
+        .reverse()
+        .find((m) => m.type === "game_updated" && m.state.id === gameId).state;
+      const me = state.players.find((p: any) => p.userId === userId);
+      const bot = state.players.find((p: any) => p.userId.startsWith("bot_"));
+      assert(
+        me.avatarUrl === `/avatars/${userId}.png`,
+        "avatar dans la partie",
+      );
+      assert(bot.avatarUrl === null, "pas d'avatar pour un bot");
       a.ws.close();
     });
   }),

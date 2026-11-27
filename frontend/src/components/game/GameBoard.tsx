@@ -224,8 +224,12 @@ export function GameBoard({ state, myId, spectator = false }: Props) {
                   myTurn ? "animate-turn" : ""
                 }`}
               >
-                <UserAvatar username={me.username} size="sm" />
-                You
+                <UserAvatar
+                  username={me.username}
+                  avatarUrl={me.avatarUrl}
+                  size="sm"
+                />
+                <span className="max-w-40 truncate">{me.username}</span>
               </div>
             )}
 
@@ -337,7 +341,11 @@ export function GameBoard({ state, myId, spectator = false }: Props) {
               className="flex w-full cursor-pointer items-center gap-3 rounded-2xl bg-black/30 p-3 text-left font-semibold transition-colors hover:bg-black/50"
               onClick={() => choose({ targetUserId: player.userId })}
             >
-              <UserAvatar username={player.username} size="sm" />
+              <UserAvatar
+                username={player.username}
+                avatarUrl={player.avatarUrl}
+                size="sm"
+              />
               <span className="flex-1 truncate">{player.username}</span>
               <span className="text-sm text-white/65">
                 {player.hand.length} cards

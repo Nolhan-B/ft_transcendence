@@ -16,7 +16,7 @@ export async function handleJoinRoom(
   }
   const user = await ctx.fastify.prisma.user.findUnique({
     where: { id: ctx.userId },
-    select: { username: true },
+    select: { username: true, avatarUrl: true },
   });
   if (!user) {
     ctx.sendError(ctx.socket, "User not found");
@@ -37,6 +37,7 @@ export async function handleJoinRoom(
       ctx.userId,
       user.username,
       msg.password,
+      user.avatarUrl,
     );
     if (!result.ok) {
       ctx.sendError(ctx.socket, result.error);

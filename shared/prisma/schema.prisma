@@ -87,6 +87,11 @@ model Match {
   players   String[]
   ranking   String[]
   winnerId  String
+  // Pseudos au moment de la partie, dans l'ordre de players (bots compris :
+  // ils n'ont pas de compte, et un compte supprime garde ainsi un nom)
+  playerNames String[] @default([])
+  // Partie ranked : [{ userId, oldElo, newElo }] ; vide en classic
+  eloChanges  Json     @default("[]")
   chatLog   Json     @default("[]")
   moveLog   Json     @default("[]")
   startedAt DateTime @default(now())

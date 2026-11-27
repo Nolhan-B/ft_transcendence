@@ -306,6 +306,8 @@ Every backend service exposes `GET /health` (`{ "service": "<name>", "status": "
 │ players   String[]           │
 │ ranking   String[]           │   finishing order (classic: the winner only)
 │ winnerId  String             │
+│ playerNames String[]         │   usernames at the time, same order as players
+│ eloChanges  Json             │   ranked: [{ userId, oldElo, newElo }]
 │ chatLog   Json               │   in-game chat messages
 │ moveLog   Json               │   every game action
 │ startedAt DateTime           │
@@ -335,7 +337,7 @@ Every backend service exposes `GET /health` (`{ "service": "<name>", "status": "
 | AI opponents | bots that play every rule with human-like mistakes | nbilyj |
 | Ranked matchmaking and ELO | queue grouped by ELO, multi-player ELO update | nbilyj |
 | Spectator mode | live games list and read-only board | nbilyj |
-| Match history and stats | history, wins, losses, win rate, streak | nbilyj (back), kebertra (front) |
+| Match history and stats | history with the players and the ELO change, wins, losses, win rate, streak, ELO progress chart, 14 achievements | nbilyj (back), kebertra (front) |
 | Leaderboard | top players and own rank | nbarbosa / nbilyj (back), gtourdia (front) |
 | Game UI and effects | felt table, animations, penalty bursts, bluff pop-up, playable-card highlight, multi-row hand | kebertra, nbilyj |
 | Customization | 8 card skins, 5 table colors | nbilyj |
@@ -525,10 +527,27 @@ Rooms and live games refresh every 5 s. If I already am in a room or a new match
 ### Profile (`/profile`, `/users/:id`)
 
 - Avatar (or a letter on a color picked from the username), username, "You" badge on my profile, "Member since <date>".
-- On my profile only:
-  - **"Edit profile"**: a pop-up to change the username (same rules as sign-up, "Username already taken" on conflict) and the avatar (PNG, JPG or WebP, 5 MB at most);
+- On my profile only: **"Edit profile"**, a pop-up to change the username (same rules as sign-up, "Username already taken" on conflict) and the avatar (PNG, JPG or WebP, 5 MB at most).
+- On every profile:
   - **stats**: games played, wins and losses, win rate, current win streak;
-  - **match history**: date, mode, my place and the winner.
+  - **ELO progress**: a line of the ELO after each ranked game (hover a dot: ELO and date), and the total won or lost;
+  - **achievements**: 14 badges, the unlocked ones first with a ✓ and their date, the locked ones grey with their progress (e.g. 42/50):
+
+    | Badge | How to unlock it |
+    |---|---|
+    | First blood | win a game |
+    | Regular, Veteran, Centurion | play 10, 50, 100 games |
+    | On fire | win 5 games in a row |
+    | Comeback | win right after 3 losses in a row |
+    | King of the table | win a game with 4 players |
+    | Contender | win a ranked game |
+    | Machine breaker | win a game against a bot |
+    | Speedrunner | win a game in under 5 minutes |
+    | Marathon | play a game of 15 minutes or more |
+    | Social butterfly | play against 10 different players (bots not counted) |
+    | Rising star, Legend | reach 1200, 1500 ELO (kept if the ELO goes down later) |
+
+  - **match history**: date, mode, result, place, the players as a small list in finishing order (my name in bold, the others link to their profile; bots and deleted accounts are not links), the ELO won or lost in ranked, duration.
 - An unknown id shows "Oops!" and "User not found." with a link home.
 
 ### Leaderboard (`/leaderboard`)
@@ -640,7 +659,9 @@ Internal only (403 through the gateway): `POST /internal/events` `{ targetUserId
 |---|---|---|---|
 | `GET /games/rooms` | 🔒 | — | **200** `RoomInfo[]`: `{ code, name, hasPassword, leaderId, maxPlayers, players: [{ id, username }], mode, settings }` (passwords never sent) |
 | `GET /games/live` | 🔒 | — | **200** `[{ id, mode, players: [{ userId, username, cardCount, isCurrentTurn }] }]`, games in progress, no card is exposed |
-| `GET /games/history` | 🔒 | — | **200** `[{ id, mode, players, ranking, winnerId, startedAt, endedAt }]`, my finished games, newest first |
+| `GET /games/history` | 🔒 | — | **200** `[{ id, mode, players, participants, ranking, winnerId, startedAt, endedAt }]`, my finished games, newest first. `participants`: `[{ id, username, avatarUrl, isBot, deleted, oldElo, newElo }]` in the order of `players` (current username of an account, the name of the time for a bot or a deleted account; ELO `null` in classic) |
+| `GET /games/history/:userId` | 🔒 | — | **200** same, for another player |
+| `GET /games/achievements/:userId` | 🔒 | — | **200** `{ achievements: [{ id, title, description, unlocked, unlockedAt, progress, goal }] }`, computed from the history and the ELO · **404** `"User not found"` |
 | `POST /games/rooms` | 🔒 | `name` (1-50), `mode` (`classic`), `maxPlayers` (2-4), `password?` | **201** `{ roomCode }` · **400** `"Room name cannot be empty"`, `"Ranked games are only available through matchmaking"`, `"Max players must be between 2 and 4"` · **404** `"User not found"` |
 
 The website creates rooms and games through the WebSocket. `POST /games/rooms` is kept for scripts and tests. A game always starts from a room (`start_game`) or from matchmaking: there is no route that puts other users in a game.
@@ -867,7 +888,7 @@ The subject asks for **14 points** (Major = 2, Minor = 1); bonus modules count u
 | 3 | **Web** — users interacting with other users | Major | 2 | direct chat, public profiles (`/users/:id`), friends system (add, accept, remove, list) | nbarbosa, gtourdia, kebertra |
 | 4 | **Web** — ORM | Minor | 1 | Prisma 7 with one shared schema, typed client in every service, transactions | nbarbosa, nbilyj |
 | 5 | **User management** — 2FA | Minor | 1 | TOTP with QR code, verify, login step with a temporary token, disable; required for password change and deletion when on | nbarbosa, kebertra |
-| 6 | **User management** — game statistics and match history | Minor | 1 | every match saved; history, wins, losses, win rate, streak on the profile; ELO and leaderboard with own rank | nbilyj, kebertra, gtourdia |
+| 6 | **User management** — game statistics and match history | Minor | 1 | every match saved with its players and ELO changes; stats (wins, losses, win rate, streak), history with the opponents and the ELO won or lost, ELO progress chart, 14 achievements with their unlock date, leaderboard with own rank | nbilyj, kebertra, gtourdia |
 | 7 | **AI** — AI opponent | Major | 2 | bots that play every card and every house rule (stacking, 7-0, bluff challenge, UNO), with random mistakes so they can lose and win; see [Bots](#bots) | nbilyj |
 | 8 | **Gaming** — complete web-based game | Major | 2 | the card game: clear rules, win conditions, live matches | nbilyj, kebertra |
 | 9 | **Gaming** — remote players | Major | 2 | each player on their own computer over WebSocket; 30 s reconnection grace, `reconnecting` state, AFK handling, state resent on reconnection | nbilyj |
@@ -963,7 +984,6 @@ The subject asks for **14 points** (Major = 2, Minor = 1); bonus modules count u
 - **No online status for friends**: the friends list does not show who is connected. The "Standard user management" module requires it, which is why that module is not claimed above.
 - **In-game chat**: messages sent during a game are shown live and saved with the match, but a player who reloads or joins late does not get the messages already sent.
 - **Game state in memory**: restarting the game service ends the games in progress (finished matches are safely stored).
-- **Match history** is only visible on my own profile (`/games/history` returns the connected user's games).
 - **Self-signed certificate**: the browser shows a warning on the first visit.
 
 ---

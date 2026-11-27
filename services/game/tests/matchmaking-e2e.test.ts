@@ -59,13 +59,18 @@ function sleep(ms: number) {
 function createDb() {
   const users = new Map<
     string,
-    { id: string; username: string; elo: number }
+    { id: string; username: string; avatarUrl: string; elo: number }
   >();
   const matches: any[] = [];
 
   function ensure(id: string) {
     if (!users.has(id))
-      users.set(id, { id, username: `user_${id}`, elo: 1000 });
+      users.set(id, {
+        id,
+        username: `user_${id}`,
+        avatarUrl: `/avatars/${id}.png`,
+        elo: 1000,
+      });
     return users.get(id)!;
   }
 
@@ -542,6 +547,23 @@ const tests = [
     });
   }),
 
+  test("match: la partie ranked contient les avatars des joueurs", async () => {
+    await withServer(async (server) => {
+      const { players, gameId } = await queueAndMatch(
+        server,
+        [1000, 1000, 1000, 1000],
+      );
+      const game = server.gameManager.getGame(gameId)!;
+      for (const p of players) {
+        const inGame = game.players.find((g) => g.userId === p.id)!;
+        assert(
+          inGame.avatarUrl === `/avatars/${p.id}.png`,
+          `avatar de ${p.id}, reçu ${inGame.avatarUrl}`,
+        );
+      }
+    });
+  }),
+
   test("match: match_found contient les pseudos et les ELO", async () => {
     await withServer(async (server) => {
       const elos = [1000, 1030, 1060, 970];
@@ -844,6 +866,42 @@ const tests = [
         Math.abs(sum) <= 2,
         `Les gains et les pertes doivent s'équilibrer (somme ${sum})`,
       );
+    });
+  }),
+
+  test("historique: le match ranked garde les pseudos et les changements d'ELO", async () => {
+    await withServer(async (server) => {
+      const { players, gameId } = await queueAndMatch(
+        server,
+        // Assez proches pour etre mis ensemble tout de suite (+-100)
+        [1000, 1020, 1040, 1060],
+      );
+      await joinAll(players, gameId);
+      const ended = waitForMessage(players[0].ws, "game_ended", 30000, false);
+      await playToEnd(server, players, gameId);
+      await ended;
+      await sleep(100);
+
+      const match = server.db.matches[0];
+      assert(
+        match.playerNames.length === 4 &&
+          match.players.every(
+            (id: string, i: number) => match.playerNames[i] === `user_${id}`,
+          ),
+        `pseudos dans l'ordre des joueurs, reçu ${JSON.stringify(match.playerNames)}`,
+      );
+      assert(match.eloChanges.length === 4, "un changement par joueur");
+      for (const change of match.eloChanges) {
+        const now = server.db.users.get(change.userId)!.elo;
+        assert(
+          change.newElo === now,
+          `newElo (${change.newElo}) = ELO enregistré (${now})`,
+        );
+      }
+      const first = match.eloChanges.find(
+        (c: any) => c.userId === match.ranking[0],
+      );
+      assert(first.newElo > first.oldElo, "le 1er gagne des points");
     });
   }),
 

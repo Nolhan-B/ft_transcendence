@@ -581,6 +581,80 @@ await test("2-player classic game plays to completion", async () => {
 });
 
 // ============================================================
+// HISTORY AND ACHIEVEMENTS (after the 2-player game above)
+// ============================================================
+
+async function getJson(path: string, token: string) {
+  const res = await fetch(`${API}${path}`, {
+    headers: { Cookie: `access_token=${token}` },
+  });
+  return { status: res.status, body: await res.json() };
+}
+
+await test("history names the players of the finished game", async () => {
+  // The game is saved right after its end: give it a moment
+  let match: any;
+  for (let i = 0; i < 20 && !match; i++) {
+    const { body } = await getJson("/game/games/history", aliceToken);
+    match = body.find((m: any) => m.players.includes(bobId));
+    if (!match) await new Promise((r) => setTimeout(r, 250));
+  }
+  assert(match, "The game with Bob should be in Alice's history");
+  const names = match.participants.map((p: any) => p.username).sort();
+  assert(
+    names.join() === [alice.username, bob.username].sort().join(),
+    `Both usernames expected, got ${names.join()}`,
+  );
+  assert(
+    match.participants.every((p: any) => !p.isBot && !p.deleted),
+    "Two real accounts",
+  );
+  assert(
+    match.participants.every((p: any) => p.newElo === null),
+    "No ELO change in classic",
+  );
+
+  // Same game seen from Bob's profile
+  const fromBob = await getJson(`/game/games/history/${bobId}`, aliceToken);
+  assert(
+    fromBob.body.some((m: any) => m.id === match.id),
+    "Same game in Bob's history",
+  );
+  log(`Players: ${names.join(" vs ")}`);
+});
+
+await test("achievements: the winner unlocked First blood", async () => {
+  const { body: history } = await getJson("/game/games/history", aliceToken);
+  const match = history.find((m: any) => m.players.includes(bobId));
+  const winnerId = match.winnerId;
+  const loserId = winnerId === aliceId ? bobId : aliceId;
+
+  const won = await getJson(`/game/games/achievements/${winnerId}`, aliceToken);
+  assert(won.status === 200, `200 expected, got ${won.status}`);
+  const firstWin = won.body.achievements.find((a: any) => a.id === "first_win");
+  assert(firstWin.unlocked, "The winner has First blood");
+  assert(firstWin.unlockedAt === match.endedAt, "Unlocked by this game");
+
+  const lost = await getJson(`/game/games/achievements/${loserId}`, aliceToken);
+  const games10 = lost.body.achievements.find((a: any) => a.id === "games_10");
+  assert(games10.progress >= 1 && games10.goal === 10, "The game counts");
+  assert(
+    !lost.body.achievements.find((a: any) => a.id === "first_win").unlocked,
+    "The loser has no win yet",
+  );
+});
+
+await test("achievements: unknown user → 404, not logged in → 401", async () => {
+  const unknown = await getJson(
+    "/game/games/achievements/00000000-0000-0000-0000-000000000000",
+    aliceToken,
+  );
+  assert(unknown.status === 404, `404 expected, got ${unknown.status}`);
+  const res = await fetch(`${API}/game/games/achievements/${aliceId}`);
+  assert(res.status === 401, `401 expected, got ${res.status}`);
+});
+
+// ============================================================
 // FULL GAME - 3 PLAYERS CLASSIC
 // ============================================================
 

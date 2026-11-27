@@ -37,6 +37,8 @@ export enum GameStatus {
 export interface Player {
   userId: string;
   username: string;
+  // Profile picture when the game started (null: none, or a bot)
+  avatarUrl?: string | null;
   hand: Card[];
   isCurrentTurn: boolean;
   disconnected: boolean;
@@ -147,17 +149,63 @@ export interface GameState {
   reconnecting: string[];
 }
 
+// One player of a finished game, as the history gives it
+export interface MatchParticipant {
+  id: string;
+  // Current username for an account, the name of the time for a bot or a
+  // deleted account
+  username: string;
+  avatarUrl: string | null;
+  isBot: boolean;
+  // Account deleted since the game
+  deleted: boolean;
+  // Ranked games: ELO before and after the game (null in classic)
+  oldElo: number | null;
+  newElo: number | null;
+}
+
 export interface Match {
   id: string;
   mode: GameMode;
   players: string[];
+  // Same players as `players`, same order, with their names and ELO changes
+  participants: MatchParticipant[];
   ranking: string[];
   winnerId: string | null;
   startedAt: string;
   endedAt: string | null;
 }
 
+export type AchievementId =
+  | "first_win"
+  | "games_10"
+  | "games_50"
+  | "streak_5"
+  | "full_table_win"
+  | "first_ranked_win"
+  | "elo_1200"
+  | "beat_a_bot"
+  | "speed_win"
+  | "marathon"
+  | "comeback"
+  | "social_10"
+  | "games_100"
+  | "elo_1500";
+
+export interface Achievement {
+  id: AchievementId;
+  title: string;
+  description: string;
+  unlocked: boolean;
+  // When it was unlocked (the end of the game that did it), null if locked
+  unlockedAt: string | null;
+  // Where the player stands, for the locked ones (e.g. 7 / 10 games)
+  progress: number;
+  goal: number;
+}
+
 export interface GameParticipant {
   id: string;
   username: string;
+  avatarUrl?: string | null;
 }

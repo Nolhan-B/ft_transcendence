@@ -33,7 +33,11 @@ export function RoomPlayers({ room, isLeader, onAddBot, onRemoveBot }: Props) {
               key={player.id}
               className="list-row animate-pop mb-2 items-center rounded-2xl bg-black/25"
             >
-              <UserAvatar username={player.username} size="md" />
+              <UserAvatar
+                username={player.username}
+                avatarUrl={player.avatarUrl}
+                size="md"
+              />
               <div className="list-col-grow flex items-center gap-2 font-semibold">
                 {player.username}
                 {player.id === room.leaderId && (

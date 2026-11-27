@@ -7,6 +7,7 @@ export const MAX_RANGE = 500;
 export interface QueueEntry {
   userId: string;
   username: string;
+  avatarUrl?: string | null;
   elo: number;
   joinedAt: number; // Date.now() lors de l'entree dans la file
 }
