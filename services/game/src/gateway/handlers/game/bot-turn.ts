@@ -13,6 +13,8 @@ import { handleDrawCard } from "./draw-card.js";
 import { handleAcceptWildDraw4 } from "./accept-wild-draw4.js";
 import { handlePlayCard } from "./play-card.js";
 import { handleCallUno } from "./call-uno.js";
+import { handleCatchUno } from "./catch-uno.js";
+import { unoKey } from "../../utils.js";
 
 // Delai de reflexion du bot : entre 2,5 s et 4,5 s par defaut, pour que les
 // humains voient passer les coups. Reglable par l'environnement (les tests le
@@ -147,4 +149,109 @@ export function scheduleBotTurnIfNeeded(
       ctx.fastify.log.error({ err, botId, gameId }, "Bot turn failed");
     });
   }, botDelayMs());
+}
+
+// Delais des reactions hors tour, entre min et min + extra (ms)
+function randomDelay(min: number, extra: number): number {
+  return min + Math.random() * extra;
+}
+
+// Chance qu'un bot voie l'occasion (il n'est pas parfait)
+const JUMP_IN_CHANCE = 0.5;
+const CATCH_UNO_CHANCE = 0.7;
+
+// Contexte d'un bot pour appeler les handlers : ses erreurs ne partent pas
+// chez l'humain (le coup a pu devenir invalide pendant le delai)
+function botContext(ctx: GatewayContext, botId: string): GatewayContext {
+  return { ...ctx, userId: botId, sendError: () => {} };
+}
+
+// A appeler apres chaque carte posee : les bots reagissent hors de leur tour,
+// comme un humain. Catch UNO : le joueur qui vient de poser est a 1 carte
+// sans avoir dit UNO. Jump-in : un bot a la meme carte (couleur et valeur)
+// que celle du dessus. Chaque reaction relit l'etat au declenchement, et les
+// handlers verifient tout (fenetre UNO, coup valide) : une occasion passee ne
+// fait rien.
+export function scheduleBotReactions(
+  ctx: GatewayContext,
+  game: InternalGameState,
+  playerId: string,
+): void {
+  if (game.status !== GameStatus.IN_PROGRESS) return;
+  const gameId = game.id;
+  const bots = game.players.filter(
+    (p) => p.userId.startsWith("bot_") && !p.disconnected,
+  );
+
+  // Catch UNO : avant la fin de la fenetre de 5 s
+  const player = game.players.find((p) => p.userId === playerId);
+  if (
+    game.settings.unoCallout &&
+    player?.hand.length === 1 &&
+    ctx.unoTimers.has(unoKey(gameId, playerId))
+  ) {
+    for (const bot of bots) {
+      if (bot.userId === playerId || Math.random() >= CATCH_UNO_CHANCE)
+        continue;
+      setTimeout(
+        () => {
+          const now = ctx.manager.getGame(gameId);
+          if (now?.status !== GameStatus.IN_PROGRESS) return;
+          handleCatchUno(botContext(ctx, bot.userId), {
+            gameId,
+            targetUserId: playerId,
+          });
+        },
+        randomDelay(1500, 2000),
+      );
+    }
+  }
+
+  // Jump-in : pas de joker (le moteur demande la meme couleur et valeur)
+  if (game.settings.jumpIn && !game.lastWildDraw4) {
+    const top = game.topCard;
+    for (const bot of bots) {
+      if (bot.isCurrentTurn) continue; // son tour normal s'en charge
+      const copy = bot.hand.find(
+        (c) =>
+          c.color === top.color && c.value === top.value && c.color !== "wild",
+      );
+      if (!copy || Math.random() >= JUMP_IN_CHANCE) continue;
+      setTimeout(
+        () => {
+          const now = ctx.manager.getGame(gameId);
+          if (
+            now?.status !== GameStatus.IN_PROGRESS ||
+            now.topCard.id !== top.id ||
+            now.lastWildDraw4
+          )
+            return;
+          const me = now.players.find((p) => p.userId === bot.userId);
+          if (!me || me.isCurrentTurn || !me.hand.some((c) => c.id === copy.id))
+            return;
+          const botCtx = botContext(ctx, bot.userId);
+          handlePlayCard(botCtx, { gameId, cardId: copy.id })
+            .then(() => {
+              // Plus qu'une carte : il dit UNO (ou l'oublie), comme a son tour
+              const after = ctx.manager.getGame(gameId);
+              const mine = after?.players.find((p) => p.userId === bot.userId);
+              if (
+                after?.status === GameStatus.IN_PROGRESS &&
+                after.settings.unoCallout &&
+                mine &&
+                shouldCallUno(mine.hand)
+              )
+                handleCallUno(botCtx, { gameId });
+            })
+            .catch((err) => {
+              ctx.fastify.log.error(
+                { err, botId: bot.userId, gameId },
+                "Bot jump-in failed",
+              );
+            });
+        },
+        randomDelay(500, 1000),
+      );
+    }
+  }
 }
