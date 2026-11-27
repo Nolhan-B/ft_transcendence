@@ -269,7 +269,56 @@ const withTimeout = (promise, ms = 5000) => {
     await waitIn(bobTab3, isFriendReq, "Demande d'ami sur l'onglet 3 de Bob");
     console.log("✅ Événement d'ami reçu sur tous les onglets.");
 
-    for (const tab of [aliceTab1, aliceTab2, bobTab2, bobTab3]) tab.ws.close();
+    // ==========================================
+    // TEST 5 : blocage
+    // ==========================================
+    const eve = await createAccount("ci_eve");
+    const frank = await createAccount("ci_frank");
+    const asUser = (user, method, path) =>
+      fetch(`${API_URL}/api/user${path}`, {
+        method,
+        headers: { Authorization: `Bearer ${user.token}` },
+      });
+    await asUser(eve, "POST", `/friends/request/${frank.user.id}`);
+    const frankAccept = await asUser(frank, "POST", `/friends/accept/${eve.user.id}`);
+    assert(frankAccept.ok, `Eve et Frank doivent devenir amis (${frankAccept.status})`);
+
+    // Message envoye pendant que Frank est absent, puis Frank bloque Eve :
+    // il ne doit pas le recevoir en se connectant
+    const eveTab = await openTab(eve);
+    await new Promise((r) => setTimeout(r, 500));
+    eveTab.ws.send(JSON.stringify({ type: "direct_message", receiverId: frank.user.id, content: "Avant le blocage" }));
+    await new Promise((r) => setTimeout(r, 500));
+    const block = await asUser(frank, "POST", `/blocks/${eve.user.id}`);
+    assert(block.ok, `Le blocage doit réussir (${block.status})`);
+    const frankTab1 = await openTab(frank);
+    await new Promise((r) => setTimeout(r, 1500));
+    assert(
+      !frankTab1.inbox.some(isDm("Avant le blocage")),
+      "Un message en attente d'une personne bloquée ne doit pas être livré",
+    );
+    console.log("✅ Messages en attente d'un utilisateur bloqué non livrés.");
+
+    // Frank bloque depuis un autre onglet : cet onglet-ci retire Eve aussi
+    await asUser(frank, "DELETE", `/blocks/${eve.user.id}`);
+    await asUser(frank, "POST", `/blocks/${eve.user.id}`);
+    await waitIn(
+      frankTab1,
+      (m) => m.type === "friend_removed" && m.userId === eve.user.id,
+      "Blocage depuis un autre onglet de Frank",
+    );
+    console.log("✅ Les autres onglets de celui qui bloque sont prévenus.");
+
+    // Bloquer et debloquer en meme temps : jamais d'erreur serveur
+    const race = await Promise.all(
+      ["DELETE", "POST", "DELETE", "POST", "DELETE", "POST"].map((m) =>
+        asUser(frank, m, `/blocks/${eve.user.id}`).then((r) => r.status),
+      ),
+    );
+    assert(race.every((s) => s < 500), `Blocage concurrent : erreur serveur (${race.join(",")})`);
+    console.log("✅ Bloquer et débloquer en même temps ne casse rien.");
+
+    for (const tab of [aliceTab1, aliceTab2, bobTab2, bobTab3, eveTab, frankTab1]) tab.ws.close();
 
     console.log("🎉 Tous les tests E2E du chat ont réussi avec succès !");
     process.exit(0);
