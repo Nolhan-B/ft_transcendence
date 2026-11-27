@@ -969,24 +969,17 @@ await test("two games can run simultaneously", async () => {
 // GAME DOUBLE CONNECTION
 // ============================================================
 
-await test("second WS connection is rejected for same user", async () => {
+await test("second WS connection is accepted for same user (two tabs)", async () => {
   const client1 = await createClient(aliceToken);
   await client1.waitFor("connected");
-
-  try {
-    const client2 = await createClient(aliceToken);
-    const error = await client2.waitFor("error", 3000);
-    assert(
-      error.message === "Already connected",
-      "Should reject second connection",
-    );
-  } catch {
-    // Si la connexion est refusée ou fermée avant le message, c'est aussi valide
-    log("Connection closed before error message (acceptable)");
-  }
-  log("Duplicate connection rejected");
+  const client2 = await createClient(aliceToken);
+  await client2.waitFor("connected");
+  assert(client1.ws.readyState === 1, "First tab should stay open");
+  assert(client2.ws.readyState === 1, "Second tab should be open");
+  log("Two tabs connected");
 
   client1.ws.close();
+  client2.ws.close();
 });
 
 await test("can reconnect after clean disconnect", async () => {

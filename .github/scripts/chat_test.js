@@ -215,6 +215,62 @@ const withTimeout = (promise, ms = 5000) => {
       });
     }));
 
+    // ==========================================
+    // TEST 4 : plusieurs onglets par utilisateur
+    // ==========================================
+    // Chaque onglet a son socket : tous recoivent les messages, ceux de
+    // l'expediteur aussi, et fermer un onglet ne coupe pas les autres
+    const openTab = (user) => new Promise((resolve, reject) => {
+      const ws = new WebSocket(`${WS_URL}?token=${user.token}`);
+      const inbox = [];
+      ws.addEventListener("message", (e) => inbox.push(JSON.parse(e.data)));
+      ws.addEventListener("open", () => resolve({ ws, inbox }));
+      ws.addEventListener("error", reject);
+    });
+    const waitIn = async (tab, pred, label) => {
+      for (let i = 0; i < 100; i++) {
+        if (tab.inbox.some(pred)) return;
+        await new Promise((r) => setTimeout(r, 50));
+      }
+      throw new Error(`${label} : rien reçu (${JSON.stringify(tab.inbox)})`);
+    };
+    const isDm = (content) => (m) => m.type === "direct_message" && m.content === content;
+
+    const aliceTab1 = await openTab(alice);
+    const aliceTab2 = await openTab(alice);
+    const bobTab1 = await openTab(bob);
+    const bobTab2 = await openTab(bob);
+    // Laisse le serveur finir la verification de session des quatre sockets
+    await new Promise((r) => setTimeout(r, 500));
+
+    aliceTab1.ws.send(JSON.stringify({ type: "direct_message", receiverId: bob.user.id, content: "Deux onglets" }));
+    await waitIn(bobTab1, isDm("Deux onglets"), "Onglet 1 de Bob");
+    await waitIn(bobTab2, isDm("Deux onglets"), "Onglet 2 de Bob");
+    await waitIn(aliceTab2, isDm("Deux onglets"), "Autre onglet d'Alice (expéditrice)");
+    console.log("✅ Message reçu sur tous les onglets, ceux de l'expéditrice compris.");
+
+    bobTab1.ws.close();
+    await new Promise((r) => setTimeout(r, 300));
+    aliceTab1.ws.send(JSON.stringify({ type: "direct_message", receiverId: bob.user.id, content: "Un onglet fermé" }));
+    await waitIn(bobTab2, isDm("Un onglet fermé"), "Onglet restant de Bob");
+    console.log("✅ Fermer un onglet ne coupe pas les autres.");
+
+    // Evenement d'ami pousse par le service user : sur tous les onglets
+    const dave = await createAccount("ci_dave");
+    const bobTab3 = await openTab(bob);
+    await new Promise((r) => setTimeout(r, 500));
+    const friendReq = await fetch(`${API_URL}/api/user/friends/request/${bob.user.id}`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${dave.token}` },
+    });
+    assert(friendReq.ok, `Demande d'ami de Dave refusée (${friendReq.status})`);
+    const isFriendReq = (m) => m.type === "friend_request_received";
+    await waitIn(bobTab2, isFriendReq, "Demande d'ami sur l'onglet 2 de Bob");
+    await waitIn(bobTab3, isFriendReq, "Demande d'ami sur l'onglet 3 de Bob");
+    console.log("✅ Événement d'ami reçu sur tous les onglets.");
+
+    for (const tab of [aliceTab1, aliceTab2, bobTab2, bobTab3]) tab.ws.close();
+
     console.log("🎉 Tous les tests E2E du chat ont réussi avec succès !");
     process.exit(0);
   } catch (err) {

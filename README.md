@@ -427,7 +427,7 @@ While the session is being checked (`GET /api/auth/me` on load), protected route
 - **"Back to game" banner**: on any other page while I still play a game, a banner says "You are still in a game" (or "It's your turn in your game!", pulsing) with a "Back to game" button. The game goes on without me in the meantime.
 - **Friends button**: a vertical "Friends" tab on the right edge (connected users) opens the friends drawer (see [Friends system](#friends-system)).
 - **Error toasts**: errors sent by the game or chat WebSocket appear bottom-right and disappear after 5 s or on click.
-- **Real-time session**: as soon as a user is connected, one game WebSocket and one chat WebSocket stay open for the whole visit, whatever the page. They reconnect by themselves with an increasing delay (1 s, 2 s, 4 s... up to 10 s), except when the server refused the connection for good (invalid token, game already open in another tab).
+- **Real-time session**: as soon as a user is connected, one game WebSocket and one chat WebSocket stay open for the whole visit, whatever the page. They reconnect by themselves with an increasing delay (1 s, 2 s, 4 s... up to 10 s), except when the server refused the connection for good (invalid token). Several tabs or devices can be open at once: each one has its own sockets.
 
 ### Home (`/home`)
 
@@ -650,7 +650,7 @@ There are two WebSockets, both authenticated by the `access_token` cookie (the c
 **Connection**
 - The server answers `{ "type": "connected" }` when it accepts the socket.
 - No cookie: `error "Unauthorized"` and close. Invalid token: `error "Invalid token"` and close.
-- **One socket per user.** A second tab gets `error "Already connected"` and is closed. After a page reload, the old dead socket is detected by a ping (2 s) and the new one is accepted.
+- **Several sockets per user.** Each tab or device has its own socket and receives the user's events (room, game, matchmaking). A user leaves the queue or a room only when their last socket closes. The messages of one socket are handled one at a time, in order. Every socket is pinged every 30 s: one that did not answer the previous ping is closed.
 - Malformed messages get `error "Invalid JSON"`, `"Invalid message"` or `"Invalid message format"`.
 
 **Rooms (client → server)**
@@ -801,7 +801,7 @@ Errors (`{ type: "error", message }`): `"Invalid JSON format"`, `"Invalid messag
 - **Uploads**: extension whitelist, the first bytes must be a real PNG, JPEG or WebP image of the announced type, 5 MB limit (also enforced by Nginx), files renamed `<userId>-<timestamp>`, the old file deleted, and partial files cleaned up on error.
 - **Internal surfaces**: `/metrics` and `/internal/*` are refused by the gateway (403). Prometheus, Grafana and PostgreSQL are not exposed publicly.
 - **Game integrity**: the server is authoritative. Every move is checked by the rules engine, and a client never sees the other players' cards (hands are replaced by placeholders before sending).
-- **Concurrency**: one game socket per user, serializable friend transactions, atomic accepts, and per-game timers so simultaneous actions cannot corrupt a game.
+- **Concurrency**: messages of a socket handled in order, serializable friend transactions, atomic accepts, and per-game timers so simultaneous actions cannot corrupt a game.
 
 ---
 
