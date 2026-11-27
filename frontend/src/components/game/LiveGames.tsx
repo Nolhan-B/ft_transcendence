@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import type { GameMode } from "shared";
 import { useAuth } from "../../hooks/auth/useAuth";
 import { UserAvatar } from "../user/UserAvatar";
+import { useGame } from "../../hooks/ws/useGame";
 
 const REFRESH_MS = 5000;
 
@@ -47,6 +48,16 @@ function useLiveGames() {
 export function LiveGames() {
   const games = useLiveGames();
   const { user } = useAuth();
+  const [hideMyGame, setHideMyGame] = useState(false);
+  const { gameState } = useGame();
+
+  useEffect(() => {
+    if (gameState?.status === "finished") {
+      setHideMyGame(true);
+    } else {
+      setHideMyGame(false);
+    }
+  }, [gameState]);
 
   if (!games || games.length === 0) return null;
 
@@ -108,12 +119,14 @@ export function LiveGames() {
               </ul>
 
               {mine ? (
-                <Link
-                  to={`/games/${game.id}`}
-                  className="btn btn-accent mt-auto"
-                >
-                  Back to my game
-                </Link>
+                !hideMyGame && (
+                  <Link
+                    to={`/games/${game.id}`}
+                    className="btn btn-accent mt-auto"
+                  >
+                    Back to my game
+                  </Link>
+                )
               ) : (
                 <Link
                   to={`/games/${game.id}/spectate`}
