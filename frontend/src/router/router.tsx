@@ -34,7 +34,6 @@ function Router() {
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/leaderboard" element={<LeaderboardPage />} />
-          <Route path="/users/:id" element={<ProfilePage />} />
 
           {/* Connected users only */}
           <Route element={<RequireAuth />}>
@@ -42,6 +41,7 @@ function Router() {
             <Route path="/play/rooms/:code" element={<RoomPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/users/:id" element={<ProfilePage />} />
           </Route>
 
           {/* Unknown URL, inside the layout */}
