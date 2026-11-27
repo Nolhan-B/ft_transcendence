@@ -945,7 +945,6 @@ The subject asks for **14 points** (Major = 2, Minor = 1); bonus modules count u
 ## Known limitations
 
 - **No online status for friends**: the friends list does not show who is connected. The "Standard user management" module requires it, which is why that module is not claimed above.
-- **No block action in the UI or API**: the `BlockedFriendship` table and every check on it exist (friend requests, chat, history), but there is no route to create or remove a block.
 - **In-game chat**: the server supports `chat_message` during a game and saves it with the match, but the in-game chat bubble (`FloatingMessageBox`) is not shown in the game screen yet.
 - **Game state in memory**: restarting the game service ends the games in progress (finished matches are safely stored).
 - **Match history** is only visible on my own profile (`/games/history` returns the connected user's games).
