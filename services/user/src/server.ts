@@ -9,7 +9,13 @@ import process from "node:process";
 import multipart from "@fastify/multipart";
 import staticPlugin from "@fastify/static";
 import path from "path";
-import { setupMetrics } from "shared";
+import {
+  isSessionCurrent,
+  jwtSecretOrExit,
+  setupMetrics,
+  setupOriginCheck,
+} from "shared";
+import type { SessionPayload } from "shared";
 import leaderboardRoutes from "./routes/leaderboard.routes.js";
 
 if (fs.existsSync("/run/secrets/db_url")) {
@@ -67,6 +73,8 @@ fastify.setErrorHandler(
 );
 
 setupMetrics(fastify, "user-service");
+// Writes sent from another website are refused (security audit F-25)
+setupOriginCheck(fastify);
 
 // Ensure uploads directory exists before registering @fastify/static
 const uploadsRoot = path.join(process.cwd(), "uploads");
@@ -80,12 +88,21 @@ fastify.register(staticPlugin, {
 fastify.register(prismaPlugin);
 fastify.register(multipart, { limits: { fileSize: 5 * 1024 * 1024 } }); // 5MB max
 fastify.register(cookie);
+// The JWT key: without it in production the service refuses to start,
+// instead of signing with a key everybody knows
+function jwtSecret(): string {
+  return jwtSecretOrExit(process.env.JWT_SECRET);
+}
+
 fastify.register(jwt, {
-  secret: process.env.JWT_SECRET ?? "dev-secret",
+  secret: jwtSecret(),
   cookie: {
     cookieName: "access_token",
     signed: false,
   },
+  // Revoked sessions are refused (security audit F-07)
+  trusted: (_request, decoded) =>
+    isSessionCurrent(fastify.prisma, decoded as SessionPayload),
 });
 
 fastify.register(profileRoutes);

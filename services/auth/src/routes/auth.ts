@@ -7,19 +7,13 @@ import type {
   JwtPayload,
 } from "shared";
 import { signChallenge } from "../services/challenge.service.js";
-
-const COOKIE_OPTIONS = {
-  path: "/",
-  httpOnly: true,
-  secure: true,
-  sameSite: "lax" as const,
-  maxAge: 7 * 24 * 60 * 60,
-};
+import { openSession, revokeSessions } from "../services/session.service.js";
 
 // Usernames: 3 to 20 letters (any language), digits, "_", "." or "-". No
 // spaces, so a name can never be blank or look empty. Same rule in the
 // frontend forms (USERNAME_PATTERN) and in the other service.
-const USERNAME_PATTERN = "^[\\p{L}\\p{N}_.\\-]{3,20}$";
+const USERNAME_PATTERN =
+  "^[\\p{L}\\p{N}][\\p{L}\\p{N}_.\\-]{1,18}[\\p{L}\\p{N}]$";
 
 export default async function authRoutes(fastify: FastifyInstance) {
   fastify.post(
@@ -37,7 +31,8 @@ export default async function authRoutes(fastify: FastifyInstance) {
               maxLength: 20,
               pattern: USERNAME_PATTERN,
             },
-            password: { type: "string", minLength: 8 },
+            // 72 at most: bcrypt ignores what comes after (audit F-16)
+            password: { type: "string", minLength: 8, maxLength: 72 },
           },
         },
       },
@@ -46,17 +41,25 @@ export default async function authRoutes(fastify: FastifyInstance) {
       const { email, username, password } = request.body as SignupPayload;
 
       try {
+        // Same email or username in another case: already taken (audit F-17)
+        if (
+          (await authService.isEmailTaken(fastify.prisma, email)) ||
+          (await authService.isUsernameTaken(fastify.prisma, username))
+        ) {
+          return reply
+            .code(409)
+            .send({ error: "Email or username already taken" });
+        }
         const user = await authService.signup(
           fastify.prisma,
           email,
           username,
           password,
         );
-        const token = fastify.jwt.sign({ id: user.id }, { expiresIn: "7d" });
+        await openSession(fastify, reply, user.id);
 
-        reply.setCookie("access_token", token, COOKIE_OPTIONS);
-
-        return reply.code(201).send({ token, user });
+        // Session in the HttpOnly cookie only, never in the body (audit F-08)
+        return reply.code(201).send({ user });
       } catch (err: unknown) {
         const prismaError = err as { code?: string };
         if (prismaError.code === "P2002") {
@@ -99,15 +102,22 @@ export default async function authRoutes(fastify: FastifyInstance) {
         } as TwoFactorRequiredResponse);
       }
 
-      const token = fastify.jwt.sign({ id: user.id }, { expiresIn: "7d" });
+      await openSession(fastify, reply, user.id);
 
-      reply.setCookie("access_token", token, COOKIE_OPTIONS);
-
-      return reply.send({ token, user });
+      // Session in the HttpOnly cookie only, never in the body (audit F-08)
+      return reply.send({ user });
     },
   );
 
-  fastify.post("/logout", async (_request, reply) => {
+  fastify.post("/logout", async (request, reply) => {
+    // Logout revokes the session for real, on every device (audit F-07):
+    // a copied token stops working too. No valid session: nothing to revoke
+    try {
+      const { id } = (await request.jwtVerify()) as JwtPayload;
+      await revokeSessions(fastify, id);
+    } catch {
+      // Already logged out, expired or revoked
+    }
     reply.clearCookie("access_token", { path: "/" });
     return reply.send({ message: "Logged out" });
   });
@@ -135,7 +145,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
           required: ["currentPassword", "newPassword"],
           properties: {
             currentPassword: { type: "string", minLength: 1 },
-            newPassword: { type: "string", minLength: 8 },
+            newPassword: { type: "string", minLength: 8, maxLength: 72 },
             code: { type: "string", minLength: 6, maxLength: 6 },
           },
         },
@@ -171,6 +181,10 @@ export default async function authRoutes(fastify: FastifyInstance) {
           });
         }
 
+        // New password: every other session is revoked, this browser keeps
+        // a fresh one (audit F-07)
+        await revokeSessions(fastify, id);
+        await openSession(fastify, reply, id);
         return reply.send({ message: "Password updated successfully" });
       } catch (err: unknown) {
         const prismaError = err as { code?: string };

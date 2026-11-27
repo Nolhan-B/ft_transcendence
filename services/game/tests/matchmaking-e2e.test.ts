@@ -414,12 +414,14 @@ const tests = [
 
   test("queue: un utilisateur absent de la base est refusé", async () => {
     await withServer(async (server) => {
-      const ws = await connectUser(server, uniqueUserId("ghost"));
-      send(ws, { type: "join_queue" });
-      const err = await waitForMessage(ws, "error");
+      // Depuis la verification de session (audit F-07), le jeton d'un compte
+      // absent de la base est refuse des la connexion, avant toute file
+      const token = server.fastify.jwt.sign({ id: uniqueUserId("ghost") });
+      const { ws, firstMsg } = await connectWs(server.port, token);
+      server.sockets.push(ws);
       assert(
-        err.message === "User not found",
-        `Message inattendu : ${err.message}`,
+        firstMsg.type === "error" && firstMsg.message === "Invalid token",
+        `Message inattendu : ${JSON.stringify(firstMsg)}`,
       );
       assert(server.queueManager.size() === 0, "La file doit rester vide");
     });

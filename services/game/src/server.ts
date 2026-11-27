@@ -7,7 +7,13 @@ import cookie from "@fastify/cookie";
 import jwt from "@fastify/jwt";
 import prismaPlugin from "./plugins/prisma.js";
 import roomManager from "./plugins/room.manager.js";
-import { setupMetrics } from "shared";
+import {
+  isSessionCurrent,
+  jwtSecretOrExit,
+  setupMetrics,
+  setupOriginCheck,
+} from "shared";
+import type { SessionPayload } from "shared";
 import fs from "node:fs";
 import process from "node:process";
 import queueManager from "./plugins/queue.manager.js";
@@ -64,6 +70,8 @@ fastify.setErrorHandler(
 );
 
 setupMetrics(fastify, "game-service");
+// Writes sent from another website are refused (security audit F-25)
+setupOriginCheck(fastify);
 
 fastify.route({
   method: ["GET", "HEAD"],
@@ -73,12 +81,21 @@ fastify.route({
 });
 
 fastify.register(cookie);
+// The JWT key: without it in production the service refuses to start,
+// instead of signing with a key everybody knows
+function jwtSecret(): string {
+  return jwtSecretOrExit(process.env.JWT_SECRET);
+}
+
 fastify.register(jwt, {
-  secret: process.env.JWT_SECRET ?? "dev-secret",
+  secret: jwtSecret(),
   cookie: {
     cookieName: "access_token",
     signed: false,
   },
+  // Revoked sessions are refused (security audit F-07)
+  trusted: (_request, decoded) =>
+    isSessionCurrent(fastify.prisma, decoded as SessionPayload),
 });
 
 fastify.register(prismaPlugin);
