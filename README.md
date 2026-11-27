@@ -139,7 +139,7 @@ The first start builds every image, which takes a few minutes. The database sche
 
 Plain `docker compose up` also loads the override (it is Docker's default), so prefer the Make commands.
 
-In development mode, if the frontend keeps showing an old style after switching Git branches, restart it keeps showing an old style after switching Git branches, restart it with `docker restart ft_transcendence-frontend-1` (Vite cache inside Docker).
+In development mode, if the frontend keeps showing an old style after switching Git branches, restart it with `docker restart ft_transcendence-frontend-1` (Vite cache inside Docker).
 
 ### Useful URLs
 

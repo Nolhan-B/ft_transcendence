@@ -225,6 +225,12 @@ export function GameProvider({ children }: { children: ReactNode }) {
           void refresh();
           break;
         case "error":
+          // "Cancel" on a queue the server already left (connection dropped
+          // meanwhile): out of the queue is what the user wanted, no error
+          if (event.message === "Not in queue") {
+            setInQueue(false);
+            break;
+          }
           // The stored game is over: forget it without bothering the user
           if (restoring.current && GONE.includes(event.message)) {
             // Shown only if the game page is open on this game (reload)
@@ -271,11 +277,13 @@ export function GameProvider({ children }: { children: ReactNode }) {
   // A new socket has joined nothing yet. The server also takes us out of our
   // room when the socket closes (and deletes it if we were its only human):
   // keeping it here would show a dead room and send its code in invites
-  // ("Room not found")
+  // ("Room not found"). Same for the ranked queue: the server removed us, so
+  // "Cancel" answered "Not in queue"; the card offers to search again.
   useEffect(() => {
     if (status === "open") return;
     joinedOn.current = null;
     setRoom(null);
+    setInQueue(false);
   }, [status]);
 
   const createRoom = useCallback(
