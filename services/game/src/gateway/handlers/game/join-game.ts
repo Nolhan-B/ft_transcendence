@@ -1,6 +1,7 @@
 import { GatewayContext } from "../../types.js";
 import { filterStateForPlayer } from "../../utils.js";
 import { leaveOtherGames } from "./leave-other-games.js";
+import { continueTurn } from "./bot-turn.js";
 
 export async function handleJoinGame(
   ctx: GatewayContext,
@@ -43,13 +44,14 @@ export async function handleJoinGame(
     ctx.userId,
   );
 
-  const current = game.players.find((p) => p.isCurrentTurn);
-  if (
-    !ctx.turnTimers.has(msg.gameId) &&
-    current &&
-    !current.userId.startsWith("bot_")
-  ) {
-    ctx.startTurnTimer(msg.gameId);
+  // First join of the game (no turn timer yet): start the first turn. If a
+  // bot plays first (the host left the room before the start, so a bot is
+  // first in the list), it must be made to play here: nothing else would
+  // (its turns are only triggered after another move) and the game froze.
+  // continueTurn schedules the bot if needed and always starts the timer
+  // (a safety net for a bot). Only once: later joins find the timer.
+  if (!ctx.turnTimers.has(msg.gameId)) {
+    continueTurn(ctx, game);
   }
 
   // Retour apres une coupure : tout le monde doit le voir sortir de

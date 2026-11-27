@@ -645,6 +645,53 @@ const tests = [
       assert(bot.hand.length === 1, "Le bot ne doit pas piocher");
     });
   }),
+
+  // B11: the host adds a bot, a friend joins, the host leaves, the friend
+  // starts. The bot is then first in the list, so it plays first: nothing
+  // made it play and the game froze.
+  test("e2e: un bot qui commence la partie joue son premier tour", async () => {
+    const { fastify, port, gameManager } = await buildServer();
+    const host = await connectWs(
+      port,
+      fastify.jwt.sign({ id: uniqueUserId() }),
+    );
+    const friendId = uniqueUserId();
+    const friend = await connectWs(port, fastify.jwt.sign({ id: friendId }));
+    try {
+      const roomCode = await createRoom(host.ws, 4, "B11");
+      send(host.ws, { type: "add_bot", roomCode });
+      await waitForMessage(host.ws, "room_updated");
+      send(friend.ws, { type: "join_room", roomCode });
+      await waitForMessage(friend.ws, "room_updated");
+      send(host.ws, { type: "leave_room", roomCode });
+      await waitForMessage(friend.ws, "room_updated");
+
+      send(friend.ws, { type: "start_game", roomCode });
+      const { gameId } = await waitForMessage(friend.ws, "game_started");
+      send(friend.ws, { type: "join_game", gameId });
+      await waitForMessage(friend.ws, "game_updated");
+
+      const game = gameManager.getGame(gameId)!;
+      const first = game.players.find((p) => p.isCurrentTurn)!;
+      assert(
+        first.userId.startsWith("bot_"),
+        `Le bot doit commencer, c'est ${first.userId}`,
+      );
+
+      // The bot plays within its delay (0.5 to 1.5 s in tests)
+      const moved = await waitForMessage(friend.ws, "game_updated", 3000);
+      const now = moved.state.players.find((p: any) => p.isCurrentTurn);
+      assert(
+        now.userId === friendId,
+        `Après le coup du bot, c'est à l'ami de jouer (c'est ${now.userId})`,
+      );
+    } finally {
+      host.ws.close();
+      friend.ws.close();
+      await sleep(50);
+      await fastify.close();
+    }
+  }),
 ];
 
 // ============================================================
