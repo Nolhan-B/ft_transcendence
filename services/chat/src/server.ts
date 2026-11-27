@@ -232,8 +232,22 @@ fastify.register(async function (fastify) {
 
         if (pendingMessages.length === 0) return;
 
+        // Messages sent while I was away by someone blocked since then (by me
+        // or who blocked me) are not delivered. They are still marked as
+        // delivered below: they must not show up all at once after an unblock
+        const blocks = await fastify.prisma.blockedFriendship.findMany({
+          where: { OR: [{ blockerId: userId }, { blockedId: userId }] },
+          select: { blockerId: true, blockedId: true },
+        });
+        const blocked = new Set(
+          blocks.map((b) =>
+            b.blockerId === userId ? b.blockedId : b.blockerId,
+          ),
+        );
+
         for (const msg of pendingMessages) {
           if (socket.readyState !== 1) return;
+          if (blocked.has(msg.senderId)) continue;
           socket.send(
             JSON.stringify({
               type: "direct_message",
