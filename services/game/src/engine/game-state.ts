@@ -37,7 +37,7 @@ export interface InternalGameState extends Omit<GameState, LiveStateFields> {
 }
 
 export function createGame(
-  participants: { id: string; username: string }[],
+  participants: { id: string; username: string; avatarUrl?: string | null }[],
   mode: GameMode,
   settings?: GameSettings,
 ): InternalGameState {
@@ -57,6 +57,7 @@ export function createGame(
   const players: Player[] = participants.map((p, i) => ({
     userId: p.id,
     username: p.username,
+    avatarUrl: p.avatarUrl ?? null,
     hand: hands[i],
     isCurrentTurn: i === 0,
     disconnected: false,

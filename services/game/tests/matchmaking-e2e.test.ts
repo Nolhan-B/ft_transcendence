@@ -59,13 +59,18 @@ function sleep(ms: number) {
 function createDb() {
   const users = new Map<
     string,
-    { id: string; username: string; elo: number }
+    { id: string; username: string; avatarUrl: string; elo: number }
   >();
   const matches: any[] = [];
 
   function ensure(id: string) {
     if (!users.has(id))
-      users.set(id, { id, username: `user_${id}`, elo: 1000 });
+      users.set(id, {
+        id,
+        username: `user_${id}`,
+        avatarUrl: `/avatars/${id}.png`,
+        elo: 1000,
+      });
     return users.get(id)!;
   }
 
@@ -539,6 +544,23 @@ const tests = [
       const found = await waitForMessage(first.ws, "match_found", 3000);
       assert(typeof found.gameId === "string", "Le joueur doit être apparié");
       for (const p of [first, ...others]) await closeWs(p.ws);
+    });
+  }),
+
+  test("match: la partie ranked contient les avatars des joueurs", async () => {
+    await withServer(async (server) => {
+      const { players, gameId } = await queueAndMatch(
+        server,
+        [1000, 1000, 1000, 1000],
+      );
+      const game = server.gameManager.getGame(gameId)!;
+      for (const p of players) {
+        const inGame = game.players.find((g) => g.userId === p.id)!;
+        assert(
+          inGame.avatarUrl === `/avatars/${p.id}.png`,
+          `avatar de ${p.id}, reçu ${inGame.avatarUrl}`,
+        );
+      }
     });
   }),
 

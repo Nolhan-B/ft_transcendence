@@ -108,7 +108,7 @@ export interface RoomInfo {
   hasPassword: boolean;
   leaderId: string;
   maxPlayers: number;
-  players: { id: string; username: string }[];
+  players: { id: string; username: string; avatarUrl?: string | null }[];
   mode: GameMode;
   settings: GameSettings;
 }

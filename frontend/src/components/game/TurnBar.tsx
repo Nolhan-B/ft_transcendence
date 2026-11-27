@@ -38,7 +38,11 @@ export function TurnBar({
           turnPlayer && (
             <span className="flex min-w-0 items-center gap-2 font-semibold compact:text-sm tiny:text-xs">
               <span className="tiny:hidden">
-                <UserAvatar username={turnPlayer.username} size="sm" />
+                <UserAvatar
+                  username={turnPlayer.username}
+                  avatarUrl={turnPlayer.avatarUrl}
+                  size="sm"
+                />
               </span>
               <span className="max-w-40 truncate">{turnPlayer.username}</span>
               <span className="font-normal text-white/60">

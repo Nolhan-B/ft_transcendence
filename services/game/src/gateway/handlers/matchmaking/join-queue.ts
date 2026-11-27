@@ -13,7 +13,7 @@ export async function handleJoinQueue(ctx: GatewayContext): Promise<void> {
 
   const user = await ctx.fastify.prisma.user.findUnique({
     where: { id: ctx.userId },
-    select: { username: true, elo: true },
+    select: { username: true, elo: true, avatarUrl: true },
   });
   if (!user) {
     ctx.sendError(ctx.socket, "User not found");
@@ -26,6 +26,7 @@ export async function handleJoinQueue(ctx: GatewayContext): Promise<void> {
   ctx.queueManager.join({
     userId: ctx.userId,
     username: user.username,
+    avatarUrl: user.avatarUrl,
     elo: user.elo,
     joinedAt: Date.now(),
   });

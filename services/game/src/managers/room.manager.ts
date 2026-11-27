@@ -6,7 +6,7 @@ export interface Room {
   password?: string;
   leaderId: string;
   maxPlayers: number;
-  players: { id: string; username: string }[];
+  players: { id: string; username: string; avatarUrl?: string | null }[];
   mode: GameMode;
   settings: GameSettings;
   createdAt: Date;
@@ -27,6 +27,7 @@ export class RoomManager {
     maxPlayers: number,
     name?: string,
     password?: string,
+    avatarUrl: string | null = null,
   ): string {
     let roomCode: string;
 
@@ -48,7 +49,7 @@ export class RoomManager {
       password: password,
       leaderId: leaderId,
       maxPlayers: maxPlayers,
-      players: [{ id: leaderId, username: username }],
+      players: [{ id: leaderId, username: username, avatarUrl }],
       mode: mode,
       settings: defaultSettings,
       createdAt: new Date(),
@@ -80,6 +81,7 @@ export class RoomManager {
     userId: string,
     username: string,
     password?: string,
+    avatarUrl: string | null = null,
   ): { ok: true; room: Room } | { ok: false; error: string } {
     const room = this.getRoom(code);
     if (!room)
@@ -99,7 +101,7 @@ export class RoomManager {
         return { ok: false, error: "Password is incorrect" };
     }
 
-    room.players.push({ id: userId, username: username });
+    room.players.push({ id: userId, username: username, avatarUrl });
 
     return { ok: true, room: room };
   }

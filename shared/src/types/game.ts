@@ -37,6 +37,8 @@ export enum GameStatus {
 export interface Player {
   userId: string;
   username: string;
+  // Profile picture when the game started (null: none, or a bot)
+  avatarUrl?: string | null;
   hand: Card[];
   isCurrentTurn: boolean;
   disconnected: boolean;
@@ -199,4 +201,5 @@ export interface Achievement {
 export interface GameParticipant {
   id: string;
   username: string;
+  avatarUrl?: string | null;
 }

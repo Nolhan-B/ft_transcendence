@@ -28,6 +28,7 @@ export function handleStartGame(
   const participants = room.players.map((p) => ({
     id: p.id,
     username: p.username,
+    avatarUrl: p.avatarUrl ?? null,
   }));
   const gameId = ctx.fastify.gameManager.createGame(
     participants,

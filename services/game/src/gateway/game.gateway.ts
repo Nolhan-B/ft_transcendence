@@ -468,7 +468,11 @@ export default async function gameGateway(fastify: FastifyInstance) {
       queueManager.removeMany(group.map((e) => e.userId));
 
       const gameId = manager.createGame(
-        group.map((e) => ({ id: e.userId, username: e.username })),
+        group.map((e) => ({
+          id: e.userId,
+          username: e.username,
+          avatarUrl: e.avatarUrl ?? null,
+        })),
         GameMode.RANKED,
       );
 

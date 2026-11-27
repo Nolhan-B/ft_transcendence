@@ -14,6 +14,7 @@ interface LiveGame {
   players: {
     userId: string;
     username: string;
+    avatarUrl?: string | null;
     cardCount: number;
     isCurrentTurn: boolean;
   }[];
@@ -119,7 +120,11 @@ export function LiveGames() {
                       player.isCurrentTurn ? "bg-accent/20" : ""
                     }`}
                   >
-                    <UserAvatar username={player.username} size="sm" />
+                    <UserAvatar
+                      username={player.username}
+                      avatarUrl={player.avatarUrl}
+                      size="sm"
+                    />
                     <span className="min-w-0 flex-1 truncate font-semibold">
                       {player.username}
                     </span>

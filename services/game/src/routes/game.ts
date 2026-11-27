@@ -38,7 +38,7 @@ export default async function gameRoutes(fastify: FastifyInstance) {
 
       const user = await fastify.prisma.user.findUnique({
         where: { id },
-        select: { username: true },
+        select: { username: true, avatarUrl: true },
       });
       if (!user) return reply.code(404).send({ error: "User not found" });
 
@@ -67,6 +67,7 @@ export default async function gameRoutes(fastify: FastifyInstance) {
         maxPlayers,
         name.trim(),
         password,
+        user.avatarUrl,
       );
 
       return reply.code(201).send({ roomCode });
@@ -99,6 +100,7 @@ export default async function gameRoutes(fastify: FastifyInstance) {
       players: game.players.map((player) => ({
         userId: player.userId,
         username: player.username,
+        avatarUrl: player.avatarUrl ?? null,
         cardCount: player.hand.length,
         isCurrentTurn: player.isCurrentTurn,
       })),
