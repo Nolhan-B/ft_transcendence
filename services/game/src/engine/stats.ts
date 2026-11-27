@@ -130,7 +130,46 @@ const DEFINITIONS: {
     description: "Win a game against a bot",
     goal: 1,
   },
+  {
+    id: "speed_win",
+    title: "Speedrunner",
+    description: "Win a game in under 5 minutes",
+    goal: 1,
+  },
+  {
+    id: "marathon",
+    title: "Marathon",
+    description: "Play a game of 15 minutes or more",
+    goal: 1,
+  },
+  {
+    id: "comeback",
+    title: "Comeback",
+    description: "Win right after 3 losses in a row",
+    goal: 1,
+  },
+  {
+    id: "social_10",
+    title: "Social butterfly",
+    description: "Play against 10 different players",
+    goal: 10,
+  },
+  {
+    id: "games_100",
+    title: "Centurion",
+    description: "Play 100 games",
+    goal: 100,
+  },
+  {
+    id: "elo_1500",
+    title: "Legend",
+    description: "Reach 1500 ELO",
+    goal: 1500,
+  },
 ];
+
+const SPEED_WIN_MS = 5 * 60_000;
+const MARATHON_MS = 15 * 60_000;
 
 // Les succes d'un joueur, calcules a partir de son historique (dans n'importe
 // quel ordre) et de son ELO actuel. Chaque succes garde la date de la partie
@@ -160,15 +199,28 @@ export function computeAchievements(
 
   let played = 0;
   let streak = 0;
+  let losses = 0; // defaites de suite juste avant cette partie
+  const opponents = new Set<string>();
   for (const match of chronological) {
     const at = match.endedAt ?? match.startedAt;
     const won = match.winnerId === userId;
+    const length = match.endedAt
+      ? Date.parse(match.endedAt) - Date.parse(match.startedAt)
+      : 0;
     played++;
     streak = won ? streak + 1 : 0;
+    for (const id of match.players)
+      if (id !== userId && !isBotId(id)) opponents.add(id);
 
     advance("games_10", played, at);
     advance("games_50", played, at);
+    advance("games_100", played, at);
     advance("streak_5", streak, at);
+    advance("social_10", opponents.size, at);
+    if (length >= MARATHON_MS) advance("marathon", 1, at);
+    if (won && length > 0 && length < SPEED_WIN_MS) advance("speed_win", 1, at);
+    if (won && losses >= 3) advance("comeback", 1, at);
+    losses = won ? 0 : losses + 1;
     if (won) {
       advance("first_win", 1, at);
       if (match.players.length >= 4) advance("full_table_win", 1, at);
@@ -176,11 +228,15 @@ export function computeAchievements(
       if (match.players.some(isBotId)) advance("beat_a_bot", 1, at);
     }
     const me = match.participants.find((p) => p.id === userId);
-    if (me?.newElo != null) advance("elo_1200", me.newElo, at);
+    if (me?.newElo != null) {
+      advance("elo_1200", me.newElo, at);
+      advance("elo_1500", me.newElo, at);
+    }
   }
   // ELO actuel (un ELO donne hors partie, par exemple par le seed) : debloque
   // sans date de partie
   advance("elo_1200", currentElo, null);
+  advance("elo_1500", currentElo, null);
 
   return DEFINITIONS.map((d) => ({
     id: d.id,

@@ -9,6 +9,12 @@ const ICONS: Record<AchievementId, string> = {
   first_ranked_win: "⚔️",
   elo_1200: "⭐",
   beat_a_bot: "🤖",
+  speed_win: "⚡",
+  marathon: "⏳",
+  comeback: "🔄",
+  social_10: "🤝",
+  games_100: "💯",
+  elo_1500: "🌟",
 };
 
 // Short date of the unlock ("Mar 3"), or nothing (unlocked outside a game)

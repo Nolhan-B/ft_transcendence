@@ -184,7 +184,13 @@ export type AchievementId =
   | "full_table_win"
   | "first_ranked_win"
   | "elo_1200"
-  | "beat_a_bot";
+  | "beat_a_bot"
+  | "speed_win"
+  | "marathon"
+  | "comeback"
+  | "social_10"
+  | "games_100"
+  | "elo_1500";
 
 export interface Achievement {
   id: AchievementId;

@@ -156,7 +156,7 @@ test("humanIds: tous les comptes, sans bots ni doublons", () => {
 
 test("succès: aucun pour un joueur sans partie", () => {
   const list = computeAchievements([], ME, 1000);
-  assert(list.length === 8, `8 succès, reçu ${list.length}`);
+  assert(list.length === 14, `14 succès, reçu ${list.length}`);
   assert(
     list.every((a) => !a.unlocked && a.unlockedAt === null),
     "tous verrouillés",
@@ -279,6 +279,99 @@ test("succès: 1200 ELO hors partie (seed) → débloqué sans date", () => {
 test("succès: les victoires d'un autre joueur ne comptent pas", () => {
   const list = computeAchievements([loss(), loss()], ME, 1000);
   assert(!get(list, "first_win").unlocked, "pas de victoire pour me");
+});
+
+// Partie d'une duree donnee (les parties par defaut durent 1 h)
+const lasting = (minutes: number, over: Partial<MatchRow> = {}) => {
+  const base = row(over);
+  const endedAt = new Date(base.startedAt.getTime() + minutes * 60_000);
+  return toMatch({ ...base, endedAt }, NO_USERS);
+};
+
+test("succès: Speedrunner, une victoire en moins de 5 minutes", () => {
+  const fast = lasting(4, { winnerId: ME });
+  assert(
+    get(computeAchievements([fast], ME, 1000), "speed_win").unlocked,
+    "4 min",
+  );
+  const slow = lasting(6, { winnerId: ME });
+  assert(
+    !get(computeAchievements([slow], ME, 1000), "speed_win").unlocked,
+    "6 min",
+  );
+  const lostFast = lasting(3, { winnerId: "other" });
+  assert(
+    !get(computeAchievements([lostFast], ME, 1000), "speed_win").unlocked,
+    "perdue",
+  );
+});
+
+test("succès: Marathon, une partie de 15 minutes ou plus, gagnée ou non", () => {
+  assert(
+    get(computeAchievements([lasting(15)], ME, 1000), "marathon").unlocked,
+    "15 min",
+  );
+  assert(
+    !get(computeAchievements([lasting(14)], ME, 1000), "marathon").unlocked,
+    "14 min",
+  );
+});
+
+test("succès: Comeback, gagner juste après 3 défaites de suite", () => {
+  const back = [loss(), loss(), loss(), win()];
+  const a = get(computeAchievements(back, ME, 1000), "comeback");
+  assert(
+    a.unlocked && a.unlockedAt === back[3].endedAt,
+    "la victoire après 3 défaites",
+  );
+  const two = [loss(), loss(), win()];
+  assert(
+    !get(computeAchievements(two, ME, 1000), "comeback").unlocked,
+    "2 défaites seulement",
+  );
+  const broken = [loss(), loss(), win(), loss(), win()];
+  assert(
+    !get(computeAchievements(broken, ME, 1000), "comeback").unlocked,
+    "série cassée",
+  );
+});
+
+test("succès: Social butterfly, 10 adversaires différents, sans bots ni doublons", () => {
+  const games = Array.from({ length: 9 }, (_, i) =>
+    loss({ players: [ME, `p${i}`, "bot_x", "p0"] }),
+  );
+  let a = get(computeAchievements(games, ME, 1000), "social_10");
+  assert(!a.unlocked && a.progress === 9, `9 adversaires, reçu ${a.progress}`);
+  games.push(loss({ players: [ME, "p9"] }));
+  a = get(computeAchievements(games, ME, 1000), "social_10");
+  assert(a.unlocked && a.unlockedAt === games[9].endedAt, "le 10e débloque");
+});
+
+test("succès: Centurion à 100 parties", () => {
+  const games = Array.from({ length: 100 }, () => loss());
+  const a = get(computeAchievements(games, ME, 1000), "games_100");
+  assert(a.unlocked && a.unlockedAt === games[99].endedAt, "la 100e");
+  const b = get(computeAchievements(games.slice(0, 99), ME, 1000), "games_100");
+  assert(!b.unlocked && b.progress === 99, "99 / 100");
+});
+
+test("succès: Legend à 1500 ELO, en partie ou hors partie", () => {
+  const up = match({
+    mode: "ranked",
+    winnerId: ME,
+    eloChanges: [{ userId: ME, oldElo: 1490, newElo: 1510 }],
+  });
+  assert(
+    get(computeAchievements([up], ME, 1300), "elo_1500").unlockedAt ===
+      up.endedAt,
+    "en partie",
+  );
+  assert(
+    get(computeAchievements([], ME, 1600), "elo_1500").unlocked,
+    "hors partie",
+  );
+  const b = get(computeAchievements([], ME, 1232), "elo_1500");
+  assert(!b.unlocked && b.progress === 1232, "1232 / 1500");
 });
 
 console.log(`\n=== ${passed} passed, ${failed} failed ===`);
