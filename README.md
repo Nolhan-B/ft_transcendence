@@ -60,7 +60,7 @@ It is the ft_transcendence project of the 42 Common Core (subject version 21.2):
 | Node.js | **22.x** | only for `make lint` and `make test`, run on the host |
 | Google Chrome | latest stable | supported browser |
 
-Free ports on the host: **8080** (HTTP, redirects to HTTPS) and **8443** (HTTPS). Prometheus (9090) and Grafana (3000) are bound to `127.0.0.1` only.
+Free ports on the host: **8080** (HTTP, redirects to HTTPS) and **8443** (HTTPS). Nothing else is published: Grafana and Prometheus are served over HTTPS by the gateway, at `/grafana/` and `/prometheus/`.
 
 ### Configuration
 
@@ -83,9 +83,11 @@ There are two kinds of configuration. `make install` creates both from templates
    | `db_password.txt` | PostgreSQL password |
    | `db_url.txt` | `postgresql://<user>:<password>@postgres:5432/<db>?schema=public`, with the same user, password and database name |
    | `jwt_secret.txt` | key that signs the JWTs |
-   | `grafana_admin_password.txt` | Grafana `admin` password |
+   | `grafana_admin_password.txt` | Grafana `admin` password (generated at random by `make`, not copied from the example) |
+   | `prometheus_password.txt` | password asked by the gateway in front of Prometheus, user `admin` (generated at random by `make`) |
+   | `prometheus_htpasswd` | the same password hashed for Nginx, rebuilt by `make` when `prometheus_password.txt` changes (then `docker compose restart gateway`) |
 
-   The example values (`changeme`, `admin`) are fine for a local evaluation. Change them anywhere else.
+   The example values (`changeme`) are fine for a local evaluation. Change them anywhere else. Grafana applies the password of the secret on every start, so changing the file and restarting Grafana is enough.
 
 Optional game-service variables (in `docker-compose.yml`, `game.environment`):
 
@@ -146,8 +148,10 @@ In development mode, if the frontend keeps showing an old style after switching 
 | https://localhost:8443 | the website |
 | https://localhost:8443/api/... | REST APIs, through the gateway |
 | https://localhost:8443/adminer/ | Adminer, a database web client |
-| http://127.0.0.1:3000 | Grafana (user `admin`, password from `secrets/grafana_admin_password.txt`) |
-| http://127.0.0.1:9090 | Prometheus |
+| https://localhost:8443/grafana/ | Grafana (user `admin`, password from `secrets/grafana_admin_password.txt`) |
+| https://localhost:8443/prometheus/ | Prometheus (user `admin`, password from `secrets/prometheus_password.txt`) |
+
+`make passwords` prints these URLs with their users and passwords (Grafana, Prometheus, Adminer).
 
 ---
 
@@ -243,7 +247,7 @@ frontend:80      auth:3001    user:3004       chat:3003            game:3002    
                                           ▼
                                  PostgreSQL 16 (Prisma)
 
-      Prometheus (127.0.0.1:9090) scrapes /metrics of the 4 services → Grafana (127.0.0.1:3000)
+      Prometheus scrapes /metrics of the 4 services → Grafana (both through the gateway: /prometheus/ and /grafana/)
 ```
 
 | Service | Port | Responsibility |
@@ -256,7 +260,7 @@ frontend:80      auth:3001    user:3004       chat:3003            game:3002    
 | `game` | 3002 | rooms, games, bots, matchmaking, ELO, spectators, match history |
 | `postgres` | 5432 | database (internal only) |
 | `adminer` | 8080 | database web client, behind the gateway |
-| `prometheus`, `grafana` | 9090, 3000 | monitoring (localhost only) |
+| `prometheus`, `grafana` | none | monitoring, through the gateway (`/prometheus/` with a password, `/grafana/`) |
 
 The `shared/` package holds the Prisma schema and client, the TypeScript types used by both frontend and backend (game state, WebSocket events, chat events) and the metrics helper.
 
@@ -797,6 +801,8 @@ Errors (`{ type: "error", message }`): `"Invalid JSON format"`, `"Invalid messag
   - `ServiceDown`: a service unreachable for 30 s;
   - `HighHttpErrorRate`: more than 0.05 5xx errors per second for 1 min;
   - `HighResponseLatency`: p90 over 1 s for 1 min.
+
+  There is no Alertmanager: firing alerts are shown in Prometheus only, at https://localhost:8443/prometheus/alerts (no mail or chat notification).
 - **Grafana** is provisioned automatically with the Prometheus data source and the "Transcendence - Mission Control" dashboard: service status, HTTP error rate, 5xx errors, total traffic, errors by code and service, p95/p99 latency, CPU per core and V8 heap.
 - **Access**: Grafana and Prometheus listen on `127.0.0.1` only. Grafana sign-up is disabled, and the admin password is a Docker secret.
 
