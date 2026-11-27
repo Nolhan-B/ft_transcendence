@@ -129,6 +129,9 @@ services:
     volumes:
       - ./gateway/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./gateway/ssl:/etc/nginx/ssl:ro
+    # Login asked by the gateway in front of Prometheus (basic auth)
+    secrets:
+      - prometheus_htpasswd
     healthcheck:
       test:
         [
@@ -191,8 +194,10 @@ services:
     image: prom/prometheus:v2.54.1
     container_name: ft_transcendence-prometheus
     restart: unless-stopped
-    ports:
-      - "127.0.0.1:9090:9090"
+    # No port on the host: Prometheus is only reached over HTTPS, through the
+    # gateway (https://localhost:8443/prometheus/), which asks for a password
+    # (Prometheus has no login of its own). Grafana still reads it inside the
+    # Docker network (http://prometheus:9090).
     volumes:
       - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./monitoring/prometheus/alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
@@ -200,6 +205,10 @@ services:
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.path=/prometheus"
+      # Links of the web UI point under /prometheus/; the routes themselves
+      # stay at / (the gateway strips the prefix)
+      - "--web.external-url=https://localhost:8443/prometheus/"
+      - "--web.route-prefix=/"
 
   grafana:
     image: grafana/grafana:11.1.0
@@ -249,3 +258,5 @@ secrets:
     file: ./secrets/jwt_secret.txt
   grafana_admin_password:
     file: ./secrets/grafana_admin_password.txt
+  prometheus_htpasswd:
+    file: ./secrets/prometheus_htpasswd

@@ -35,7 +35,7 @@ SSL_KEY  = $(SSL_DIR)/transcendence.key
 SSL_CRT  = $(SSL_DIR)/transcendence.crt
 
 # Docker secrets, copied one by one from secrets.example/ when missing
-SECRETS  = secrets/db_password.txt secrets/db_url.txt secrets/jwt_secret.txt secrets/grafana_admin_password.txt
+SECRETS  = secrets/db_password.txt secrets/db_url.txt secrets/jwt_secret.txt secrets/grafana_admin_password.txt secrets/prometheus_password.txt secrets/prometheus_htpasswd
 
 # node --version 22.x needed
 NODE_MAJOR = 22
@@ -50,7 +50,7 @@ PASSWORD = password123
 #                                   .PHONY                                     #
 # **************************************************************************** #
 
-.PHONY: all install build up dev down logs log ps clean fclean re lint lint-fix test seed seed-leaderboard help
+.PHONY: all install build up dev down logs log ps clean fclean re lint lint-fix test seed seed-leaderboard passwords help
 
 .DEFAULT_GOAL := all
 
@@ -71,6 +71,7 @@ help:
 	$(ECHO) "  $(CYAN)make logs$(RESET)           follow the logs of all the services"
 	$(ECHO) "  $(CYAN)make log SERVICE=<name>$(RESET) follow the logs of one service (auth, user, chat, game, frontend, gateway...)"
 	$(ECHO) "  $(CYAN)make ps$(RESET)             show the state of the services"
+	$(ECHO) "  $(CYAN)make passwords$(RESET)      show the URLs, users and passwords of Grafana, Prometheus and Adminer"
 	$(ECHO) "  $(CYAN)make lint$(RESET)           ESLint and Prettier check (Node $(NODE_MAJOR).x needed)"
 	$(ECHO) "  $(CYAN)make lint-fix$(RESET)       ESLint --fix and Prettier --write on the whole project"
 	$(ECHO) "  $(CYAN)make test$(RESET)           start the project, then run all the tests"
@@ -106,6 +107,18 @@ secrets/grafana_admin_password.txt:
 	mkdir -p secrets
 	openssl rand -base64 24 | tr -d '/+=\n' > $@
 	$(ECHO) "$(GREEN)✓ $@ créé (mot de passe aléatoire, user admin)$(RESET)"
+
+# Prometheus has no login of its own: the gateway asks for one (basic auth).
+# The password in clear for you, and its hash for nginx. The hash is rebuilt
+# when the password file changes: then restart the gateway.
+secrets/prometheus_password.txt:
+	mkdir -p secrets
+	openssl rand -base64 24 | tr -d '/+=\n' > $@
+	$(ECHO) "$(GREEN)✓ $@ créé (mot de passe aléatoire, user admin)$(RESET)"
+
+secrets/prometheus_htpasswd: secrets/prometheus_password.txt
+	printf 'admin:%s\n' "$$(openssl passwd -apr1 "$$(cat $<)")" > $@
+	$(ECHO) "$(GREEN)✓ $@ créé depuis $<$(RESET)"
 
 # The key is written by the same command as the certificate
 $(SSL_CRT):
@@ -147,6 +160,14 @@ log:
 
 ps:
 	$(COMPOSE) ps
+
+# URLs, users and passwords of the admin tools, read from secrets/ (all
+# reached over HTTPS through the gateway)
+GATEWAY_URL = https://localhost:$$(sed -n 's/^HTTPS_PORT=//p' .env 2>/dev/null | tail -n 1 | grep . || echo 8443)
+passwords: $(SECRETS)
+	$(ECHO) "$(YELLOW)Grafana$(RESET)     $(GATEWAY_URL)/grafana/     user admin, password $$(cat secrets/grafana_admin_password.txt)"
+	$(ECHO) "$(YELLOW)Prometheus$(RESET)  $(GATEWAY_URL)/prometheus/  user admin, password $$(cat secrets/prometheus_password.txt)"
+	$(ECHO) "$(YELLOW)Adminer$(RESET)     $(GATEWAY_URL)/adminer/     server postgres, user $(DB_USER), password $$(cat secrets/db_password.txt), database $(DB_NAME)"
 
 # Shell code that stops when node is missing or is not the expected version.
 # Written on ONE line on purpose: macOS ships GNU Make 3.81, which ignores
