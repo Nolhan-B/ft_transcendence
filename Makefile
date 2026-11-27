@@ -100,6 +100,13 @@ secrets/%.txt: secrets.example/%.txt
 	cp $< $@
 	$(ECHO) "$(GREEN)✓ $@ créé (valeur d'exemple, à changer hors développement)$(RESET)"
 
+# Grafana: a random password instead of the example one (admin/admin would
+# open the dashboards to anyone reaching the port)
+secrets/grafana_admin_password.txt:
+	mkdir -p secrets
+	openssl rand -base64 24 | tr -d '/+=\n' > $@
+	$(ECHO) "$(GREEN)✓ $@ créé (mot de passe aléatoire, user admin)$(RESET)"
+
 # The key is written by the same command as the certificate
 $(SSL_CRT):
 	$(ECHO) "$(CYAN)Génération du certificat TLS auto-signé...$(RESET)"

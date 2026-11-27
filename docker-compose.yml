@@ -207,6 +207,19 @@ services:
     restart: unless-stopped
     ports:
       - "127.0.0.1:3000:3000"
+    # Grafana reads GF_SECURITY_ADMIN_PASSWORD__FILE only when it creates its
+    # database: an existing volume kept its first password (admin/admin) even
+    # after the secret changed. The secret is applied on every start, then
+    # Grafana starts as usual. On a new volume the reset fails (no admin yet,
+    # ignored) and Grafana creates the admin with the secret.
+    entrypoint:
+      - sh
+      - -c
+      - >-
+        grafana cli --homepath "$$GF_PATHS_HOME" --config "$$GF_PATHS_CONFIG"
+        admin reset-admin-password "$$(cat /run/secrets/grafana_admin_password)"
+        > /dev/null 2>&1 || true;
+        exec /run.sh
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD__FILE=/run/secrets/grafana_admin_password
