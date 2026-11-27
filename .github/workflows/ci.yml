@@ -95,6 +95,8 @@ jobs:
           echo "postgresql://transcendence_user:dummy_password@postgres:5432/transcendence_db?schema=public" > secrets/db_url.txt
           echo "dummy_jwt_secret" > secrets/jwt_secret.txt
           echo "grafana_admin_password" > secrets/grafana_admin_password.txt
+          echo "prometheus_password" > secrets/prometheus_password.txt
+          printf 'admin:%s\n' "$(openssl passwd -apr1 prometheus_password)" > secrets/prometheus_htpasswd
           mkdir -p gateway/ssl
           openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
             -keyout gateway/ssl/transcendence.key \
