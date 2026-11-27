@@ -1,4 +1,5 @@
 import { GatewayContext } from "../../types.js";
+import { leaveOtherRooms } from "../room/lobby-rules.js";
 
 export async function handleJoinQueue(ctx: GatewayContext): Promise<void> {
   if (ctx.queueManager.has(ctx.userId)) {
@@ -18,6 +19,9 @@ export async function handleJoinQueue(ctx: GatewayContext): Promise<void> {
     ctx.sendError(ctx.socket, "User not found");
     return;
   }
+
+  // La file remplace la room ou il attendait
+  leaveOtherRooms(ctx);
 
   ctx.queueManager.join({
     userId: ctx.userId,

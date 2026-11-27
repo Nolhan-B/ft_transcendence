@@ -13,7 +13,11 @@ import { getCardEffect, isValidPlay } from "./rules.js";
 // Champs de GameState calcules par le gateway au moment de l'envoi (timers,
 // sockets) : ils ne sont pas stockes dans l'etat interne
 export type LiveStateFields =
-  "turnTimeLeftMs" | "pendingWildDraw4" | "unoVulnerable" | "reconnecting";
+  | "turnTimeLeftMs"
+  | "turnDurationMs"
+  | "pendingWildDraw4"
+  | "unoVulnerable"
+  | "reconnecting";
 
 export interface InternalGameState extends Omit<GameState, LiveStateFields> {
   drawPile: Card[];

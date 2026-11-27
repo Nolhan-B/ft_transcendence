@@ -1,6 +1,11 @@
 import { GameMode } from "shared";
 import { GatewayContext } from "../../types.js";
 import { toRoomInfo } from "../../utils.js";
+import {
+  isPlayingAGame,
+  leaveOtherRooms,
+  leaveQueueIfQueued,
+} from "./lobby-rules.js";
 
 export async function handleCreateRoom(
   ctx: GatewayContext,
@@ -13,6 +18,10 @@ export async function handleCreateRoom(
     );
     return;
   }
+  if (isPlayingAGame(ctx)) {
+    ctx.sendError(ctx.socket, "Already in a game");
+    return;
+  }
   const user = await ctx.fastify.prisma.user.findUnique({
     where: { id: ctx.userId },
     select: { username: true },
@@ -21,6 +30,9 @@ export async function handleCreateRoom(
     ctx.sendError(ctx.socket, "User not found");
     return;
   }
+  // Une room a la fois : la nouvelle remplace l'ancienne et la file
+  leaveOtherRooms(ctx);
+  leaveQueueIfQueued(ctx);
   const roomCode = ctx.roomManager.createRoom(
     ctx.userId,
     user.username,

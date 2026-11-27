@@ -90,6 +90,7 @@ New fields:
 |---|---|---|
 | `lastActions` | `GameAction[]` | what produced this state, in order (see section 5) |
 | `turnTimeLeftMs` | `number \| null` | time left for the current player, **at the moment the message was sent**. `null`: bot turn, a +4 awaiting an answer, or game over |
+| `turnDurationMs` | `number` | length of a full turn on the server (`TURN_TIMEOUT_MS`, 20 s by default), to draw the timer circle |
 | `pendingWildDraw4` | `{ playerId, targetId, timeLeftMs } \| null` | a +4 waits for `targetId` to accept or challenge (bluff rule) |
 | `unoVulnerable` | `string[]` | players with 1 card who did not call UNO and can still be caught |
 | `reconnecting` | `string[]` | players whose connection dropped, still within the 30 s grace (not kicked yet) |
@@ -184,7 +185,8 @@ const turnEndsAt = state.turnTimeLeftMs === null ? null : Date.now() + state.tur
 ```
 
 Do **not** restart a fixed 20 s on every `game_updated`: a `catch_uno` or a
-reconnect does not reset the turn. Hide the timer when it is `null`.
+reconnect does not reset the turn. Hide the timer when it is `null`. The full
+length of a turn is `turnDurationMs` (the site uses it for the circle).
 
 ### Bluff dialog (+4)
 

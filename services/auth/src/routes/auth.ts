@@ -136,6 +136,20 @@ export default async function authRoutes(fastify: FastifyInstance) {
     return { user };
   });
 
+  // Who is connected, for the website: always 200, { user: null } for a
+  // visitor or a revoked session. GET /me answers 401 in that case, and the
+  // browser logs every 401 as an error in the console, on every page.
+  fastify.get("/session", async (request) => {
+    try {
+      await request.jwtVerify();
+    } catch {
+      return { user: null };
+    }
+    const { id } = request.user as JwtPayload;
+    const user = await authService.getMe(fastify.prisma, id);
+    return { user: user ?? null };
+  });
+
   fastify.post(
     "/password",
     {

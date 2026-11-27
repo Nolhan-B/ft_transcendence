@@ -25,6 +25,14 @@ const STORED_GAME = "sns.currentGame";
 // Answers to join_game for a game that no longer accepts us
 const GONE = ["Game not found", "You are not part of this game"];
 
+// The server sends the time left when it sends the state: the end of the turn
+// is counted from now, on this browser's clock (no clock offset with the server)
+function endOfTurn(state: GameState): number | null {
+  return state.turnTimeLeftMs === null
+    ? null
+    : Date.now() + state.turnTimeLeftMs;
+}
+
 function storedGame(): string | null {
   try {
     return localStorage.getItem(STORED_GAME);
@@ -48,6 +56,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [winnerId, setWinnerId] = useState<string | null>(null);
   const [turnStartedAt, setTurnStartedAt] = useState<number | null>(null);
+  const [turnEndsAt, setTurnEndsAt] = useState<number | null>(null);
   const [inQueue, setInQueue] = useState(false);
   const [unoCalls, setUnoCalls] = useState<Record<string, number>>({});
   const [unoEvent, setUnoEvent] = useState<UnoEvent | null>(null);
@@ -112,6 +121,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
         case "room_updated":
           setRoom(event.room);
           break;
+        case "room_left":
+          // Left from another tab, or moved to another room
+          setRoom((room) => (room?.code === event.roomCode ? null : room));
+          break;
         case "game_started":
           setGameId(event.gameId);
           storeGame(event.gameId);
@@ -146,6 +159,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
           if (watching.current === event.state.id) watching.current = null;
           setGameState(event.state);
           setTurnStartedAt(Date.now());
+          setTurnEndsAt(endOfTurn(event.state));
           break;
         case "game_updated": {
           // Keep track of the game I really play, even when it is not shown
@@ -163,6 +177,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
           }
           setGameState(event.state);
           setTurnStartedAt(Date.now());
+          setTurnEndsAt(endOfTurn(event.state));
           break;
         }
         case "uno_called":
@@ -275,6 +290,13 @@ export function GameProvider({ children }: { children: ReactNode }) {
     (roomCode: string, password?: string) => {
       setError(null);
       send({ type: "join_room", roomCode, password });
+    },
+    [send],
+  );
+
+  const inviteToRoom = useCallback(
+    (roomCode: string, userId: string) => {
+      send({ type: "invite_to_room", roomCode, userId });
     },
     [send],
   );
@@ -428,6 +450,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     setGameState(null);
     setWinnerId(null);
     setTurnStartedAt(null);
+    setTurnEndsAt(null);
     setUnoCalls({});
     setUnoEvent(null);
     setChatMessages([]);
@@ -453,6 +476,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       gameId,
       gameState,
       turnStartedAt,
+      turnEndsAt,
       winnerId,
       unoCalls,
       unoEvent,
@@ -463,6 +487,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       clearError,
       createRoom,
       joinRoom,
+      inviteToRoom,
       leaveRoom,
       startGame,
       updateSettings,
@@ -489,6 +514,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       gameId,
       gameState,
       turnStartedAt,
+      turnEndsAt,
       winnerId,
       unoCalls,
       unoEvent,
@@ -499,6 +525,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       clearError,
       createRoom,
       joinRoom,
+      inviteToRoom,
       leaveRoom,
       startGame,
       updateSettings,

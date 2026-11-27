@@ -86,4 +86,33 @@ if [ "$ME_STATUS" -ne 200 ]; then
   exit 1
 fi
 
+# The website asks /session: always 200, so that a visitor never gets a 401
+# logged as an error in the browser console
+check_session() {
+  local label="$1" expected="$2"
+  shift 2
+  local status
+  status=$(curl -k -s -o "$WORKDIR/session.json" -w "%{http_code}" "$@" "$BASE_URL/api/auth/session")
+  echo "$label HTTP Status: $status"
+  cat "$WORKDIR/session.json"
+  echo ""
+  if [ "$status" -ne 200 ] || ! grep -q "$expected" "$WORKDIR/session.json"; then
+    echo "::error::/session $label: expected 200 with $expected"
+    exit 1
+  fi
+}
+
+echo "=== 7. Testing /session for a visitor (200, user null) ==="
+check_session "Visitor" '"user":null'
+
+echo "=== 8. Testing /session with a bad token (200, user null) ==="
+check_session "Bad token" '"user":null' -H "Cookie: access_token=not-a-token"
+
+echo "=== 9. Testing /session when connected (200, the user) ==="
+check_session "Connected" "\"email\":\"$EMAIL\"" -H "Cookie: access_token=$TOKEN"
+
+echo "=== 10. Testing /session after logout (200, user null) ==="
+curl -k -s -o /dev/null -X POST "$BASE_URL/api/auth/logout" -H "Cookie: access_token=$TOKEN"
+check_session "After logout" '"user":null' -H "Cookie: access_token=$TOKEN"
+
 echo "=== All integration, routing, and negative tests passed successfully! ==="

@@ -1,86 +1,12 @@
 import { FastifyInstance } from "fastify";
-import {
-  CreateGamePayload,
-  CreateRoomPayload,
-  GameMode,
-  JwtPayload,
-} from "shared";
+import { CreateRoomPayload, GameMode, JwtPayload } from "shared";
 import {
   MAX_PLAYERS,
   MIN_PLAYERS,
   ROOM_NAME_MAX_LENGTH,
-  isValidSettings,
-  pickSettings,
 } from "../gateway/utils.js";
 
 export default async function gameRoutes(fastify: FastifyInstance) {
-  fastify.post(
-    "/games/create",
-    {
-      schema: {
-        body: {
-          type: "object",
-          required: ["participants", "mode"],
-          properties: {
-            participants: {
-              type: "array",
-              minItems: 2,
-              maxItems: 4,
-              items: {
-                type: "object",
-                required: ["id"],
-                properties: {
-                  id: { type: "string", minLength: 1 },
-                },
-              },
-            },
-            mode: { type: "string", enum: Object.values(GameMode) },
-            settings: { type: "object" },
-          },
-        },
-      },
-    },
-    async (request, reply) => {
-      await request.jwtVerify();
-      const { id } = request.user as JwtPayload;
-
-      const { participants, mode, settings } =
-        request.body as CreateGamePayload;
-
-      // Ensure all participant IDs are distinct
-      const uniqueIds = new Set(participants.map((p) => p.id));
-      if (uniqueIds.size !== participants.length) {
-        return reply
-          .code(400)
-          .send({ error: "Duplicate participants are not allowed" });
-      }
-      if (mode === GameMode.RANKED) {
-        return reply.code(400).send({
-          error: "Ranked games are only available through matchmaking",
-        });
-      }
-
-      const isCreatorInGame = participants.some((p) => p.id === id);
-      if (!isCreatorInGame)
-        return reply.code(400).send({ error: "Creator must be a participant" });
-
-      if (!uniqueIds.has(id)) {
-        return reply.code(400).send({ error: "Creator must be a participant" });
-      }
-
-      if (settings !== undefined && !isValidSettings(settings)) {
-        return reply.code(400).send({ error: "Invalid game settings" });
-      }
-
-      const gameId = fastify.gameManager.createGame(
-        participants,
-        mode,
-        settings && pickSettings(settings),
-      );
-      return reply.code(201).send({ gameId });
-    },
-  );
-
   fastify.post(
     "/games/rooms",
     {

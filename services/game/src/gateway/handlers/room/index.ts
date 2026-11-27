@@ -1,6 +1,7 @@
 export { handleCreateRoom } from "./create-room.js";
 export { handleJoinRoom } from "./join-room.js";
 export { handleLeaveRoom } from "./leave-room.js";
+export { handleInviteToRoom } from "./invite-to-room.js";
 export { handleUpdateRoom } from "./update-room.js";
 export { handleStartGame } from "./start-game.js";
 export { handleAddBot, handleRemoveBot } from "./add-bot.js";

@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import type { Card, CardColor, GameState, Player } from "shared";
-import { useCountdown } from "../../hooks/game/useCountdown";
+import { useSecondsUntil } from "../../hooks/game/useSecondsUntil";
 import { useUnoWindows } from "../../hooks/game/useUnoWindows";
 import { useGame } from "../../hooks/ws/useGame";
 import { ChoiceDialog } from "./ChoiceDialog";
@@ -27,10 +27,6 @@ import {
   useHandLayout,
 } from "./handRows";
 import type { Seat } from "./OpponentSeat";
-
-// Length of a turn on the server (TURN_TIMEOUT_MS, 20 s by default). It does
-// not send the remaining time: the countdown restarts with each new state.
-const TURN_SECONDS = 20;
 
 const COLOR_CHOICES: { color: CardColor; label: string; button: string }[] = [
   { color: "red", label: "Red", button: "bg-primary" },
@@ -104,10 +100,14 @@ export function GameBoard({ state, myId, spectator = false }: Props) {
     challengeBluff,
     acceptWildDraw4,
     turnStartedAt,
+    turnEndsAt,
     unoCalls,
     unoEvent,
   } = useGame();
-  const turnLeft = useCountdown(turnStartedAt, TURN_SECONDS);
+  // Time left and length of the turn, both from the server: a state that does
+  // not change the turn (UNO call...) does not restart the countdown
+  const turnLeft = useSecondsUntil(turnEndsAt);
+  const turnSeconds = Math.max(1, Math.round(state.turnDurationMs / 1000));
   // The board, shaken when I take cards (ActionBursts)
   const board = useRef<HTMLDivElement>(null);
   // Room for my hand, and a hidden probe giving the width of a card
@@ -208,7 +208,7 @@ export function GameBoard({ state, myId, spectator = false }: Props) {
         turnPlayer={turnPlayer}
         myTurn={myTurn}
         secondsLeft={turnPlayer ? timerFor(turnPlayer) : null}
-        turnSeconds={TURN_SECONDS}
+        turnSeconds={turnSeconds}
         direction={state.direction}
       />
 

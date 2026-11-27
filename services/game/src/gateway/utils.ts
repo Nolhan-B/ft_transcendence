@@ -62,6 +62,7 @@ export type LiveState = Pick<GameState, LiveStateFields>;
 
 export const NO_LIVE_STATE: LiveState = {
   turnTimeLeftMs: null,
+  turnDurationMs: 0,
   pendingWildDraw4: null,
   unoVulnerable: [],
   reconnecting: [],
@@ -175,6 +176,10 @@ export function validateMessage(raw: unknown): ClientMessage | null {
     case "join_room":
       if (typeof msg.roomCode !== "string") return null;
       if (msg.password !== undefined && typeof msg.password !== "string")
+        return null;
+      break;
+    case "invite_to_room":
+      if (typeof msg.roomCode !== "string" || typeof msg.userId !== "string")
         return null;
       break;
     case "leave_room":

@@ -19,6 +19,18 @@ interface LiveGame {
   }[];
 }
 
+// Only the well-formed games: one broken entry must not blank the lobby
+function isLiveGame(value: unknown): value is LiveGame {
+  const game = value as LiveGame;
+  return (
+    typeof game?.id === "string" &&
+    Array.isArray(game.players) &&
+    game.players.every(
+      (p) => typeof p?.userId === "string" && typeof p?.username === "string",
+    )
+  );
+}
+
 // The games in progress, asked again every few seconds
 function useLiveGames() {
   const [games, setGames] = useState<LiveGame[] | null>(null);
@@ -28,7 +40,9 @@ function useLiveGames() {
       const response = await fetch("/api/game/games/live", {
         credentials: "include",
       });
-      if (response.ok) setGames(await response.json());
+      if (!response.ok) return;
+      const data: unknown = await response.json();
+      setGames(Array.isArray(data) ? data.filter(isLiveGame) : []);
     } catch {
       // Keep the last list: the next refresh will try again
     }

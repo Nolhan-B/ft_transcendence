@@ -1,10 +1,19 @@
 import { GatewayContext } from "../../types.js";
 import { toRoomInfo } from "../../utils.js";
+import {
+  isPlayingAGame,
+  leaveOtherRooms,
+  leaveQueueIfQueued,
+} from "./lobby-rules.js";
 
 export async function handleJoinRoom(
   ctx: GatewayContext,
   msg: { roomCode: string; password?: string },
 ): Promise<void> {
+  if (isPlayingAGame(ctx)) {
+    ctx.sendError(ctx.socket, "Already in a game");
+    return;
+  }
   const user = await ctx.fastify.prisma.user.findUnique({
     where: { id: ctx.userId },
     select: { username: true },
@@ -34,6 +43,11 @@ export async function handleJoinRoom(
       return;
     }
   }
+
+  // Seulement une fois entre : une invitation perimee ou un mauvais mot de
+  // passe ne fait pas perdre la room ou la place dans la file
+  leaveOtherRooms(ctx, msg.roomCode);
+  leaveQueueIfQueued(ctx);
 
   if (!ctx.roomSockets.has(msg.roomCode))
     ctx.roomSockets.set(msg.roomCode, new Set());

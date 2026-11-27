@@ -138,6 +138,8 @@ export interface GameState {
   lastActions: GameAction[];
   // Temps restant du tour au moment de l'envoi (null : pas de chrono, ex bot)
   turnTimeLeftMs: number | null;
+  // Duree complete d'un tour sur le serveur (TURN_TIMEOUT_MS), pour le cercle
+  turnDurationMs: number;
   pendingWildDraw4: PendingWildDraw4 | null;
   // Joueurs a 1 carte qui n'ont pas dit UNO et peuvent encore etre attrapes
   unoVulnerable: string[];
@@ -158,10 +160,4 @@ export interface Match {
 export interface GameParticipant {
   id: string;
   username: string;
-}
-
-export interface CreateGamePayload {
-  participants: GameParticipant[];
-  mode: GameMode;
-  settings?: GameSettings;
 }

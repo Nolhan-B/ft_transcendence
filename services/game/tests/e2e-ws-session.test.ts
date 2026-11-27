@@ -211,6 +211,29 @@ async function startGameWithBot(client: Client): Promise<string> {
   return started.gameId;
 }
 
+// Cree une room et renvoie son code
+async function createRoom(client: Client, name = "Room", maxPlayers = 3) {
+  const before = client.messages.length;
+  send(client.ws, {
+    type: "create_room",
+    mode: GameMode.CLASSIC,
+    maxPlayers,
+    name,
+  });
+  const msg = await waitFor(
+    client,
+    (m) =>
+      m.type === "room_updated" &&
+      m.room.name === name &&
+      client.messages.indexOf(m) >= before,
+    `room_updated ${name}`,
+  );
+  return msg.room.code as string;
+}
+
+const inRoom = (server: Server, code: string, userId: string) =>
+  !!server.roomManager.getRoom(code)?.players.some((p) => p.id === userId);
+
 // ============================================================
 // TESTS
 // ============================================================
@@ -687,6 +710,344 @@ const tests = [
         "Dernier onglet fermé : le joueur quitte la room",
       );
       host.ws.close();
+    });
+  }),
+
+  // ---------------- Une chose a la fois ----------------
+
+  test("lobby: créer une 2e room quitte la 1re", async () => {
+    await withServer(async (server) => {
+      const userId = uniqueUserId();
+      const a = await connect(server, userId);
+      const first = await createRoom(a, "Première");
+      const second = await createRoom(a, "Deuxième");
+      assert(!inRoom(server, first, userId), "Plus dans la 1re room");
+      assert(inRoom(server, second, userId), "Dans la 2e room");
+      assert(
+        !server.roomManager.getRoom(first),
+        "La 1re room, vide, est supprimée",
+      );
+      await waitFor(
+        a,
+        (m) => m.type === "room_left" && m.roomCode === first,
+        "room_left",
+      );
+      a.ws.close();
+    });
+  }),
+
+  test("lobby: rejoindre une autre room quitte la sienne, les autres le voient", async () => {
+    await withServer(async (server) => {
+      const host1 = await connect(server, uniqueUserId());
+      const host2 = await connect(server, uniqueUserId());
+      const room1 = await createRoom(host1, "Room 1");
+      const room2 = await createRoom(host2, "Room 2");
+      const userId = uniqueUserId();
+      const p = await connect(server, userId);
+      send(p.ws, { type: "join_room", roomCode: room1 });
+      await waitFor(
+        host1,
+        (m) => m.type === "room_updated" && m.room.players.length === 2,
+        "P dans room 1",
+      );
+
+      send(p.ws, { type: "join_room", roomCode: room2 });
+      await waitFor(
+        host2,
+        (m) => m.type === "room_updated" && m.room.players.length === 2,
+        "P dans room 2",
+      );
+      await waitFor(
+        host1,
+        (m) => m.type === "room_updated" && m.room.players.length === 1,
+        "room 1 mise à jour sans P",
+      );
+      assert(!inRoom(server, room1, userId), "Plus dans la room 1");
+      assert(inRoom(server, room2, userId), "Dans la room 2");
+      for (const c of [host1, host2, p]) c.ws.close();
+    });
+  }),
+
+  test("lobby: mauvais mot de passe ou room disparue → garde sa room", async () => {
+    await withServer(async (server) => {
+      const host = await connect(server, uniqueUserId());
+      const code = server.roomManager.createRoom(
+        "someone",
+        "someone",
+        GameMode.CLASSIC,
+        3,
+        "Privée",
+        "secret",
+      );
+      void host;
+      const userId = uniqueUserId();
+      const p = await connect(server, userId);
+      const mine = await createRoom(p, "La mienne");
+
+      send(p.ws, { type: "join_room", roomCode: code, password: "faux" });
+      await waitFor(
+        p,
+        isError("Password is incorrect"),
+        "Password is incorrect",
+      );
+      send(p.ws, { type: "join_room", roomCode: "ZZZZZZ" });
+      await waitFor(p, isError("Room not found"), "Room not found");
+      await sleep(100);
+      assert(inRoom(server, mine, userId), "Doit rester dans sa room");
+      assert(!p.messages.some(isType("room_left")), "Aucun room_left");
+      host.ws.close();
+      p.ws.close();
+    });
+  }),
+
+  test("lobby: créer ou rejoindre une room en jouant → Already in a game", async () => {
+    await withServer(async (server) => {
+      const host = await connect(server, uniqueUserId());
+      const other = await createRoom(host, "Autre");
+      const userId = uniqueUserId();
+      const p = await connect(server, userId);
+      await startGameWithBot(p);
+      const roomsBefore = server.roomManager.listRooms().length;
+
+      send(p.ws, {
+        type: "create_room",
+        mode: GameMode.CLASSIC,
+        maxPlayers: 2,
+        name: "Pendant",
+      });
+      await waitFor(p, isError("Already in a game"), "create refusé");
+      send(p.ws, { type: "join_room", roomCode: other });
+      await sleep(100);
+      assert(
+        p.messages.filter(isError("Already in a game")).length === 2,
+        "join refusé aussi",
+      );
+      assert(
+        server.roomManager.listRooms().length === roomsBefore,
+        "Aucune room créée",
+      );
+      assert(!inRoom(server, other, userId), "Pas entré dans l'autre room");
+      host.ws.close();
+      p.ws.close();
+    });
+  }),
+
+  test("lobby: un 2e onglet ne peut pas lancer une 2e partie", async () => {
+    await withServer(async (server) => {
+      const userId = uniqueUserId();
+      const a = await connect(server, userId);
+      await startGameWithBot(a);
+      const b = await connect(server, userId);
+      send(b.ws, {
+        type: "create_room",
+        mode: GameMode.CLASSIC,
+        maxPlayers: 2,
+        name: "Onglet B",
+      });
+      await waitFor(
+        b,
+        isError("Already in a game"),
+        "refusé dans l'autre onglet",
+      );
+      a.ws.close();
+      b.ws.close();
+    });
+  }),
+
+  test("lobby: start_game refusé si un joueur de la room joue déjà", async () => {
+    await withServer(async (server) => {
+      const playerId = uniqueUserId();
+      const p = await connect(server, playerId);
+      await startGameWithBot(p);
+      const host = await connect(server, uniqueUserId());
+      const code = await createRoom(host, "Avec un joueur occupé");
+      // Il ne peut plus y entrer par le socket : on l'y met directement
+      server.roomManager.joinRoom(code, playerId, `user_${playerId}`);
+      send(host.ws, { type: "start_game", roomCode: code });
+      await waitFor(host, isError("is already in a game"), "start refusé");
+      assert(
+        !host.messages.some(isType("game_started")),
+        "Aucune partie lancée",
+      );
+      host.ws.close();
+      p.ws.close();
+    });
+  }),
+
+  test("lobby: partie quittée (socket fermé) → peut recréer une room", async () => {
+    await withServer(async (server) => {
+      const userId = uniqueUserId();
+      const a = await connect(server, userId);
+      await startGameWithBot(a);
+      a.ws.close();
+      await waitClosed(a);
+      await sleep(50);
+      const b = await connect(server, userId);
+      const code = await createRoom(b, "Après");
+      assert(inRoom(server, code, userId), "Room créée");
+      b.ws.close();
+    });
+  }),
+
+  test("lobby: rejoindre la file quitte la room", async () => {
+    await withServer(async (server) => {
+      const userId = uniqueUserId();
+      const a = await connect(server, userId);
+      const code = await createRoom(a, "Avant la file");
+      send(a.ws, { type: "join_queue" });
+      await waitFor(a, isType("queue_joined"), "queue_joined");
+      await waitFor(
+        a,
+        (m) => m.type === "room_left" && m.roomCode === code,
+        "room_left",
+      );
+      assert(!inRoom(server, code, userId), "Plus dans la room");
+      assert(server.queueManager.has(userId), "Dans la file");
+      a.ws.close();
+    });
+  }),
+
+  test("lobby: créer une room quitte la file", async () => {
+    await withServer(async (server) => {
+      const userId = uniqueUserId();
+      const a = await connect(server, userId);
+      send(a.ws, { type: "join_queue" });
+      await waitFor(a, isType("queue_joined"), "queue_joined");
+      await createRoom(a, "Après la file");
+      await waitFor(a, isType("queue_left"), "queue_left");
+      assert(!server.queueManager.has(userId), "Plus dans la file");
+      a.ws.close();
+    });
+  }),
+
+  test("lobby: leave_room → room_left sur tous les onglets", async () => {
+    await withServer(async (server) => {
+      const host = await connect(server, uniqueUserId());
+      const code = await createRoom(host, "Onglets");
+      const userId = uniqueUserId();
+      const a = await connect(server, userId);
+      const b = await connect(server, userId);
+      send(a.ws, { type: "join_room", roomCode: code });
+      await waitFor(a, isType("room_updated"), "A dans la room");
+      send(b.ws, { type: "join_room", roomCode: code });
+      await waitFor(b, isType("room_updated"), "B dans la room");
+      send(a.ws, { type: "leave_room", roomCode: code });
+      await waitFor(a, isType("room_left"), "room_left sur A");
+      await waitFor(b, isType("room_left"), "room_left sur B");
+      for (const c of [host, a, b]) c.ws.close();
+    });
+  }),
+
+  // ---------------- Invitations ----------------
+
+  test("invite: un invité entre dans une room à mot de passe sans le mot de passe", async () => {
+    await withServer(async (server) => {
+      const host = await connect(server, uniqueUserId());
+      send(host.ws, {
+        type: "create_room",
+        mode: GameMode.CLASSIC,
+        maxPlayers: 3,
+        name: "Privée",
+        password: "secret",
+      });
+      const code = (await waitFor(host, isType("room_updated"), "room_updated"))
+        .room.code;
+      const friendId = uniqueUserId();
+      const friend = await connect(server, friendId);
+
+      send(host.ws, {
+        type: "invite_to_room",
+        roomCode: code,
+        userId: friendId,
+      });
+      await sleep(100);
+      assert(!host.messages.some(isType("error")), "L'invitation doit passer");
+      send(friend.ws, { type: "join_room", roomCode: code });
+      await waitFor(
+        friend,
+        isType("room_updated"),
+        "room_updated pour l'invité",
+      );
+      assert(inRoom(server, code, friendId), "L'invité est dans la room");
+      host.ws.close();
+      friend.ws.close();
+    });
+  }),
+
+  test("invite: sans invitation, le mot de passe est toujours demandé", async () => {
+    await withServer(async (server) => {
+      const host = await connect(server, uniqueUserId());
+      send(host.ws, {
+        type: "create_room",
+        mode: GameMode.CLASSIC,
+        maxPlayers: 3,
+        name: "Privée",
+        password: "secret",
+      });
+      const code = (await waitFor(host, isType("room_updated"), "room_updated"))
+        .room.code;
+      send(host.ws, {
+        type: "invite_to_room",
+        roomCode: code,
+        userId: uniqueUserId(),
+      });
+      const strangerId = uniqueUserId();
+      const stranger = await connect(server, strangerId);
+      send(stranger.ws, { type: "join_room", roomCode: code });
+      await waitFor(
+        stranger,
+        isError("Password is incorrect"),
+        "Password is incorrect",
+      );
+      assert(!inRoom(server, code, strangerId), "Pas entré");
+      host.ws.close();
+      stranger.ws.close();
+    });
+  }),
+
+  test("invite: seul un membre de la room peut inviter", async () => {
+    await withServer(async (server) => {
+      const host = await connect(server, uniqueUserId());
+      send(host.ws, {
+        type: "create_room",
+        mode: GameMode.CLASSIC,
+        maxPlayers: 3,
+        name: "Privée",
+        password: "secret",
+      });
+      const code = (await waitFor(host, isType("room_updated"), "room_updated"))
+        .room.code;
+      const outsider = await connect(server, uniqueUserId());
+      const meId = uniqueUserId();
+      send(outsider.ws, {
+        type: "invite_to_room",
+        roomCode: code,
+        userId: meId,
+      });
+      await waitFor(outsider, isError("You are not in this room"), "refus");
+      const me = await connect(server, meId);
+      send(me.ws, { type: "join_room", roomCode: code });
+      await waitFor(
+        me,
+        isError("Password is incorrect"),
+        "l'invitation n'a pas compté",
+      );
+      for (const c of [host, outsider, me]) c.ws.close();
+    });
+  }),
+
+  test("invite: room inconnue ou message incomplet → erreur", async () => {
+    await withServer(async (server) => {
+      const a = await connect(server, uniqueUserId());
+      send(a.ws, { type: "invite_to_room", roomCode: "ZZZZZZ", userId: "x" });
+      await waitFor(a, isError("Room not found"), "Room not found");
+      send(a.ws, { type: "invite_to_room", roomCode: "ZZZZZZ" });
+      await waitFor(
+        a,
+        isError("Invalid message format"),
+        "Invalid message format",
+      );
+      a.ws.close();
     });
   }),
 
