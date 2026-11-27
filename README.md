@@ -391,6 +391,12 @@ A bot plays after 2.5 to 4.5 s:
 - it challenges a +4 more often when it holds the current color itself;
 - it forgets to say UNO one time in ten.
 
+Out of their turn, bots also react like a player:
+- **jump-in** (when the rule is on): a bot holding the exact copy (color and value) of the card just played jumps in after 0.5 to 1.5 s, one time in two. Never with a wild;
+- **catch a missed UNO** (when the rule is on): a player down to one card without saying UNO is caught by each bot 70 % of the time, 1.5 to 3.5 s later (inside the 5 s window).
+
+Before acting, a bot checks that the chance is still there (same top card, player still in the UNO window), so a late reaction does nothing.
+
 Bots never get a turn timer and are never counted AFK.
 
 ---
