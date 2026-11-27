@@ -20,6 +20,11 @@ const GRACE_MS = 300;
 process.env.MATCHMAKING_TICK_MS = String(TICK_MS);
 process.env.GAME_JOIN_TIMEOUT_MS = String(JOIN_TIMEOUT_MS);
 process.env.RECONNECT_GRACE_MS = String(GRACE_MS);
+// playToEnd joue des parties entieres a la vitesse de la machine : bien plus
+// de 50 messages/s par joueur, la limite anti-flood les couperait au hasard
+// (elle est testee avec ses vraies valeurs dans e2e-ws-session)
+process.env.WS_MSG_PER_SECOND = "100000";
+process.env.WS_MSG_BURST = "100000";
 
 let gameGateway: any;
 
@@ -496,6 +501,44 @@ const tests = [
           `${p.id} doit être sorti de la file`,
         );
       }
+    });
+  }),
+
+  test("match: match_found arrive sur tous les onglets du joueur", async () => {
+    await withServer(async (server) => {
+      // Le premier joueur a un deuxième onglet ouvert, qui n'a rien demandé
+      const first = await queuePlayer(server);
+      const otherTab = await connectUser(server, first.id);
+      const pending = waitForMessage(otherTab, "match_found", 3000);
+      const others = [];
+      for (let i = 0; i < 3; i++) others.push(await queuePlayer(server));
+
+      const found = await waitForMessage(first.ws, "match_found", 3000);
+      const onOtherTab = await pending;
+      assert(
+        onOtherTab.gameId === found.gameId,
+        "Le deuxième onglet doit recevoir la même partie",
+      );
+      for (const p of [first, ...others]) await closeWs(p.ws);
+      await closeWs(otherTab);
+    });
+  }),
+
+  test("match: fermer un onglet laisse le joueur dans la file", async () => {
+    await withServer(async (server) => {
+      const first = await queuePlayer(server);
+      const otherTab = await connectUser(server, first.id);
+      await closeWs(otherTab);
+      assert(
+        server.queueManager.has(first.id),
+        "Le joueur doit rester dans la file",
+      );
+
+      const others = [];
+      for (let i = 0; i < 3; i++) others.push(await queuePlayer(server));
+      const found = await waitForMessage(first.ws, "match_found", 3000);
+      assert(typeof found.gameId === "string", "Le joueur doit être apparié");
+      for (const p of [first, ...others]) await closeWs(p.ws);
     });
   }),
 

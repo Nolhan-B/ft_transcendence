@@ -61,6 +61,10 @@ import { computeEloChanges } from "../engine/elo.js";
 // une room perdait sa room (elle est supprimee a la fermeture du socket).
 // Un socket qui n'a pas repondu au ping precedent est mort : on le coupe.
 const HEARTBEAT_MS = Number(process.env.HEARTBEAT_MS) || 30_000;
+// Messages par seconde et rafale permis sur un socket. Un humain en est tres
+// loin ; les tests qui jouent des parties entieres a toute vitesse les relevent.
+const WS_MSG_PER_SECOND = Number(process.env.WS_MSG_PER_SECOND) || 50;
+const WS_MSG_BURST = Number(process.env.WS_MSG_BURST) || 200;
 
 const TURN_TIMEOUT_MS = Number(process.env.TURN_TIMEOUT_MS) || 20000;
 const MAX_AFK_COUNT = 2;
@@ -492,7 +496,7 @@ export default async function gameGateway(fastify: FastifyInstance) {
     }
     // Flood protection on this socket: bursts of 200 messages, then 50 per
     // second (audit F-10)
-    const allowMessage = createMessageLimiter(50, 200);
+    const allowMessage = createMessageLimiter(WS_MSG_PER_SECOND, WS_MSG_BURST);
 
     const token = request.cookies.access_token;
     if (!token) {
