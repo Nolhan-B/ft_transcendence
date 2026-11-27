@@ -15,11 +15,9 @@ import { GameContext } from "./GameContext";
 import type { GameContextValue, RefusedGame, UnoEvent } from "./GameContext";
 import { useAuth } from "../hooks/auth/useAuth";
 
-// The server closes the socket after these refusals. "Already connected" is
-// often only a race (page reload, hot reload: the old socket is not closed yet
-// on the server), so it is retried a few times before giving up.
-const ALWAYS_FATAL = ["Unauthorized", "Invalid token"];
-const MAX_REFUSALS = 3;
+// The server closes the socket after these refusals: retrying is useless.
+// Several tabs are fine, each one has its own socket.
+const FATAL = ["Unauthorized", "Invalid token"];
 
 // The game in progress, kept in the browser: after a reload the player can
 // go back to it (the server does not say which game we are in)
@@ -78,8 +76,6 @@ export function GameProvider({ children }: { children: ReactNode }) {
   // again, so "Back to game" and the reconnection keep working.
   const activeGame = useRef<string | null>(null);
 
-  // Consecutive "Already connected" answers (reset once the server accepts us)
-  const refusals = useRef(0);
   // Game joined on the current socket: joining twice would register the
   // socket twice on the server, and every event would arrive twice
   const joinedOn = useRef<string | null>(null);
@@ -95,17 +91,11 @@ export function GameProvider({ children }: { children: ReactNode }) {
     path: "/api/game/ws",
     isFatal: (message) => {
       const event = message as ServerEvent;
-      return (
-        event.type === "error" &&
-        (ALWAYS_FATAL.includes(event.message) ||
-          (event.message === "Already connected" &&
-            refusals.current >= MAX_REFUSALS))
-      );
+      return event.type === "error" && FATAL.includes(event.message);
     },
     onMessage: (message) => {
       // Not part of ServerEvent: sent by the server once it accepts the socket
       if ((message as { type?: string }).type === "connected") {
-        refusals.current = 0;
         // Back from a reload: join the stored game again, so that we stay in
         // it (unless the game page already did)
         const stored = storedGame();
@@ -255,15 +245,6 @@ export function GameProvider({ children }: { children: ReactNode }) {
             joining.current = null;
             joinedOn.current = null;
             storeGame(null);
-            break;
-          }
-          if (event.message === "Already connected") {
-            refusals.current++;
-            // Still retrying: stay silent
-            if (refusals.current < MAX_REFUSALS) break;
-            setError(
-              "The game is already open in another tab or window. Close it, then reload this page.",
-            );
             break;
           }
           setError(event.message);

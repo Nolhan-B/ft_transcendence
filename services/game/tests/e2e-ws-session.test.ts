@@ -13,9 +13,9 @@ process.env.BOT_MIN_DELAY_MS = "500";
 process.env.BOT_EXTRA_DELAY_MS = "1000";
 
 // Délais courts pour les tests : doivent être posés AVANT de charger le gateway
-const ALIVE_MS = 300;
+const HEARTBEAT_MS = 300;
 const GRACE_MS = 500;
-process.env.ALIVE_CHECK_MS = String(ALIVE_MS);
+process.env.HEARTBEAT_MS = String(HEARTBEAT_MS);
 process.env.RECONNECT_GRACE_MS = String(GRACE_MS);
 
 let gameGateway: any;
@@ -245,62 +245,122 @@ const tests = [
     });
   }),
 
-  // ---------------- Deuxième onglet ----------------
+  // ---------------- Plusieurs onglets ----------------
 
-  test("ws: deuxième onglet alors que le premier est vivant → refusé", async () => {
+  test("ws: deuxième onglet alors que le premier est vivant → accepté", async () => {
     await withServer(async (server) => {
       const userId = uniqueUserId();
       const a = await connect(server, userId);
-      const b = openClient(server, userId);
-
-      await waitFor(b, isError("Already connected"), "Already connected");
-      await waitClosed(b);
-      assert(
-        !b.messages.some(isType("connected")),
-        "Le deuxième onglet ne doit pas recevoir connected",
-      );
+      const b = await connect(server, userId);
+      await sleep(100);
       assert(
         a.ws.readyState === WebSocket.OPEN,
-        "Le premier onglet doit rester ouvert",
+        "Le premier doit rester ouvert",
+      );
+      assert(
+        b.ws.readyState === WebSocket.OPEN,
+        "Le deuxième doit être ouvert",
+      );
+      assert(
+        !a.messages.some(isType("error")) && !b.messages.some(isType("error")),
+        "Aucune erreur sur les deux onglets",
       );
       a.ws.close();
+      b.ws.close();
     });
   }),
 
-  test("ws: après un refus, le premier onglet fonctionne toujours", async () => {
+  test("ws: trois onglets → chacun peut agir", async () => {
     await withServer(async (server) => {
       const userId = uniqueUserId();
-      const a = await connect(server, userId);
-      const b = openClient(server, userId);
-      await waitClosed(b);
-
-      send(a.ws, {
-        type: "create_room",
-        mode: GameMode.CLASSIC,
-        maxPlayers: 2,
-        name: "Toujours là",
-      });
-      await waitFor(a, isType("room_updated"), "room_updated sur A");
-      a.ws.close();
+      const tabs = [
+        await connect(server, userId),
+        await connect(server, userId),
+        await connect(server, userId),
+      ];
+      for (const [i, tab] of tabs.entries()) {
+        send(tab.ws, {
+          type: "create_room",
+          mode: GameMode.CLASSIC,
+          maxPlayers: 2,
+          name: `Onglet ${i}`,
+        });
+        await waitFor(tab, isType("room_updated"), `room_updated onglet ${i}`);
+      }
+      for (const tab of tabs) tab.ws.close();
     });
   }),
 
-  test("ws: le refus d'un deuxième onglet ne retire pas le premier de la file", async () => {
+  test("ws: fermer un onglet ne retire pas le joueur de la file", async () => {
     await withServer(async (server) => {
       const userId = uniqueUserId();
       const a = await connect(server, userId);
       send(a.ws, { type: "join_queue" });
       await waitFor(a, isType("queue_joined"), "queue_joined");
 
-      const b = openClient(server, userId);
+      const b = await connect(server, userId);
+      b.ws.close();
       await waitClosed(b);
       await sleep(100);
-
       assert(
         server.queueManager.has(userId),
         "A doit toujours être dans la file",
       );
+
       a.ws.close();
+      await waitClosed(a);
+      await sleep(100);
+      assert(
+        !server.queueManager.has(userId),
+        "Le dernier onglet fermé : le joueur quitte la file",
+      );
+    });
+  }),
+
+  test("ws: deux onglets dans la même partie → les deux reçoivent l'état", async () => {
+    await withServer(async (server) => {
+      const userId = uniqueUserId();
+      const a = await connect(server, userId);
+      const gameId = await startGameWithBot(a);
+
+      const b = await connect(server, userId);
+      send(b.ws, { type: "join_game", gameId });
+      await waitFor(b, isType("game_updated"), "game_updated sur B");
+
+      // Le bot ou le timer finit par jouer : les deux onglets le voient
+      const beforeA = a.messages.length;
+      const beforeB = b.messages.length;
+      const game = server.gameManager.getGame(gameId)!;
+      const me = game.players.find((p) => p.userId === userId)!;
+      if (me.isCurrentTurn) send(a.ws, { type: "draw_card", gameId });
+      const fresh = (c: Client, before: number) => (m: any) =>
+        m.type === "game_updated" && c.messages.indexOf(m) >= before;
+      await waitFor(a, fresh(a, beforeA), "nouvel état sur A", 8000);
+      await waitFor(b, fresh(b, beforeB), "nouvel état sur B", 8000);
+      a.ws.close();
+      b.ws.close();
+    });
+  }),
+
+  test("ws: fermer un onglet en pleine partie → l'autre garde la place", async () => {
+    await withServer(async (server) => {
+      const userId = uniqueUserId();
+      const a = await connect(server, userId);
+      const gameId = await startGameWithBot(a);
+      const b = await connect(server, userId);
+      send(b.ws, { type: "join_game", gameId });
+      await waitFor(b, isType("game_updated"), "game_updated sur B");
+
+      a.ws.close();
+      await sleep(GRACE_MS + 300);
+      const game = server.gameManager.getGame(gameId);
+      assert(
+        game?.status === GameStatus.IN_PROGRESS,
+        "La partie doit continuer",
+      );
+      const me = game!.players.find((p) => p.userId === userId)!;
+      assert(!me.disconnected, "Le joueur ne doit pas être marqué déconnecté");
+      b.ws.close();
     });
   }),
 
@@ -324,7 +384,7 @@ const tests = [
       a.ws.close(); // pas d'attente : le serveur n'a peut-être pas encore traité le close
       const b = await connect(server, userId);
       assert(
-        !b.messages.some(isError("Already connected")),
+        !b.messages.some(isType("error")),
         "Le refresh ne doit pas être refusé",
       );
       b.ws.close();
@@ -347,36 +407,48 @@ const tests = [
     });
   }),
 
-  test("ws: ancien socket mort (ne répond plus au ping) → nouveau accepté", async () => {
+  test("ws: dix chargements sans fermer les anciens → tous acceptés", async () => {
+    await withServer(async (server) => {
+      const userId = uniqueUserId();
+      const tabs: Client[] = [];
+      for (let i = 0; i < 10; i++) tabs.push(await connect(server, userId));
+      assert(
+        tabs.every((t) => t.ws.readyState === WebSocket.OPEN),
+        "Tous doivent être ouverts",
+      );
+      for (const t of tabs) t.ws.close();
+    });
+  }),
+
+  test("ws: socket mort (ne répond plus au ping) → coupé par le heartbeat", async () => {
     await withServer(async (server) => {
       const userId = uniqueUserId();
       const dead = await connect(server, userId, { dead: true });
 
       const start = Date.now();
       const b = await connect(server, userId);
-      const elapsed = Date.now() - start;
-
       assert(
-        elapsed >= ALIVE_MS - 50,
-        `Doit attendre le délai de ping (${elapsed} ms)`,
+        Date.now() - start < HEARTBEAT_MS,
+        "Le nouveau est accepté sans attendre",
       );
       await waitClosed(dead);
-      assert(b.ws.readyState === WebSocket.OPEN, "Le nouveau doit être ouvert");
+      assert(
+        b.ws.readyState === WebSocket.OPEN,
+        "Le nouveau doit rester ouvert",
+      );
       b.ws.close();
     });
   }),
 
-  test("ws: après un ancien socket mort, un troisième onglet est refusé", async () => {
+  test("ws: un socket qui répond aux pings reste ouvert", async () => {
     await withServer(async (server) => {
-      const userId = uniqueUserId();
-      await connect(server, userId, { dead: true });
-      const b = await connect(server, userId);
-      await sleep(100); // le close tardif de l'ancien est passé
-
-      // Si le close de l'ancien avait effacé B, C serait accepté
-      const c = openClient(server, userId);
-      await waitFor(c, isError("Already connected"), "Already connected");
-      b.ws.close();
+      const a = await connect(server, uniqueUserId());
+      await sleep(HEARTBEAT_MS * 4);
+      assert(
+        a.ws.readyState === WebSocket.OPEN,
+        "Le socket vivant doit rester ouvert",
+      );
+      a.ws.close();
     });
   }),
 
@@ -396,15 +468,11 @@ const tests = [
     });
   }),
 
-  test("ws: le nouveau client abandonne pendant la vérification → le suivant est accepté", async () => {
+  test("ws: un client qui se ferme tout de suite → le suivant est accepté", async () => {
     await withServer(async (server) => {
       const userId = uniqueUserId();
-      await connect(server, userId, { dead: true });
-
-      // B s'ouvre puis se ferme pendant que le serveur ping l'ancien
       const b = openClient(server, userId, { onOpen: (ws) => ws.close() });
       await waitClosed(b);
-      await sleep(ALIVE_MS + 100);
 
       const c = await connect(server, userId);
       assert(c.ws.readyState === WebSocket.OPEN, "C doit être accepté");
@@ -412,9 +480,9 @@ const tests = [
     });
   }),
 
-  // ---------------- Messages pendant la vérification ----------------
+  // ---------------- Messages envoyés dès l'ouverture ----------------
 
-  test("ws: un message envoyé pendant la vérification n'est pas perdu", async () => {
+  test("ws: un message envoyé dès l'ouverture n'est pas perdu", async () => {
     await withServer(async (server) => {
       const userId = uniqueUserId();
       await connect(server, userId, { dead: true });

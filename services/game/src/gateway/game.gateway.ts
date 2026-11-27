@@ -56,33 +56,11 @@ import { handleLeaveQueue } from "./handlers/matchmaking/leave-queue.js";
 import { findMatch } from "../engine/matchmaking.js";
 import { computeEloChanges } from "../engine/elo.js";
 
-const ALIVE_CHECK_MS = Number(process.env.ALIVE_CHECK_MS) || 2000;
 // Ping de chaque socket a cet intervalle. Sans trafic, le gateway (nginx,
 // proxy_read_timeout 600s) coupe la connexion : un joueur qui attend dans
-// une room perdait sa room (elle est supprimee a la fermeture du socket)
-const HEARTBEAT_MS = 30_000;
-
-// true si le socket répond encore, false s'il se ferme ou ne répond pas
-function isStillAlive(ws: WebSocket): Promise<boolean> {
-  if (ws.readyState !== WebSocket.OPEN) return Promise.resolve(false);
-  return new Promise((resolve) => {
-    const done = (alive: boolean) => {
-      clearTimeout(timer);
-      ws.off("pong", onPong);
-      ws.off("close", onClose);
-      resolve(alive);
-    };
-    const onPong = () => done(true);
-    const onClose = () => done(false);
-    const timer = setTimeout(() => {
-      ws.terminate(); // connexion morte : on la tue, ça déclenche son "close"
-      done(false);
-    }, ALIVE_CHECK_MS);
-    ws.on("pong", onPong);
-    ws.on("close", onClose);
-    ws.ping();
-  });
-}
+// une room perdait sa room (elle est supprimee a la fermeture du socket).
+// Un socket qui n'a pas repondu au ping precedent est mort : on le coupe.
+const HEARTBEAT_MS = Number(process.env.HEARTBEAT_MS) || 30_000;
 
 const TURN_TIMEOUT_MS = Number(process.env.TURN_TIMEOUT_MS) || 20000;
 const MAX_AFK_COUNT = 2;
@@ -95,7 +73,14 @@ const roomSockets: Map<
   string,
   Set<{ socket: WebSocket; userId: string }>
 > = new Map();
-const connectedUser: Map<string, WebSocket> = new Map();
+// Tous les sockets ouverts d'un joueur : un par onglet ou appareil
+const connectedUser: Map<string, Set<WebSocket>> = new Map();
+
+function sendToUser(userId: string, event: string): void {
+  for (const ws of connectedUser.get(userId) ?? []) {
+    if (ws.readyState === WebSocket.OPEN) ws.send(event);
+  }
+}
 const chatLogs: Map<
   string,
   { userId: string; username: string; content: string; time: string }[]
@@ -485,10 +470,7 @@ export default async function gameGateway(fastify: FastifyInstance) {
             elo: e.elo,
           })),
         });
-        for (const e of group) {
-          const socket = connectedUser.get(e.userId);
-          if (socket?.readyState === WebSocket.OPEN) socket.send(event);
-        }
+        for (const e of group) sendToUser(e.userId, event);
 
         // Si personne ne rejoint la partie, on l'annule sans toucher a l'ELO
         cancelGameIfNeverJoined(gameId);
@@ -531,10 +513,16 @@ export default async function gameGateway(fastify: FastifyInstance) {
       return;
     }
 
-    // Les messages qui arrivent pendant la vérification sont gardés de côté
-    const pending: RawData[] = [];
-    const buffer = (data: RawData) => pending.push(data);
-    socket.on("message", buffer);
+    // Les messages d'un socket sont traites un par un, dans l'ordre d'arrivee :
+    // sans ca, un join_queue (qui attend la base) se fait doubler par le
+    // leave_queue envoye juste apres. Ceux qui arrivent pendant la
+    // verification de session attendent qu'elle soit finie (accepted).
+    // onMessage attrape deja ses erreurs.
+    let accept!: () => void;
+    let queue = new Promise<void>((resolve) => (accept = resolve));
+    socket.on("message", (data: RawData) => {
+      queue = queue.then(() => onMessage(data));
+    });
 
     // Revoked session (logout, password or 2FA change): refused like an
     // invalid token (security audit F-07)
@@ -553,21 +541,26 @@ export default async function gameGateway(fastify: FastifyInstance) {
       return;
     }
 
-    // Refresh : l'ancien socket est mort ou en train de se fermer → on accepte
-    // Deuxième onglet : l'ancien répond au ping → on refuse
-    const existing = connectedUser.get(userId);
-    if (existing && existing !== socket && (await isStillAlive(existing))) {
-      sendError(socket, "Already connected");
-      socket.close();
-      return;
-    }
-
-    // Le nouveau client a pu abandonner pendant l'attente
+    // Le client a pu abandonner pendant la verification
     if (socket.readyState !== WebSocket.OPEN) return;
 
-    connectedUser.set(userId, socket);
+    // Plusieurs onglets ou appareils : chaque socket est accepte et recoit
+    // les evenements du joueur
+    if (!connectedUser.has(userId)) connectedUser.set(userId, new Set());
+    connectedUser.get(userId)!.add(socket);
+
+    let alive = true;
+    socket.on("pong", () => (alive = true));
     const heartbeat = setInterval(() => {
-      if (socket.readyState === WebSocket.OPEN) socket.ping();
+      if (socket.readyState !== WebSocket.OPEN) return;
+      // Pas de pong depuis le dernier ping : connexion morte, son "close"
+      // libere la file et les rooms
+      if (!alive) {
+        socket.terminate();
+        return;
+      }
+      alive = false;
+      socket.ping();
     }, HEARTBEAT_MS);
 
     const ctx: GatewayContext = {
@@ -690,10 +683,14 @@ export default async function gameGateway(fastify: FastifyInstance) {
 
     socket.on("close", async () => {
       clearInterval(heartbeat);
-      // L'ancien socket peut se fermer après l'arrivée du nouveau :
-      // il ne doit pas effacer ce qui appartient au nouveau
-      const isCurrent = connectedUser.get(userId) === socket;
-      if (isCurrent) queueManager.leave(userId);
+      // Le joueur garde sa place tant qu'il lui reste un socket ouvert
+      const sockets = connectedUser.get(userId);
+      sockets?.delete(socket);
+      const lastSocket = !sockets || sockets.size === 0;
+      if (lastSocket) {
+        connectedUser.delete(userId);
+        queueManager.leave(userId);
+      }
 
       for (const [gameId, watchers] of spectators) {
         for (const client of watchers) {
@@ -802,14 +799,12 @@ export default async function gameGateway(fastify: FastifyInstance) {
           }
         }
       }
-
-      if (isCurrent) connectedUser.delete(userId);
     });
 
-    // On branche le vrai handler et on rejoue les messages gardés de côté
-    socket.off("message", buffer);
-    socket.on("message", onMessage);
+    // Les messages d'un socket sont traites un par un, dans l'ordre d'arrivee :
+    // sans ca, un join_queue (qui attend la base) se fait doubler par le
+    // leave_queue envoye juste apres. onMessage attrape deja ses erreurs.
     socket.send(JSON.stringify({ type: "connected" }));
-    for (const data of pending) await onMessage(data);
+    accept();
   });
 }
