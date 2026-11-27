@@ -912,8 +912,9 @@ The subject asks for **14 points** (Major = 2, Minor = 1); bonus modules count u
 - **Chat UI**: chat view inside the drawer, unread and request badges.
 - **Pages and navigation**: home hero, Rules page content, leaderboard page connected to the API, navbar drawer menu, footer sections.
 - **Debug header**: a development tool.
+- **Minor frontend fixes**: testing and fixing frontend functionnalities.
 - **Makefile rules**: `install`, `up`/`down`, `seed` (debug users and conversation), `seed-leaderboard`.
-- **Challenges**: _to complete._
+- **Challenges**: Implementation of new functionnalities in the ChatProvider, learning how to use react hooks.
 
 ### kebertra
 - **Frontend architecture**:
