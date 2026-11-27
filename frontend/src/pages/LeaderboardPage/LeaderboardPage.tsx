@@ -86,7 +86,7 @@ function Leaderboard() {
                 <td>{leader.elo}</td>
               </tr>
             ))}
-          {myRank && leaderboard.at(-1)?.rank && (
+          {myRank && leaderboard[leaderboard.length - 1]?.rank && (
             <tr className="bg-base-200">
               <th>{myRank.rank}</th>
               <td>
