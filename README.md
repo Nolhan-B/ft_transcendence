@@ -439,7 +439,6 @@ The big card-fan logo, "SORRY NOT SORRY", the "Play. Bluff. Win." headline, a "P
   - the two passwords must match ("Passwords not matching.").
   On success the user is logged in and goes to `/home`. Server errors are shown in the card (e.g. "Email or username already taken").
 - **Sign-in form**: email and password. "Invalid credentials" on failure. If the account has 2FA, the card switches to a **6-digit code** step. A wrong code shows "Invalid code"; an expired step (10 min) shows "Invalid or expired temporary token" and the user starts again.
-- A "Login with Google" button is shown but **not implemented** (see [Known limitations](#known-limitations)).
 
 ### Lobby (`/play`)
 
@@ -945,7 +944,6 @@ The subject asks for **14 points** (Major = 2, Minor = 1); bonus modules count u
 
 ## Known limitations
 
-- **No OAuth**: the "Login with Google" button on the sign-in card does nothing yet. It should be implemented or removed before the evaluation.
 - **No online status for friends**: the friends list does not show who is connected. The "Standard user management" module requires it, which is why that module is not claimed above.
 - **No block action in the UI or API**: the `BlockedFriendship` table and every check on it exist (friend requests, chat, history), but there is no route to create or remove a block.
 - **In-game chat**: the server supports `chat_message` during a game and saves it with the match, but the in-game chat bubble (`FloatingMessageBox`) is not shown in the game screen yet.
