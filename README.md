@@ -565,7 +565,11 @@ The top 10 players by ELO: rank, username ("You" on my own line, highlighted) an
 
 Every route is reached through the gateway at `https://localhost:8443/api/<service>/...`.
 
-**Authentication.** Routes marked 🔒 need the `access_token` cookie set by login or sign-up (a JWT valid 7 days, `HttpOnly`, `Secure`, `SameSite=Lax`). Without a valid token they answer **401**.
+**Authentication.** Routes marked 🔒 need the `access_token` cookie set by login or sign-up (a JWT valid 7 days, `HttpOnly`, `Secure`, `SameSite=Lax`). The token is never in a response body. Without a valid token, or with a revoked one (after a logout, a password change or a 2FA change), they answer **401**.
+
+**Protections on every route.**
+- `POST`, `PUT`, `PATCH`, `DELETE` sent from a page of another website (an `Origin` header naming another host) answer **403** `"Cross-site request refused"`.
+- Login, sign-up and 2FA routes are limited to 30 attempts per minute per IP, after which they answer **429** `"Too many requests, try again in a minute"`.
 
 **Error format.**
 - Errors raised by a route: `{ "error": "<message>" }`.
@@ -579,15 +583,15 @@ Every route is reached through the gateway at `https://localhost:8443/api/<servi
 
 | Method & path | Auth | Body | Responses |
 |---|---|---|---|
-| `POST /signup` | — | `email` (valid email), `username` (3-20 letters, digits, `_ . -`), `password` (8+ characters) | **201** `{ token, user }` + cookie · **400** validation · **409** `"Email or username already taken"` |
-| `POST /login` | — | `email`, `password` | **200** `{ token, user }` + cookie · **200** `{ requiresTwoFactor: true, tempToken }` when 2FA is on (no cookie; `tempToken` valid 10 min) · **401** `"Invalid credentials"` |
-| `POST /logout` | — | — | **200** `{ message: "Logged out" }`, cookie cleared |
+| `POST /signup` | — | `email` (valid email, case-insensitive), `username` (3-20 letters, digits, `_ . -`, starting and ending with a letter or digit; unique without case), `password` (8 to 72 characters) | **201** `{ user }` + cookie · **400** validation · **409** `"Email or username already taken"` (also in another case) |
+| `POST /login` | — | `email`, `password` | **200** `{ user }` + cookie · **200** `{ requiresTwoFactor: true, tempToken }` when 2FA is on (no cookie; `tempToken` valid 10 min, single use, only accepted by `/2fa/validate`) · **401** `"Invalid credentials"` |
+| `POST /logout` | — | — | **200** `{ message: "Logged out" }`, cookie cleared. Revokes every session of the user, on every device |
 | `GET /me` | 🔒 | — | **200** `{ user }` · **404** `"User not found"` |
 | `POST /password` | 🔒 | `currentPassword`, `newPassword` (8+), `code` (6 digits, required if 2FA is on) | **200** `{ message: "Password updated successfully" }` · **400** `"New password must be different from current password"` · **401** `"Invalid current password or 2FA code"` · **404** `"User not found"` |
 | `DELETE /account` | 🔒 | `password`, `code` (if 2FA) | **200** `{ message: "Account deleted" }`, cookie cleared · **401** `"Invalid password or 2FA code"` · **404** `"Account already deleted"` |
 | `POST /2fa/enable` | 🔒 | — | **200** `{ qrCode }` (data URL of the QR code; the secret is stored but not active yet) · **409** `"2FA is already enabled"` · **404** |
 | `POST /2fa/verify` | 🔒 | `code` (6 digits) | **200** `{ message: "2FA enabled", user }` · **401** `"Invalid code"` · **404** |
-| `POST /2fa/validate` | — | `tempToken`, `code` | **200** `{ token, user }` + cookie · **401** `"Invalid or expired temporary token"`, `"Invalid token"`, `"Invalid code"` · **404** |
+| `POST /2fa/validate` | — | `tempToken`, `code` | **200** `{ user }` + cookie · **401** `"Invalid or expired temporary token"` (also after use, or after 5 wrong codes), `"Invalid code"` (also a code already used) · **404** |
 | `POST /2fa/disable` | 🔒 | `password`, `code` | **200** `{ message: "2FA disabled", user }` · **401** `"Invalid password or TOTP code"` · **404** |
 
 `user` = `{ id, email, username, avatarUrl, createdAt, elo }` (plus `twoFactorSecretEnabled` on login and `/me`). The password and the 2FA secret are never returned.
@@ -600,9 +604,9 @@ Every route is reached through the gateway at `https://localhost:8443/api/<servi
 |---|---|---|---|
 | `GET /profile/:id` | — | `id`: UUID | **200** `{ profile }` · **400** bad UUID · **404** `"User not found"` |
 | `GET /profile` | 🔒 | — | **200** `{ profile }` (mine) · **404** |
-| `PUT /profile` | 🔒 | `{ username }` (3-20 letters, digits, `_ . -`; no other field allowed) | **200** `{ updatedProfile }` · **400** validation · **409** `"Username already taken"` · **404** |
+| `PUT /profile` | 🔒 | `{ username }` (3-20 letters, digits, `_ . -`, starting and ending with a letter or digit; no other field allowed) | **200** `{ updatedProfile }` · **400** validation · **409** `"Username already taken"` · **404** |
 | `PUT /profile/avatar` | 🔒 | multipart form, field `file`: `.png`, `.jpg`, `.jpeg` or `.webp`, 5 MB max | **200** `{ profile }` (the old avatar file is deleted) · **400** `"Request must be multipart/form-data"`, `"No file uploaded"`, `"Invalid file type"` · **413** `"File too large"` · **404** |
-| `GET /users/by-username/:username` | 🔒 | — | **200** `{ profile }` · **404** `"User not found"` |
+| `GET /users/by-username/:username` | 🔒 | — | **200** `profile` (case-insensitive search) · **404** `"User not found"` |
 | `GET /friends` | 🔒 | — | **200** `{ friends: profile[] }` (accepted, both directions) |
 | `GET /friends/requests/received` | 🔒 | — | **200** `{ receivedRequests: profile[] }` |
 | `GET /friends/requests/sent` | 🔒 | — | **200** `{ sentRequests: profile[] }` |
@@ -628,8 +632,8 @@ Internal only (403 through the gateway): `POST /internal/events` `{ targetUserId
 
 | Method & path | Auth | Body | Responses |
 |---|---|---|---|
-| `GET /games/rooms` | — | — | **200** `RoomInfo[]`: `{ code, name, hasPassword, leaderId, maxPlayers, players: [{ id, username }], mode, settings }` (passwords never sent) |
-| `GET /games/live` | — | — | **200** `[{ id, mode, players: [{ userId, username, cardCount, isCurrentTurn }] }]`, games in progress, no card is exposed |
+| `GET /games/rooms` | 🔒 | — | **200** `RoomInfo[]`: `{ code, name, hasPassword, leaderId, maxPlayers, players: [{ id, username }], mode, settings }` (passwords never sent) |
+| `GET /games/live` | 🔒 | — | **200** `[{ id, mode, players: [{ userId, username, cardCount, isCurrentTurn }] }]`, games in progress, no card is exposed |
 | `GET /games/history` | 🔒 | — | **200** `[{ id, mode, players, ranking, winnerId, startedAt, endedAt }]`, my finished games, newest first |
 | `POST /games/rooms` | 🔒 | `name` (1-50), `mode` (`classic`), `maxPlayers` (2-4), `password?` | **201** `{ roomCode }` · **400** `"Room name cannot be empty"`, `"Ranked games are only available through matchmaking"`, `"Max players must be between 2 and 4"` · **404** `"User not found"` |
 | `POST /games/create` | 🔒 | `participants` (2-4 `{ id }`, the creator included), `mode` (`classic`), `settings?` | **201** `{ gameId }` · **400** `"Duplicate participants are not allowed"`, `"Ranked games are only available through matchmaking"`, `"Creator must be a participant"`, `"Invalid game settings"` |
@@ -779,7 +783,15 @@ Errors (`{ type: "error", message }`): `"Invalid JSON format"`, `"Invalid messag
 
 - **HTTPS everywhere**: Nginx serves TLS 1.2/1.3 only (`HIGH:!aNULL:!MD5`), and port 80 redirects to HTTPS. Inside the Docker network, services talk in plain HTTP, as the subject allows.
 - **Passwords**: hashed and salted with bcrypt (cost 10), never returned by the API.
-- **Sessions**: JWT signed with a secret from a Docker secret, valid 7 days, stored in an `HttpOnly`, `Secure`, `SameSite=Lax` cookie that JavaScript cannot read. The 2FA step uses a separate 10-minute token that cannot open a session by itself.
+- **Sessions**: JWT signed with a secret from a Docker secret (a service refuses to start without it), valid 7 days, stored in an `HttpOnly`, `Secure`, `SameSite=Lax` cookie that JavaScript cannot read, and never sent in a response body.
+- **Revocation**: each session carries the user's `tokenVersion`. Logout, a password change or a 2FA change bumps it, and every older session is refused by every service, sockets included. The browser making the change gets a fresh session.
+- **2FA step**: a separate 10-minute token signed with its own key, so no other service accepts it as a session. It works once, a TOTP code cannot be replayed, and 5 wrong codes burn it.
+- **Brute force**: login, sign-up and 2FA are limited to 30 attempts per minute per IP. A login takes the same time whether the email exists or not, so accounts cannot be guessed from timing.
+- **Identities**: emails and usernames are unique without case, and stored normalized.
+- **Cross-site**: writes and WebSocket connections coming from another website are refused (`Origin` check), on top of the `SameSite` cookie.
+- **WebSockets**: frames of 16 KB at most, flood limits per socket (game: bursts of 200 then 50 messages/s; chat: 20 then 5/s), every message validated, and a malformed message can never stop a service. Direct messages are only allowed between friends.
+- **Headers**: HSTS, `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy`, `Permissions-Policy`, `Cache-Control: no-store` on the API, nginx version hidden, and a strict Content-Security-Policy on the site (scripts from the site only, no framing).
+- **Production build**: `make up` serves the static Vite build (no source code, no source maps, no debug tools); the development server is only started by `make dev`.
 - **2FA**: TOTP (RFC 6238), compatible with any authenticator app.
 - **Validation on both sides**:
   - in the browser, `required`, `minLength`, `maxLength`, `pattern` and type checks on every form;
@@ -787,7 +799,7 @@ Errors (`{ type: "error", message }`): `"Invalid JSON format"`, `"Invalid messag
 - **Secrets**: database password, database URL, JWT key and Grafana password are Docker secrets read from `/run/secrets`. `.env` and `secrets/` are ignored by Git, and the CI scans every push for leaked secrets (gitleaks).
 - **SQL injection**: every query goes through Prisma, with parameterized queries.
 - **XSS**: React escapes every text, and no user content is rendered as HTML.
-- **Uploads**: extension whitelist, 5 MB limit (also enforced by Nginx), files renamed `<userId>-<timestamp>`, the old file deleted, and partial files cleaned up on error.
+- **Uploads**: extension whitelist, the first bytes must be a real PNG, JPEG or WebP image of the announced type, 5 MB limit (also enforced by Nginx), files renamed `<userId>-<timestamp>`, the old file deleted, and partial files cleaned up on error.
 - **Internal surfaces**: `/metrics` and `/internal/*` are refused by the gateway (403). Prometheus, Grafana and PostgreSQL are not exposed publicly.
 - **Game integrity**: the server is authoritative. Every move is checked by the rules engine, and a client never sees the other players' cards (hands are replaced by placeholders before sending).
 - **Concurrency**: one game socket per user, serializable friend transactions, atomic accepts, and per-game timers so simultaneous actions cannot corrupt a game.

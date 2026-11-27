@@ -40,7 +40,21 @@ export async function updateProfile(
 
   // Explicitly whitelist allowed fields matching UpdateProfilePayload
   const updateData: { username?: string } = {};
-  if (data.username !== undefined) updateData.username = data.username;
+  if (data.username !== undefined) {
+    const username = data.username.normalize("NFKC");
+    // Unique without case: "Bob" cannot be taken while "bob" exists
+    // (security audit F-17). Same answer as the database constraint.
+    const taken = await prisma.user.findFirst({
+      where: {
+        username: { equals: username, mode: "insensitive" },
+        NOT: { id },
+      },
+      select: { id: true },
+    });
+    if (taken)
+      throw Object.assign(new Error("Username taken"), { code: "P2002" });
+    updateData.username = username;
+  }
 
   if (Object.keys(updateData).length === 0) {
     return getProfileById(prisma, id);
@@ -89,8 +103,11 @@ export async function getProfileByUsername(
   prisma: PrismaClient,
   username: string,
 ): Promise<Profile | null> {
-  const user = await prisma.user.findUnique({
-    where: { username },
+  // Found whatever the case typed (security audit F-17)
+  const user = await prisma.user.findFirst({
+    where: {
+      username: { equals: username.normalize("NFKC"), mode: "insensitive" },
+    },
     select: {
       id: true,
       username: true,

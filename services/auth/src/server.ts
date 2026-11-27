@@ -7,7 +7,13 @@ import authRoutes from "./routes/auth.js";
 import twofaRoutes from "./routes/twoaf.js";
 import fs from "node:fs";
 import process from "node:process";
-import { setupMetrics } from "shared";
+import {
+  isSessionCurrent,
+  jwtSecretOrExit,
+  setupMetrics,
+  setupOriginCheck,
+} from "shared";
+import type { SessionPayload } from "shared";
 import { initChallengeKey } from "./services/challenge.service.js";
 
 if (fs.existsSync("/run/secrets/db_url")) {
@@ -16,10 +22,13 @@ if (fs.existsSync("/run/secrets/db_url")) {
     .trim();
 }
 
-let jwtSecret = process.env.JWT_SECRET ?? "dev-secret";
-if (fs.existsSync("/run/secrets/jwt_secret")) {
-  jwtSecret = fs.readFileSync("/run/secrets/jwt_secret", "utf-8").trim();
-}
+// Without a key in production the service refuses to start, instead of
+// signing with a key everybody knows
+const jwtSecret = jwtSecretOrExit(
+  fs.existsSync("/run/secrets/jwt_secret")
+    ? fs.readFileSync("/run/secrets/jwt_secret", "utf-8")
+    : process.env.JWT_SECRET,
+);
 // Cle distincte pour le jeton de l'etape 2FA (audit F-03)
 initChallengeKey(jwtSecret);
 
@@ -56,6 +65,8 @@ app.setErrorHandler(
 );
 
 setupMetrics(app, "auth-service");
+// Writes sent from another website are refused (security audit F-25)
+setupOriginCheck(app);
 
 async function start() {
   try {
@@ -66,6 +77,9 @@ async function start() {
         cookieName: "access_token",
         signed: false,
       },
+      // Revoked sessions are refused (security audit F-07)
+      trusted: (_request, decoded) =>
+        isSessionCurrent(app.prisma, decoded as SessionPayload),
     });
 
     await app.register(prismaPlugin);

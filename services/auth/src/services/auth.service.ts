@@ -3,6 +3,44 @@ import { PrismaClient } from "shared";
 import type { User } from "shared";
 import { authenticator } from "@otplib/preset-default";
 
+// Compared against when the email is unknown, so that a login takes the same
+// time whether the account exists or not (security audit F-09)
+const DUMMY_HASH = bcrypt.hashSync("not-a-real-password", 10);
+
+// Emails are compared without case: "Bob@X.com" and "bob@x.com" are the same
+// account (security audit F-17). They are stored in lower case.
+export function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
+// Usernames are unique without case either: "Bob" and "bob" cannot coexist
+// (security audit F-17). They keep the case the user typed, for display.
+export async function isUsernameTaken(
+  prisma: PrismaClient,
+  username: string,
+  exceptUserId?: string,
+): Promise<boolean> {
+  const user = await prisma.user.findFirst({
+    where: {
+      username: { equals: username.normalize("NFKC"), mode: "insensitive" },
+      ...(exceptUserId && { NOT: { id: exceptUserId } }),
+    },
+    select: { id: true },
+  });
+  return user !== null;
+}
+
+export async function isEmailTaken(
+  prisma: PrismaClient,
+  email: string,
+): Promise<boolean> {
+  const user = await prisma.user.findFirst({
+    where: { email: { equals: normalizeEmail(email), mode: "insensitive" } },
+    select: { id: true },
+  });
+  return user !== null;
+}
+
 export async function signup(
   prisma: PrismaClient,
   email: string,
@@ -12,7 +50,11 @@ export async function signup(
   const hashedPassword = await bcrypt.hash(password, 10);
 
   const user = await prisma.user.create({
-    data: { email, username, password: hashedPassword },
+    data: {
+      email: normalizeEmail(email),
+      username: username.normalize("NFKC"),
+      password: hashedPassword,
+    },
   });
 
   return {
@@ -30,11 +72,12 @@ export async function login(
   email: string,
   password: string,
 ): Promise<Omit<User, "twoFactorSecret"> | null> {
-  const user = await prisma.user.findUnique({ where: { email } });
-  if (!user || !user.password) return null;
-
-  const valid = await bcrypt.compare(password, user.password);
-  if (!valid) return null;
+  const user = await prisma.user.findFirst({
+    where: { email: { equals: normalizeEmail(email), mode: "insensitive" } },
+  });
+  // Unknown email: same bcrypt work as a real check (audit F-09)
+  const valid = await bcrypt.compare(password, user?.password ?? DUMMY_HASH);
+  if (!user || !user.password || !valid) return null;
 
   return {
     id: user.id,
