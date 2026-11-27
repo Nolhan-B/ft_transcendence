@@ -50,6 +50,7 @@ export default function FriendChat({ profile }: FriendChatProps) {
   function invite() {
     if (status !== "open" || game.status !== "open") return;
     if (game.room) {
+      game.inviteToRoom(game.room.code, profile.id);
       sendGameInvite(profile.id, game.room.code);
       navigate(`/play/rooms/${game.room.code}`);
       return;
@@ -65,18 +66,20 @@ export default function FriendChat({ profile }: FriendChatProps) {
   useEffect(() => {
     if (!inviting.current || !game.room) return;
     inviting.current = false;
+    game.inviteToRoom(game.room.code, profile.id);
     sendGameInvite(profile.id, game.room.code);
     navigate(`/play/rooms/${game.room.code}`);
-  }, [game.room, profile.id, sendGameInvite, navigate]);
+  }, [game, profile.id, sendGameInvite, navigate]);
 
-  // Join the room of an invite. The server lets a player sit in two rooms:
-  // leave mine first. The lobby moves to the room once the server answers.
+  // Join the room of an invite: no password needed, the invite let me in.
+  // The server takes me out of my room only once I am in the new one (an
+  // old invite to a room that is gone does not cost me my room). The lobby
+  // moves to the room once the server answers.
   function join(roomCode: string) {
     if (game.room?.code === roomCode) {
       navigate(`/play/rooms/${roomCode}`);
       return;
     }
-    if (game.room) game.leaveRoom();
     game.joinRoom(roomCode);
     navigate("/play");
   }

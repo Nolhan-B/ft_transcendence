@@ -35,8 +35,11 @@ export interface GameContextValue {
   gameId: string | null;
   // Last state of the game sent by the server (the other hands are hidden)
   gameState: GameState | null;
-  // When the last state arrived: the server's turn timer restarts with it
+  // When the last state arrived (UNO windows are counted from it)
   turnStartedAt: number | null;
+  // When the current turn ends, on this browser's clock (from the time left
+  // sent by the server), or null when there is no timer (bot, finished...)
+  turnEndsAt: number | null;
   // Set when the server announces the end of the game
   winnerId: string | null;
   // When each player last said UNO (Date.now()), to know who is protected
@@ -53,6 +56,8 @@ export interface GameContextValue {
   clearError: () => void;
   createRoom: (payload: CreateRoomPayload) => void;
   joinRoom: (roomCode: string, password?: string) => void;
+  // Lets a friend join my room without its password (before the chat invite)
+  inviteToRoom: (roomCode: string, userId: string) => void;
   leaveRoom: () => void;
   startGame: () => void;
   // Leader only (the server ignores the others)

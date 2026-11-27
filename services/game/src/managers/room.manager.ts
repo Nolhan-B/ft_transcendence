@@ -10,7 +10,12 @@ export interface Room {
   mode: GameMode;
   settings: GameSettings;
   createdAt: Date;
+  // Joueurs invites par un membre : ils entrent sans le mot de passe
+  invited: Set<string>;
 }
+
+// Une room n'a jamais plus d'invites que ca (un membre qui spamme)
+const MAX_INVITED = 50;
 
 export class RoomManager {
   private rooms: Map<string, Room> = new Map();
@@ -47,6 +52,7 @@ export class RoomManager {
       mode: mode,
       settings: defaultSettings,
       createdAt: new Date(),
+      invited: new Set(),
     };
 
     this.rooms.set(roomCode, room);
@@ -88,7 +94,7 @@ export class RoomManager {
         error: "Max player capacity has already been reached for this room",
       };
 
-    if (room.password) {
+    if (room.password && !room.invited.has(userId)) {
       if (room.password !== password)
         return { ok: false, error: "Password is incorrect" };
     }
@@ -105,6 +111,23 @@ export class RoomManager {
     if (leaderId !== room.leaderId) return;
 
     room.settings = settings;
+  }
+
+  // Un membre de la room invite un joueur : il pourra entrer sans le mot de
+  // passe (le membre le connait, il pourrait aussi bien le lui donner)
+  invite(
+    code: string,
+    memberId: string,
+    userId: string,
+  ): { ok: true } | { ok: false; error: string } {
+    const room = this.getRoom(code);
+    if (!room) return { ok: false, error: "Room not found" };
+    if (!room.players.some((p) => p.id === memberId))
+      return { ok: false, error: "You are not in this room" };
+    if (room.invited.size >= MAX_INVITED && !room.invited.has(userId))
+      return { ok: false, error: "Too many invites for this room" };
+    room.invited.add(userId);
+    return { ok: true };
   }
 
   listRooms(): Room[] {

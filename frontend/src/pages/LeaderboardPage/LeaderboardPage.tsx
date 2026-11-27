@@ -2,18 +2,13 @@ import { useEffect, useState } from "react";
 import { MainTitle } from "../../components/texts/MainTitle";
 import type { LeaderboardEntry } from "shared";
 import { useAuth } from "../../hooks/auth/useAuth";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 
 function Leaderboard() {
   const [error, setError] = useState<string>("");
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [myRank, setMyRank] = useState<LeaderboardEntry | null>(null);
   const { user } = useAuth();
-  const navigate = useNavigate();
-
-  if (!user) {
-    navigate("/home");
-  }
 
   async function fetchLeaderboard() {
     const res = await fetch("/api/user/leaderboard?limit=10", {

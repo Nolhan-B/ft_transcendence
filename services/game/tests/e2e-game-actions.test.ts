@@ -1198,6 +1198,24 @@ const tests = [
     });
   }),
 
+  test("chrono: l'état donne la durée complète du tour (TURN_TIMEOUT_MS)", async () => {
+    await withServer(async (server) => {
+      const { players, gameId } = await setupGame(server, 2);
+      const [a, b] = players;
+      const forB = waitForMessage(b.ws, "game_updated");
+      send(a.ws, { type: "draw_card", gameId });
+      const state = (await forB).state;
+      assert(
+        state.turnDurationMs === TURN_MS,
+        `durée ${TURN_MS} attendue, reçu ${state.turnDurationMs}`,
+      );
+      assert(
+        state.turnTimeLeftMs <= state.turnDurationMs,
+        "le temps restant ne dépasse pas la durée",
+      );
+    });
+  }),
+
   test("chrono: à la reconnexion, le temps restant est celui du chrono en cours", async () => {
     await withServer(async (server) => {
       const { players, gameId } = await setupGame(server, 2);

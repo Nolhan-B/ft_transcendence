@@ -35,6 +35,7 @@ import {
   handleCreateRoom,
   handleJoinRoom,
   handleLeaveRoom,
+  handleInviteToRoom,
   handleUpdateRoom,
   handleStartGame,
   handleAddBot,
@@ -166,6 +167,7 @@ export default async function gameGateway(fastify: FastifyInstance) {
     return {
       ...NO_LIVE_STATE,
       turnTimeLeftMs: timed ? Math.max(0, deadline - Date.now()) : null,
+      turnDurationMs: TURN_TIMEOUT_MS,
       // Socket ferme, delai de reconnexion en cours (pas encore exclus)
       reconnecting: game.players
         .filter(
@@ -650,6 +652,9 @@ export default async function gameGateway(fastify: FastifyInstance) {
             break;
           case "leave_room":
             handleLeaveRoom(ctx, message);
+            break;
+          case "invite_to_room":
+            handleInviteToRoom(ctx, message);
             break;
           case "update_room":
             handleUpdateRoom(ctx, message);

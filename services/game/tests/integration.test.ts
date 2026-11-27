@@ -242,6 +242,43 @@ async function test(name: string, fn: () => Promise<void>, retries = 0) {
 // SETUP
 // ============================================================
 
+// Starts a game the way the site does: the first player creates a room, the
+// others join it, the first one starts it. Returns { gameId } like the old
+// POST /games/create (removed: it let anyone put other users in a game).
+async function createGame(
+  tokens: string[],
+  settings?: Record<string, unknown>,
+): Promise<{ gameId: string }> {
+  const clients = [];
+  for (const token of tokens) {
+    const c = await createClient(token);
+    await c.waitFor("connected");
+    clients.push(c);
+  }
+  const [leader, ...others] = clients;
+  leader.send({
+    type: "create_room",
+    name: "Integration",
+    mode: "classic",
+    maxPlayers: tokens.length,
+  });
+  const roomCode = (await leader.waitFor("room_updated")).room.code;
+  if (settings) {
+    leader.send({ type: "update_room", roomCode, settings });
+    await leader.waitFor("room_updated");
+  }
+  for (const c of others) {
+    c.send({ type: "join_room", roomCode });
+    await c.waitFor("room_updated");
+  }
+  leader.send({ type: "start_game", roomCode });
+  const { gameId } = await leader.waitFor("game_started");
+  for (const c of clients) c.ws.close();
+  // Let the server see these sockets close before the test opens its own
+  await new Promise((r) => setTimeout(r, 100));
+  return { gameId };
+}
+
 const alice = {
   email: `alice-${Date.now()}@test.com`,
   username: `alice${Date.now()}`,
@@ -315,40 +352,19 @@ await test("signup david", async () => {
 // ============================================================
 
 await test("create classic game", async () => {
-  const res = await post(
-    "/game/games/create",
-    {
-      participants: [
-        { id: aliceId, username: alice.username },
-        { id: bobId, username: bob.username },
-      ],
-      mode: "classic",
-    },
-    aliceToken,
-  );
+  const res = await createGame([aliceToken, bobToken]);
   assert(res.gameId, "Should return a gameId");
   log(`Game ID: ${res.gameId}`);
 });
 
 await test("create game with custom settings", async () => {
-  const res = await post(
-    "/game/games/create",
-    {
-      participants: [
-        { id: aliceId, username: alice.username },
-        { id: bobId, username: bob.username },
-      ],
-      mode: "classic",
-      settings: {
-        stacking: "all",
-        sevenZeroRule: true,
-        jumpIn: true,
-        bluffChallenge: true,
-        unoCallout: true,
-      },
-    },
-    aliceToken,
-  );
+  const res = await createGame([aliceToken, bobToken], {
+    stacking: "all",
+    sevenZeroRule: true,
+    jumpIn: true,
+    bluffChallenge: true,
+    unoCallout: true,
+  });
   assert(res.gameId, "Should return a gameId");
 
   // Verify settings are passed through
@@ -433,17 +449,7 @@ await test("unknown message type is rejected", async () => {
 // ============================================================
 
 await test("join game returns filtered state", async () => {
-  const res = await post(
-    "/game/games/create",
-    {
-      participants: [
-        { id: aliceId, username: alice.username },
-        { id: bobId, username: bob.username },
-      ],
-      mode: "classic",
-    },
-    aliceToken,
-  );
+  const res = await createGame([aliceToken, bobToken]);
 
   const client = await createClient(aliceToken);
   await client.waitFor("connected");
@@ -481,17 +487,7 @@ await test("joining non-existent game returns error", async () => {
 });
 
 await test("non-participant cannot join game", async () => {
-  const res = await post(
-    "/game/games/create",
-    {
-      participants: [
-        { id: aliceId, username: alice.username },
-        { id: bobId, username: bob.username },
-      ],
-      mode: "classic",
-    },
-    aliceToken,
-  );
+  const res = await createGame([aliceToken, bobToken]);
 
   const client = await createClient(charlieToken);
   await client.waitFor("connected");
@@ -506,17 +502,7 @@ await test("non-participant cannot join game", async () => {
 });
 
 await test("player_joined is broadcast to others", async () => {
-  const res = await post(
-    "/game/games/create",
-    {
-      participants: [
-        { id: aliceId, username: alice.username },
-        { id: bobId, username: bob.username },
-      ],
-      mode: "classic",
-    },
-    aliceToken,
-  );
+  const res = await createGame([aliceToken, bobToken]);
 
   const aliceClient = await createClient(aliceToken);
   await aliceClient.waitFor("connected");
@@ -539,17 +525,7 @@ await test("player_joined is broadcast to others", async () => {
 // ============================================================
 
 await test("play card out of turn returns error", async () => {
-  const res = await post(
-    "/game/games/create",
-    {
-      participants: [
-        { id: aliceId, username: alice.username },
-        { id: bobId, username: bob.username },
-      ],
-      mode: "classic",
-    },
-    aliceToken,
-  );
+  const res = await createGame([aliceToken, bobToken]);
 
   const bobClient = await createClient(bobToken);
   await bobClient.waitFor("connected");
@@ -563,17 +539,7 @@ await test("play card out of turn returns error", async () => {
 });
 
 await test("draw card out of turn returns error", async () => {
-  const res = await post(
-    "/game/games/create",
-    {
-      participants: [
-        { id: aliceId, username: alice.username },
-        { id: bobId, username: bob.username },
-      ],
-      mode: "classic",
-    },
-    aliceToken,
-  );
+  const res = await createGame([aliceToken, bobToken]);
 
   const bobClient = await createClient(bobToken);
   await bobClient.waitFor("connected");
@@ -591,17 +557,7 @@ await test("draw card out of turn returns error", async () => {
 // ============================================================
 
 await test("2-player classic game plays to completion", async () => {
-  const res = await post(
-    "/game/games/create",
-    {
-      participants: [
-        { id: aliceId, username: alice.username },
-        { id: bobId, username: bob.username },
-      ],
-      mode: "classic",
-    },
-    aliceToken,
-  );
+  const res = await createGame([aliceToken, bobToken]);
 
   const aliceClient = await createClient(aliceToken);
   const bobClient = await createClient(bobToken);
@@ -629,18 +585,7 @@ await test("2-player classic game plays to completion", async () => {
 // ============================================================
 
 await test("3-player classic game plays to completion", async () => {
-  const res = await post(
-    "/game/games/create",
-    {
-      participants: [
-        { id: aliceId, username: alice.username },
-        { id: bobId, username: bob.username },
-        { id: charlieId, username: charlie.username },
-      ],
-      mode: "classic",
-    },
-    aliceToken,
-  );
+  const res = await createGame([aliceToken, bobToken, charlieToken]);
 
   const aliceClient = await createClient(aliceToken);
   const bobClient = await createClient(bobToken);
@@ -671,24 +616,13 @@ await test("3-player classic game plays to completion", async () => {
 // ============================================================
 
 await test("game with stacking setting plays to completion", async () => {
-  const res = await post(
-    "/game/games/create",
-    {
-      participants: [
-        { id: aliceId, username: alice.username },
-        { id: bobId, username: bob.username },
-      ],
-      mode: "classic",
-      settings: {
-        stacking: "all",
-        sevenZeroRule: false,
-        jumpIn: false,
-        bluffChallenge: false,
-        unoCallout: false,
-      },
-    },
-    aliceToken,
-  );
+  const res = await createGame([aliceToken, bobToken], {
+    stacking: "all",
+    sevenZeroRule: false,
+    jumpIn: false,
+    bluffChallenge: false,
+    unoCallout: false,
+  });
 
   const aliceClient = await createClient(aliceToken);
   const bobClient = await createClient(bobToken);
@@ -715,24 +649,13 @@ await test("game with stacking setting plays to completion", async () => {
 // ============================================================
 
 await test("game with all settings enabled plays to completion", async () => {
-  const res = await post(
-    "/game/games/create",
-    {
-      participants: [
-        { id: aliceId, username: alice.username },
-        { id: bobId, username: bob.username },
-      ],
-      mode: "classic",
-      settings: {
-        stacking: "all",
-        sevenZeroRule: false, // skip sevenZero as it needs targetUserId
-        jumpIn: true,
-        bluffChallenge: false, // skip bluff as it needs challenge/accept response
-        unoCallout: true,
-      },
-    },
-    aliceToken,
-  );
+  const res = await createGame([aliceToken, bobToken], {
+    stacking: "all",
+    sevenZeroRule: false, // skip sevenZero as it needs targetUserId
+    jumpIn: true,
+    bluffChallenge: false, // skip bluff as it needs challenge/accept response
+    unoCallout: true,
+  });
 
   const aliceClient = await createClient(aliceToken);
   const bobClient = await createClient(bobToken);
@@ -759,17 +682,7 @@ await test("game with all settings enabled plays to completion", async () => {
 // ============================================================
 
 await test("chat message is received by other player", async () => {
-  const res = await post(
-    "/game/games/create",
-    {
-      participants: [
-        { id: aliceId, username: alice.username },
-        { id: bobId, username: bob.username },
-      ],
-      mode: "classic",
-    },
-    aliceToken,
-  );
+  const res = await createGame([aliceToken, bobToken]);
 
   const aliceClient = await createClient(aliceToken);
   const bobClient = await createClient(bobToken);
@@ -796,17 +709,7 @@ await test("chat message is received by other player", async () => {
 });
 
 await test("chat message includes username", async () => {
-  const res = await post(
-    "/game/games/create",
-    {
-      participants: [
-        { id: aliceId, username: alice.username },
-        { id: bobId, username: bob.username },
-      ],
-      mode: "classic",
-    },
-    aliceToken,
-  );
+  const res = await createGame([aliceToken, bobToken]);
 
   const aliceClient = await createClient(aliceToken);
   const bobClient = await createClient(bobToken);
@@ -836,17 +739,7 @@ await test("chat message includes username", async () => {
 // ============================================================
 
 await test("disconnect broadcasts player_left", async () => {
-  const res = await post(
-    "/game/games/create",
-    {
-      participants: [
-        { id: aliceId, username: alice.username },
-        { id: bobId, username: bob.username },
-      ],
-      mode: "classic",
-    },
-    aliceToken,
-  );
+  const res = await createGame([aliceToken, bobToken]);
 
   const aliceClient = await createClient(aliceToken);
   const bobClient = await createClient(bobToken);
@@ -867,33 +760,43 @@ await test("disconnect broadcasts player_left", async () => {
 });
 
 // ============================================================
+// REMOVED ROUTE
+// ============================================================
+
+// It took any list of users: anyone could put other players in a game
+// without their consent, with no username, which broke the lobby (B5)
+await test("POST /games/create no longer exists", async () => {
+  const res = await fetch(`${API}/game/games/create`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Cookie: `access_token=${aliceToken}`,
+    },
+    body: JSON.stringify({
+      participants: [{ id: aliceId }, { id: bobId }],
+      mode: "classic",
+    }),
+  });
+  assert(res.status === 404, `Should answer 404, got ${res.status}`);
+  const games = await (
+    await fetch(`${API}/game/games/live`, {
+      headers: { Cookie: `access_token=${aliceToken}` },
+    })
+  ).json();
+  assert(
+    !JSON.stringify(games).includes('"username":null'),
+    "No game without usernames in the live list",
+  );
+});
+
+// ============================================================
 // SIMULTANEOUS GAMES
 // ============================================================
 
 await test("two games can run simultaneously", async () => {
-  const res1 = await post(
-    "/game/games/create",
-    {
-      participants: [
-        { id: aliceId, username: alice.username },
-        { id: bobId, username: bob.username },
-      ],
-      mode: "classic",
-    },
-    aliceToken,
-  );
+  const res1 = await createGame([aliceToken, bobToken]);
 
-  const res2 = await post(
-    "/game/games/create",
-    {
-      participants: [
-        { id: charlieId, username: charlie.username },
-        { id: davidId, username: david.username },
-      ],
-      mode: "classic",
-    },
-    charlieToken,
-  );
+  const res2 = await createGame([charlieToken, davidToken]);
 
   assert(res1.gameId !== res2.gameId, "Should be different games");
 
@@ -930,17 +833,7 @@ await test("two games can run simultaneously", async () => {
 // ============================================================
 
 // await test("AFK: game ends when all players are disconnected by timeout", async () => {
-//   const res = await post(
-//     "/game/games/create",
-//     {
-//       participants: [
-//         { id: aliceId, username: alice.username },
-//         { id: bobId, username: bob.username },
-//       ],
-//       mode: "classic",
-//     },
-//     aliceToken,
-//   );
+//   const res = await createGame([aliceToken, bobToken]);
 
 //   const aliceClient = await createClient(aliceToken);
 //   const bobClient = await createClient(bobToken);

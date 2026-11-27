@@ -24,7 +24,8 @@ async function errorMessage(res: Response, fallback: string) {
 
 // Single source of truth for "who is connected". The token is in an httpOnly
 // cookie, unreadable from JS: the only way to know the user is to ask the
-// server (GET /api/auth/me).
+// server. GET /api/auth/session always answers 200 ({ user: null } for a
+// visitor): a 401 would be logged as an error in the console on every page.
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
@@ -33,9 +34,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refresh = useCallback(async () => {
     try {
-      const res = await fetch("/api/auth/me", { credentials: "include" });
-      // Any non-ok answer (no cookie, expired token...) means not connected
-      setUser(res.ok ? ((await res.json()).user as AuthUser) : null);
+      const res = await fetch("/api/auth/session", { credentials: "include" });
+      setUser(
+        res.ok ? (((await res.json()).user as AuthUser | null) ?? null) : null,
+      );
     } catch {
       setUser(null);
     } finally {

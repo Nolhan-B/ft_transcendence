@@ -22,6 +22,12 @@ export interface JoinRoomPayload {
   password?: string;
 }
 
+// A member of the room invites a player: he can join without the password
+export interface InviteToRoomPayload {
+  roomCode: string;
+  userId: string;
+}
+
 export interface LeaveRoomPayload {
   roomCode: string;
 }
@@ -110,6 +116,13 @@ export interface RoomInfo {
 export interface RoomUpdatedEvent {
   type: "room_updated";
   room: RoomInfo;
+}
+
+// Sent to the sockets of a player who is no longer in the room (left from
+// another tab, or moved to another room): they stop showing it
+export interface RoomLeftEvent {
+  type: "room_left";
+  roomCode: string;
 }
 
 export interface GameStartedEvent {
@@ -215,6 +228,7 @@ export interface EloUpdatedEvent {
 
 export type ServerEvent =
   | RoomUpdatedEvent
+  | RoomLeftEvent
   | GameStartedEvent
   | GameUpdatedEvent
   | PlayerJoinedEvent
@@ -235,6 +249,7 @@ export type ClientMessage =
   | ({ type: "create_room" } & CreateRoomPayload)
   | ({ type: "join_room" } & JoinRoomPayload)
   | ({ type: "leave_room" } & LeaveRoomPayload)
+  | ({ type: "invite_to_room" } & InviteToRoomPayload)
   | ({ type: "update_room" } & UpdateRoomPayload)
   | ({ type: "start_game" } & StartGamePayload)
   | ({ type: "join_game" } & JoinGamePayload)

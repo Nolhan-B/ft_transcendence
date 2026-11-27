@@ -404,9 +404,9 @@ Bots never get a turn timer and are never counted AFK.
 | `/` | everyone | redirects to `/home` |
 | `/home` | everyone | home page |
 | `/rules` | everyone | game rules |
-| `/leaderboard` | everyone (data needs a login) | top 10 and own rank |
+| `/leaderboard` | connected users (otherwise `/auth`) | top 10 and own rank |
 | `/terms`, `/privacy` | everyone | Terms of Service, Privacy Policy |
-| `/users/:id` | everyone | public profile |
+| `/users/:id` | connected users | public profile of a player |
 | `/auth` (`?mode=register`) | visitors only (a connected user goes to `/home`) | sign-in / sign-up |
 | `/play` | connected users (otherwise `/auth`) | lobby |
 | `/play/rooms/:code` | connected users | waiting room |
@@ -416,7 +416,7 @@ Bots never get a turn timer and are never counted AFK.
 | `/games/:id/spectate` | connected users | spectator view |
 | any other URL | everyone | "not found" page inside the layout |
 
-While the session is being checked (`GET /api/auth/me` on load), protected routes show a spinner instead of redirecting too early.
+While the session is being checked (`GET /api/auth/session` on load), protected routes show a spinner instead of redirecting too early.
 
 ### Layout and navigation
 
@@ -586,6 +586,7 @@ Every route is reached through the gateway at `https://localhost:8443/api/<servi
 | `POST /login` | — | `email`, `password` | **200** `{ user }` + cookie · **200** `{ requiresTwoFactor: true, tempToken }` when 2FA is on (no cookie; `tempToken` valid 10 min, single use, only accepted by `/2fa/validate`) · **401** `"Invalid credentials"` |
 | `POST /logout` | — | — | **200** `{ message: "Logged out" }`, cookie cleared. Revokes every session of the user, on every device |
 | `GET /me` | 🔒 | — | **200** `{ user }` · **404** `"User not found"` |
+| `GET /session` | — | — | **200** `{ user }`, or `{ user: null }` for a visitor or a revoked session (never 401: the site asks it on every page, and a 401 would be logged as a console error) |
 | `POST /password` | 🔒 | `currentPassword`, `newPassword` (8+), `code` (6 digits, required if 2FA is on) | **200** `{ message: "Password updated successfully" }` · **400** `"New password must be different from current password"` · **401** `"Invalid current password or 2FA code"` · **404** `"User not found"` |
 | `DELETE /account` | 🔒 | `password`, `code` (if 2FA) | **200** `{ message: "Account deleted" }`, cookie cleared · **401** `"Invalid password or 2FA code"` · **404** `"Account already deleted"` |
 | `POST /2fa/enable` | 🔒 | — | **200** `{ qrCode }` (data URL of the QR code; the secret is stored but not active yet) · **409** `"2FA is already enabled"` · **404** |
@@ -635,9 +636,8 @@ Internal only (403 through the gateway): `POST /internal/events` `{ targetUserId
 | `GET /games/live` | 🔒 | — | **200** `[{ id, mode, players: [{ userId, username, cardCount, isCurrentTurn }] }]`, games in progress, no card is exposed |
 | `GET /games/history` | 🔒 | — | **200** `[{ id, mode, players, ranking, winnerId, startedAt, endedAt }]`, my finished games, newest first |
 | `POST /games/rooms` | 🔒 | `name` (1-50), `mode` (`classic`), `maxPlayers` (2-4), `password?` | **201** `{ roomCode }` · **400** `"Room name cannot be empty"`, `"Ranked games are only available through matchmaking"`, `"Max players must be between 2 and 4"` · **404** `"User not found"` |
-| `POST /games/create` | 🔒 | `participants` (2-4 `{ id }`, the creator included), `mode` (`classic`), `settings?` | **201** `{ gameId }` · **400** `"Duplicate participants are not allowed"`, `"Ranked games are only available through matchmaking"`, `"Creator must be a participant"`, `"Invalid game settings"` |
 
-The website creates rooms and games through the WebSocket. The two `POST` routes are kept for scripts and tests.
+The website creates rooms and games through the WebSocket. `POST /games/rooms` is kept for scripts and tests. A game always starts from a room (`start_game`) or from matchmaking: there is no route that puts other users in a game.
 
 ---
 
@@ -657,13 +657,16 @@ There are two WebSockets, both authenticated by the `access_token` cookie (the c
 
 | Message | Payload | Answer / effect |
 |---|---|---|
-| `create_room` | `name`, `mode: "classic"`, `maxPlayers` 2-4, `password?` | `room_updated { room }` to the creator, who is the leader · `error` `"Ranked games are only available through matchmaking"`, `"User not found"` |
-| `join_room` | `roomCode`, `password?` | `room_updated` to everyone in the room · `error` `"Can not find room with code X"`, `"Already in room"`, `"Max player capacity has already been reached for this room"`, `"Password is incorrect"` |
-| `leave_room` | `roomCode` | `room_updated` to the others. The next human becomes leader; an empty room is deleted |
+| `create_room` | `name`, `mode: "classic"`, `maxPlayers` 2-4, `password?` | `room_updated { room }` to the creator, who is the leader. Leaves his other room (`room_left`) and the ranked queue (`queue_left`) · `error` `"Already in a game"`, `"Ranked games are only available through matchmaking"`, `"User not found"` |
+| `join_room` | `roomCode`, `password?` (not needed when invited) | `room_updated` to everyone in the room. Only once in, leaves his other room and the queue · `error` `"Already in a game"`, `"Room not found"`, `"Max player capacity has already been reached for this room"`, `"Password is incorrect"` |
+| `invite_to_room` | `roomCode`, `userId` | sent by a member before the chat invite: the invited player joins without the password · `error` `"Room not found"`, `"You are not in this room"`, `"Too many invites for this room"` |
+| `leave_room` | `roomCode` | `room_left { roomCode }` to every tab of the player, `room_updated` to the others. The next human becomes leader; an empty room is deleted |
 | `update_room` | `roomCode`, `settings` | `room_updated` to everyone · `error` `"Only the leader can update settings"`, `"Room not found"` |
 | `add_bot` | `roomCode` | a bot joins (Alice, Bob, Charlie...) · `error` `"Only the owner can add bots"`, `"Max player capacity has already been reached for this room"` |
 | `remove_bot` | `roomCode`, `botId` | `error` `"Only the owner can remove bots"`, `"Not a bot"` |
-| `start_game` | `roomCode` | `game_started { gameId }` to every human of the room, and the room is deleted · `error` `"Only the leader can start"`, `"Need at least 2 players"` |
+| `start_game` | `roomCode` | `game_started { gameId }` to every human of the room, and the room is deleted · `error` `"Only the leader can start"`, `"Need at least 2 players"`, `"<username> is already in a game"` |
+
+**One thing at a time.** A player is in one room, or in the ranked queue, or in a game. Joining a room or the queue leaves the other one; a game in progress (followed by one of his tabs) refuses both.
 
 **Matchmaking (client → server)**
 

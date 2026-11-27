@@ -33,11 +33,11 @@ function Router() {
           <Route path="/rules" element={<RulesPage />} />
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/privacy" element={<PrivacyPage />} />
-          <Route path="/leaderboard" element={<LeaderboardPage />} />
 
           {/* Connected users only */}
           <Route element={<RequireAuth />}>
             <Route path="/play" element={<PlayPage />} />
+            <Route path="/leaderboard" element={<LeaderboardPage />} />
             <Route path="/play/rooms/:code" element={<RoomPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/settings" element={<SettingsPage />} />

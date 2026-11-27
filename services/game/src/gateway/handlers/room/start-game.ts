@@ -1,5 +1,6 @@
 import { GatewayContext } from "../../types.js";
 import type { ServerEvent } from "shared";
+import { isPlayingAGame } from "./lobby-rules.js";
 
 export function handleStartGame(
   ctx: GatewayContext,
@@ -16,6 +17,12 @@ export function handleStartGame(
   }
   if (room.players.length < 2) {
     ctx.sendError(ctx.socket, "Need at least 2 players");
+    return;
+  }
+  // Personne ne joue deux parties en meme temps
+  const busy = room.players.find((p) => isPlayingAGame(ctx, p.id));
+  if (busy) {
+    ctx.sendError(ctx.socket, `${busy.username} is already in a game`);
     return;
   }
   const participants = room.players.map((p) => ({
