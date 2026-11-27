@@ -645,6 +645,57 @@ const tests = [
       assert(bot.hand.length === 1, "Le bot ne doit pas piocher");
     });
   }),
+
+  // B11: the host adds a bot, a friend joins, the host leaves, the friend
+  // starts. The bot is then first in the list, so it plays first: nothing
+  // made it play and the game froze.
+  test("e2e: un bot qui commence la partie joue son premier tour", async () => {
+    const { fastify, port, gameManager } = await buildServer();
+    const host = await connectWs(
+      port,
+      fastify.jwt.sign({ id: uniqueUserId() }),
+    );
+    const friendId = uniqueUserId();
+    const friend = await connectWs(port, fastify.jwt.sign({ id: friendId }));
+    try {
+      const roomCode = await createRoom(host.ws, 4, "B11");
+      send(host.ws, { type: "add_bot", roomCode });
+      await waitForMessage(host.ws, "room_updated");
+      send(friend.ws, { type: "join_room", roomCode });
+      await waitForMessage(friend.ws, "room_updated");
+      send(host.ws, { type: "leave_room", roomCode });
+      await waitForMessage(friend.ws, "room_updated");
+
+      send(friend.ws, { type: "start_game", roomCode });
+      const { gameId } = await waitForMessage(friend.ws, "game_started");
+      send(friend.ws, { type: "join_game", gameId });
+      await waitForMessage(friend.ws, "game_updated");
+
+      const game = gameManager.getGame(gameId)!;
+      const first = game.players.find((p) => p.isCurrentTurn)!;
+      assert(
+        first.userId.startsWith("bot_"),
+        `Le bot doit commencer, c'est ${first.userId}`,
+      );
+
+      // The bot acts within its delay (0.5 to 1.5 s in tests). Only check
+      // that it did something: who plays next depends on the dealt cards (a
+      // skip, a reverse or a +2 gives the turn back to the bot with 2 players)
+      const moved = await waitForMessage(friend.ws, "game_updated", 3000);
+      const botActed = moved.state.lastActions.some(
+        (a: any) => a.userId === first.userId,
+      );
+      assert(
+        botActed,
+        `Le bot doit avoir joué ou pioché, actions reçues : ${JSON.stringify(moved.state.lastActions)}`,
+      );
+    } finally {
+      host.ws.close();
+      friend.ws.close();
+      await sleep(50);
+      await fastify.close();
+    }
+  }),
 ];
 
 // ============================================================
