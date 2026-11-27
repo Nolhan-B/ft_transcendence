@@ -236,6 +236,12 @@ export default async function friendsRoutes(fastify: FastifyInstance) {
           type: "friend_removed",
           userId,
         });
+        // My other tabs too: they still listed the blocked user as a friend
+        // until a reload (the tab that blocked has already forgotten them)
+        await notifyChatUser(fastify, userId, {
+          type: "friend_removed",
+          userId: targetId,
+        });
         return reply.send({ message: "User blocked" });
       } catch (err: unknown) {
         const prismaError = err as { code?: string };
