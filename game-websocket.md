@@ -41,7 +41,7 @@ same screen.
 | Watch a game | `{ type: "spectate_game", gameId }` | `spectate_started { state }` |
 | Stop watching | `{ type: "leave_spectate", gameId }` | |
 
-- One socket per user. A second tab gets `error: "Already connected"`.
+- Several sockets per user (one per tab or device), each one receives the user's events.
 - After a refresh, send `join_game` again. You have **30 s** to come back
   before being kicked (see `reconnecting`).
 - `spectate_started.state` has the same shape as `game_updated.state`.

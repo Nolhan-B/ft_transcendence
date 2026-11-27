@@ -8,11 +8,9 @@ export function handleLeaveRoom(
   ctx.roomManager.leaveRoom(msg.roomCode, ctx.userId);
   const roomSocketSet = ctx.roomSockets.get(msg.roomCode);
   if (roomSocketSet) {
+    // Tous ses onglets quittent la room avec lui
     for (const client of roomSocketSet) {
-      if (client.userId === ctx.userId) {
-        roomSocketSet.delete(client);
-        break;
-      }
+      if (client.userId === ctx.userId) roomSocketSet.delete(client);
     }
   }
   const room = ctx.roomManager.getRoom(msg.roomCode);

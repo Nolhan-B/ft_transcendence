@@ -65,8 +65,7 @@ export interface TwoFactorValidatePayload {
   code: string;
 }
 
-export type AuthResponse =
-  { token: string; user: User } | TwoFactorRequiredResponse;
+export type AuthResponse = { user: User } | TwoFactorRequiredResponse;
 
 export interface TwoFactorVerifyPayload {
   code: string;

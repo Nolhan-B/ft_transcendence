@@ -13,9 +13,10 @@ process.env.BOT_MIN_DELAY_MS = "500";
 process.env.BOT_EXTRA_DELAY_MS = "1000";
 
 // Délais courts pour les tests : doivent être posés AVANT de charger le gateway
-const ALIVE_MS = 300;
+const HEARTBEAT_MS = 300;
 const GRACE_MS = 500;
-process.env.ALIVE_CHECK_MS = String(ALIVE_MS);
+const SLOW_DB_MS = 300;
+process.env.HEARTBEAT_MS = String(HEARTBEAT_MS);
 process.env.RECONNECT_GRACE_MS = String(GRACE_MS);
 
 let gameGateway: any;
@@ -26,9 +27,9 @@ let failed = 0;
 const JWT_SECRET = "test-secret";
 
 let userCounter = 0;
-function uniqueUserId(): string {
+function uniqueUserId(prefix = "ws"): string {
   userCounter++;
-  return `ws_${Date.now()}_${userCounter}`;
+  return `${prefix}_${Date.now()}_${userCounter}`;
 }
 
 function test(name: string, fn: () => Promise<void>) {
@@ -64,11 +65,18 @@ async function buildServer() {
   fastify.decorate("prisma", {
     match: { create: async () => ({}) },
     user: {
-      findUnique: async ({ where }: any) => ({
-        id: where.id,
-        username: `user_${where.id}`,
-        elo: 1000,
-      }),
+      // "revoked_..." : session revoquee (tokenVersion 1, les tokens de test
+      // sont en version 0). "slow_..." : la base met 300 ms a repondre, pour
+      // tester ce qui arrive pendant la verification de session.
+      findUnique: async ({ where }: any) => {
+        if (where.id.startsWith("slow")) await sleep(SLOW_DB_MS);
+        return {
+          id: where.id,
+          username: `user_${where.id}`,
+          elo: 1000,
+          tokenVersion: where.id.startsWith("revoked") ? 1 : 0,
+        };
+      },
       findMany: async () => [],
       update: async () => ({}),
     },
@@ -245,62 +253,122 @@ const tests = [
     });
   }),
 
-  // ---------------- Deuxième onglet ----------------
+  // ---------------- Plusieurs onglets ----------------
 
-  test("ws: deuxième onglet alors que le premier est vivant → refusé", async () => {
+  test("ws: deuxième onglet alors que le premier est vivant → accepté", async () => {
     await withServer(async (server) => {
       const userId = uniqueUserId();
       const a = await connect(server, userId);
-      const b = openClient(server, userId);
-
-      await waitFor(b, isError("Already connected"), "Already connected");
-      await waitClosed(b);
-      assert(
-        !b.messages.some(isType("connected")),
-        "Le deuxième onglet ne doit pas recevoir connected",
-      );
+      const b = await connect(server, userId);
+      await sleep(100);
       assert(
         a.ws.readyState === WebSocket.OPEN,
-        "Le premier onglet doit rester ouvert",
+        "Le premier doit rester ouvert",
+      );
+      assert(
+        b.ws.readyState === WebSocket.OPEN,
+        "Le deuxième doit être ouvert",
+      );
+      assert(
+        !a.messages.some(isType("error")) && !b.messages.some(isType("error")),
+        "Aucune erreur sur les deux onglets",
       );
       a.ws.close();
+      b.ws.close();
     });
   }),
 
-  test("ws: après un refus, le premier onglet fonctionne toujours", async () => {
+  test("ws: trois onglets → chacun peut agir", async () => {
     await withServer(async (server) => {
       const userId = uniqueUserId();
-      const a = await connect(server, userId);
-      const b = openClient(server, userId);
-      await waitClosed(b);
-
-      send(a.ws, {
-        type: "create_room",
-        mode: GameMode.CLASSIC,
-        maxPlayers: 2,
-        name: "Toujours là",
-      });
-      await waitFor(a, isType("room_updated"), "room_updated sur A");
-      a.ws.close();
+      const tabs = [
+        await connect(server, userId),
+        await connect(server, userId),
+        await connect(server, userId),
+      ];
+      for (const [i, tab] of tabs.entries()) {
+        send(tab.ws, {
+          type: "create_room",
+          mode: GameMode.CLASSIC,
+          maxPlayers: 2,
+          name: `Onglet ${i}`,
+        });
+        await waitFor(tab, isType("room_updated"), `room_updated onglet ${i}`);
+      }
+      for (const tab of tabs) tab.ws.close();
     });
   }),
 
-  test("ws: le refus d'un deuxième onglet ne retire pas le premier de la file", async () => {
+  test("ws: fermer un onglet ne retire pas le joueur de la file", async () => {
     await withServer(async (server) => {
       const userId = uniqueUserId();
       const a = await connect(server, userId);
       send(a.ws, { type: "join_queue" });
       await waitFor(a, isType("queue_joined"), "queue_joined");
 
-      const b = openClient(server, userId);
+      const b = await connect(server, userId);
+      b.ws.close();
       await waitClosed(b);
       await sleep(100);
-
       assert(
         server.queueManager.has(userId),
         "A doit toujours être dans la file",
       );
+
       a.ws.close();
+      await waitClosed(a);
+      await sleep(100);
+      assert(
+        !server.queueManager.has(userId),
+        "Le dernier onglet fermé : le joueur quitte la file",
+      );
+    });
+  }),
+
+  test("ws: deux onglets dans la même partie → les deux reçoivent l'état", async () => {
+    await withServer(async (server) => {
+      const userId = uniqueUserId();
+      const a = await connect(server, userId);
+      const gameId = await startGameWithBot(a);
+
+      const b = await connect(server, userId);
+      send(b.ws, { type: "join_game", gameId });
+      await waitFor(b, isType("game_updated"), "game_updated sur B");
+
+      // Le bot ou le timer finit par jouer : les deux onglets le voient
+      const beforeA = a.messages.length;
+      const beforeB = b.messages.length;
+      const game = server.gameManager.getGame(gameId)!;
+      const me = game.players.find((p) => p.userId === userId)!;
+      if (me.isCurrentTurn) send(a.ws, { type: "draw_card", gameId });
+      const fresh = (c: Client, before: number) => (m: any) =>
+        m.type === "game_updated" && c.messages.indexOf(m) >= before;
+      await waitFor(a, fresh(a, beforeA), "nouvel état sur A", 8000);
+      await waitFor(b, fresh(b, beforeB), "nouvel état sur B", 8000);
+      a.ws.close();
+      b.ws.close();
+    });
+  }),
+
+  test("ws: fermer un onglet en pleine partie → l'autre garde la place", async () => {
+    await withServer(async (server) => {
+      const userId = uniqueUserId();
+      const a = await connect(server, userId);
+      const gameId = await startGameWithBot(a);
+      const b = await connect(server, userId);
+      send(b.ws, { type: "join_game", gameId });
+      await waitFor(b, isType("game_updated"), "game_updated sur B");
+
+      a.ws.close();
+      await sleep(GRACE_MS + 300);
+      const game = server.gameManager.getGame(gameId);
+      assert(
+        game?.status === GameStatus.IN_PROGRESS,
+        "La partie doit continuer",
+      );
+      const me = game!.players.find((p) => p.userId === userId)!;
+      assert(!me.disconnected, "Le joueur ne doit pas être marqué déconnecté");
+      b.ws.close();
     });
   }),
 
@@ -324,7 +392,7 @@ const tests = [
       a.ws.close(); // pas d'attente : le serveur n'a peut-être pas encore traité le close
       const b = await connect(server, userId);
       assert(
-        !b.messages.some(isError("Already connected")),
+        !b.messages.some(isType("error")),
         "Le refresh ne doit pas être refusé",
       );
       b.ws.close();
@@ -347,36 +415,48 @@ const tests = [
     });
   }),
 
-  test("ws: ancien socket mort (ne répond plus au ping) → nouveau accepté", async () => {
+  test("ws: dix chargements sans fermer les anciens → tous acceptés", async () => {
+    await withServer(async (server) => {
+      const userId = uniqueUserId();
+      const tabs: Client[] = [];
+      for (let i = 0; i < 10; i++) tabs.push(await connect(server, userId));
+      assert(
+        tabs.every((t) => t.ws.readyState === WebSocket.OPEN),
+        "Tous doivent être ouverts",
+      );
+      for (const t of tabs) t.ws.close();
+    });
+  }),
+
+  test("ws: socket mort (ne répond plus au ping) → coupé par le heartbeat", async () => {
     await withServer(async (server) => {
       const userId = uniqueUserId();
       const dead = await connect(server, userId, { dead: true });
 
       const start = Date.now();
       const b = await connect(server, userId);
-      const elapsed = Date.now() - start;
-
       assert(
-        elapsed >= ALIVE_MS - 50,
-        `Doit attendre le délai de ping (${elapsed} ms)`,
+        Date.now() - start < HEARTBEAT_MS,
+        "Le nouveau est accepté sans attendre",
       );
       await waitClosed(dead);
-      assert(b.ws.readyState === WebSocket.OPEN, "Le nouveau doit être ouvert");
+      assert(
+        b.ws.readyState === WebSocket.OPEN,
+        "Le nouveau doit rester ouvert",
+      );
       b.ws.close();
     });
   }),
 
-  test("ws: après un ancien socket mort, un troisième onglet est refusé", async () => {
+  test("ws: un socket qui répond aux pings reste ouvert", async () => {
     await withServer(async (server) => {
-      const userId = uniqueUserId();
-      await connect(server, userId, { dead: true });
-      const b = await connect(server, userId);
-      await sleep(100); // le close tardif de l'ancien est passé
-
-      // Si le close de l'ancien avait effacé B, C serait accepté
-      const c = openClient(server, userId);
-      await waitFor(c, isError("Already connected"), "Already connected");
-      b.ws.close();
+      const a = await connect(server, uniqueUserId());
+      await sleep(HEARTBEAT_MS * 4);
+      assert(
+        a.ws.readyState === WebSocket.OPEN,
+        "Le socket vivant doit rester ouvert",
+      );
+      a.ws.close();
     });
   }),
 
@@ -396,15 +476,11 @@ const tests = [
     });
   }),
 
-  test("ws: le nouveau client abandonne pendant la vérification → le suivant est accepté", async () => {
+  test("ws: un client qui se ferme tout de suite → le suivant est accepté", async () => {
     await withServer(async (server) => {
       const userId = uniqueUserId();
-      await connect(server, userId, { dead: true });
-
-      // B s'ouvre puis se ferme pendant que le serveur ping l'ancien
       const b = openClient(server, userId, { onOpen: (ws) => ws.close() });
       await waitClosed(b);
-      await sleep(ALIVE_MS + 100);
 
       const c = await connect(server, userId);
       assert(c.ws.readyState === WebSocket.OPEN, "C doit être accepté");
@@ -412,9 +488,211 @@ const tests = [
     });
   }),
 
-  // ---------------- Messages pendant la vérification ----------------
+  // ---------------- Session ----------------
 
-  test("ws: un message envoyé pendant la vérification n'est pas perdu", async () => {
+  test("ws: session révoquée → Invalid token, jamais connected", async () => {
+    await withServer(async (server) => {
+      const c = openClient(server, uniqueUserId("revoked"));
+      await waitFor(c, isError("Invalid token"), "Invalid token");
+      await waitClosed(c);
+      assert(
+        !c.messages.some(isType("connected")),
+        "Ne doit jamais recevoir connected",
+      );
+    });
+  }),
+
+  test("ws: session à jour (v = tokenVersion) → acceptée", async () => {
+    await withServer(async (server) => {
+      const userId = uniqueUserId("revoked");
+      const token = server.fastify.jwt.sign({ id: userId, v: 1 });
+      const c = await connect(server, userId, { token });
+      assert(c.ws.readyState === WebSocket.OPEN, "Doit être ouvert");
+      c.ws.close();
+    });
+  }),
+
+  test("ws: messages envoyés pendant la vérification de session → traités dans l'ordre", async () => {
+    await withServer(async (server) => {
+      const userId = uniqueUserId("slow");
+      const b = openClient(server, userId, {
+        onOpen: (ws) => {
+          send(ws, { type: "join_queue" });
+          send(ws, { type: "leave_queue" });
+        },
+      });
+      await waitFor(b, isType("queue_left"), "queue_left");
+      const connected = b.messages.findIndex(isType("connected"));
+      const joined = b.messages.findIndex(isType("queue_joined"));
+      const left = b.messages.findIndex(isType("queue_left"));
+      assert(connected !== -1 && connected < joined, "connected d'abord");
+      assert(joined < left, "queue_joined avant queue_left");
+      assert(!b.messages.some(isType("error")), "Aucune erreur");
+      b.ws.close();
+    });
+  }),
+
+  test("ws: onglet fermé pendant la vérification → ne garde pas le joueur dans la file", async () => {
+    await withServer(async (server) => {
+      const userId = uniqueUserId("slow");
+      // A se ferme avant la fin de la vérification de session
+      const a = openClient(server, userId, { onOpen: (ws) => ws.close() });
+      await waitClosed(a);
+      await sleep(SLOW_DB_MS + 100);
+
+      const b = await connect(server, userId);
+      send(b.ws, { type: "join_queue" });
+      await waitFor(b, isType("queue_joined"), "queue_joined");
+      b.ws.close();
+      await waitClosed(b);
+      await sleep(100);
+      // Si A etait reste dans les sockets du joueur, B ne serait pas le dernier
+      assert(
+        !server.queueManager.has(userId),
+        "Le joueur doit avoir quitté la file",
+      );
+    });
+  }),
+
+  // ---------------- Anti-flood ----------------
+
+  test("ws: flood de 300 messages → l'excédent est refusé, le socket reste utilisable", async () => {
+    await withServer(async (server) => {
+      const c = await connect(server, uniqueUserId());
+      for (let i = 0; i < 300; i++) send(c.ws, { type: "leave_queue" });
+      await sleep(500);
+      const limited = c.messages.filter(isError("Too many messages")).length;
+      assert(limited >= 50, `Au moins 50 refus attendus, ${limited} reçus`);
+      assert(limited <= 120, `La rafale de 200 doit passer, ${limited} refus`);
+      assert(c.ws.readyState === WebSocket.OPEN, "Le socket reste ouvert");
+
+      // Une seconde plus tard, le seau s'est rempli : une vraie action passe
+      await sleep(1000);
+      send(c.ws, {
+        type: "create_room",
+        mode: GameMode.CLASSIC,
+        maxPlayers: 2,
+        name: "Après le flood",
+      });
+      await waitFor(c, isType("room_updated"), "room_updated après le flood");
+      c.ws.close();
+    });
+  }),
+
+  test("ws: la limite est par socket → un autre onglet n'est pas bloqué", async () => {
+    await withServer(async (server) => {
+      const userId = uniqueUserId();
+      const a = await connect(server, userId);
+      const b = await connect(server, userId);
+      for (let i = 0; i < 300; i++) send(a.ws, { type: "leave_queue" });
+      await sleep(300);
+      send(b.ws, {
+        type: "create_room",
+        mode: GameMode.CLASSIC,
+        maxPlayers: 2,
+        name: "Onglet calme",
+      });
+      await waitFor(b, isType("room_updated"), "room_updated sur B");
+      assert(
+        !b.messages.some(isError("Too many messages")),
+        "B ne doit pas être limité",
+      );
+      a.ws.close();
+      b.ws.close();
+    });
+  }),
+
+  // ---------------- Rooms et onglets ----------------
+
+  test("ws: leave_room depuis un onglet → tous les onglets quittent la room", async () => {
+    await withServer(async (server) => {
+      const host = await connect(server, uniqueUserId());
+      send(host.ws, {
+        type: "create_room",
+        mode: GameMode.CLASSIC,
+        maxPlayers: 3,
+        name: "Onglets",
+      });
+      const roomCode = (
+        await waitFor(host, isType("room_updated"), "room_updated")
+      ).room.code;
+
+      const userId = uniqueUserId();
+      const a = await connect(server, userId);
+      const b = await connect(server, userId);
+      send(a.ws, { type: "join_room", roomCode });
+      await waitFor(a, isType("room_updated"), "room_updated sur A");
+      send(b.ws, { type: "join_room", roomCode });
+      await waitFor(b, isType("room_updated"), "room_updated sur B");
+
+      send(a.ws, { type: "leave_room", roomCode });
+      await sleep(200);
+      const room = server.roomManager.getRoom(roomCode)!;
+      assert(
+        !JSON.stringify(room).includes(userId),
+        "Le joueur ne doit plus être dans la room",
+      );
+
+      // B ne suit plus la room : il ne reçoit pas ses mises à jour suivantes
+      const before = b.messages.length;
+      const other = await connect(server, uniqueUserId());
+      send(other.ws, { type: "join_room", roomCode });
+      await waitFor(
+        host,
+        (m) => m.type === "room_updated" && m.room.players.length === 2,
+        "room_updated avec other",
+      );
+      await sleep(200);
+      assert(
+        !b.messages.slice(before).some(isType("room_updated")),
+        "B ne doit plus recevoir les mises à jour de la room",
+      );
+      for (const c of [host, a, b, other]) c.ws.close();
+    });
+  }),
+
+  test("ws: fermer un des deux onglets d'une room → le joueur y reste", async () => {
+    await withServer(async (server) => {
+      const host = await connect(server, uniqueUserId());
+      send(host.ws, {
+        type: "create_room",
+        mode: GameMode.CLASSIC,
+        maxPlayers: 3,
+        name: "Lobby",
+      });
+      const roomCode = (
+        await waitFor(host, isType("room_updated"), "room_updated")
+      ).room.code;
+
+      const userId = uniqueUserId();
+      const a = await connect(server, userId);
+      const b = await connect(server, userId);
+      send(a.ws, { type: "join_room", roomCode });
+      await waitFor(a, isType("room_updated"), "room_updated sur A");
+      send(b.ws, { type: "join_room", roomCode });
+      await waitFor(b, isType("room_updated"), "room_updated sur B");
+
+      a.ws.close();
+      await waitClosed(a);
+      await sleep(200);
+      assert(
+        JSON.stringify(server.roomManager.getRoom(roomCode)).includes(userId),
+        "Le joueur doit rester dans la room",
+      );
+      b.ws.close();
+      await waitClosed(b);
+      await sleep(200);
+      assert(
+        !JSON.stringify(server.roomManager.getRoom(roomCode)).includes(userId),
+        "Dernier onglet fermé : le joueur quitte la room",
+      );
+      host.ws.close();
+    });
+  }),
+
+  // ---------------- Messages envoyés dès l'ouverture ----------------
+
+  test("ws: un message envoyé dès l'ouverture n'est pas perdu", async () => {
     await withServer(async (server) => {
       const userId = uniqueUserId();
       await connect(server, userId, { dead: true });

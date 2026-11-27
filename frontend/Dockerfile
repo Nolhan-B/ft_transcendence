@@ -33,15 +33,8 @@ RUN npm run build
 
 FROM nginx:1.27-alpine AS prod
 
-# Configure Nginx with SPA fallback routing
-RUN printf 'server {\n\
-    listen 80;\n\
-    location / {\n\
-        root /usr/share/nginx/html;\n\
-        index index.html;\n\
-        try_files $uri $uri/ /index.html;\n\
-    }\n\
-}\n' > /etc/nginx/conf.d/default.conf
+# Nginx: SPA fallback routing and the Content-Security-Policy
+COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
 
 COPY --from=builder /app/frontend/dist /usr/share/nginx/html
 

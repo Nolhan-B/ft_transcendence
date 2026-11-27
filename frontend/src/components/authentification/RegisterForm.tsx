@@ -65,6 +65,7 @@ export function RegisterForm() {
             placeholder="Password"
             required
             minLength={8}
+            maxLength={72}
             className="input input-md validator w-full"
             onChange={(e) => setPassword(e.target.value)}
           />

@@ -8,7 +8,15 @@ import type { WebSocket } from "ws";
 import type { FriendSocketEvent, SendDirectMessagePayload } from "shared";
 import prismaPlugin from "./plugins/prisma.js";
 import messageHistoryRoutes from "./routes/message_history.js";
-import { setupMetrics } from "shared";
+import {
+  isSessionCurrent,
+  jwtSecretOrExit,
+  setupMetrics,
+  setupOriginCheck,
+  isSameOrigin,
+  createMessageLimiter,
+} from "shared";
+import type { SessionPayload } from "shared";
 
 if (fs.existsSync("/run/secrets/db_url")) {
   process.env.DATABASE_URL = fs
@@ -66,16 +74,40 @@ fastify.setErrorHandler(
 );
 
 setupMetrics(fastify, "chat-services");
+// Writes sent from another website are refused (security audit F-25)
+setupOriginCheck(fastify);
 
-export const connectedClients = new Map<string, WebSocket>();
+// Every open socket of a user: one per tab or device
+export const connectedClients = new Map<string, Set<WebSocket>>();
+
+// Sends to every open socket of the user, returns true if one got it
+function sendToUser(userId: string, data: string): boolean {
+  let delivered = false;
+  for (const ws of connectedClients.get(userId) ?? []) {
+    if (ws.readyState === 1) {
+      ws.send(data);
+      delivered = true;
+    }
+  }
+  return delivered;
+}
 
 fastify.register(cookie);
+// The JWT key: without it in production the service refuses to start,
+// instead of signing with a key everybody knows
+function jwtSecret(): string {
+  return jwtSecretOrExit(process.env.JWT_SECRET);
+}
+
 fastify.register(jwt, {
-  secret: process.env.JWT_SECRET ?? "dev-secret",
+  secret: jwtSecret(),
   cookie: {
     cookieName: "access_token",
     signed: false,
   },
+  // Revoked sessions are refused (security audit F-07)
+  trusted: (_request, decoded) =>
+    isSessionCurrent(fastify.prisma, decoded as SessionPayload),
 });
 // Trames bornees : un message fait 2000 caracteres au plus (audit F-22)
 fastify.register(websocket, { options: { maxPayload: 16 * 1024 } });
@@ -112,17 +144,21 @@ fastify.post("/internal/events", async (request, reply) => {
     return reply.code(400).send({ error: "Invalid internal event payload" });
   }
 
-  const recipientSocket = connectedClients.get(body.targetUserId);
-  if (recipientSocket && recipientSocket.readyState === 1) {
-    recipientSocket.send(JSON.stringify(body.event));
-    return reply.send({ delivered: true });
-  }
-
-  return reply.send({ delivered: false });
+  const delivered = sendToUser(body.targetUserId, JSON.stringify(body.event));
+  return reply.send({ delivered });
 });
 
 fastify.register(async function (fastify) {
-  fastify.get("/ws", { websocket: true }, (socket: WebSocket, req) => {
+  fastify.get("/ws", { websocket: true }, async (socket: WebSocket, req) => {
+    // Handshake from a page of another website: refused (audit F-23)
+    if (!isSameOrigin(req.headers.origin, req.headers.host)) {
+      socket.close(1008, "Cross-site connection refused");
+      return;
+    }
+    // Flood protection on this socket: every message is written to the
+    // database, so bursts of 20, then 5 per second (audit F-10)
+    const allowMessage = createMessageLimiter(5, 20);
+
     const query = req.query as { token?: string };
     const token = query?.token ?? req.cookies?.access_token;
 
@@ -133,14 +169,40 @@ fastify.register(async function (fastify) {
     }
 
     let userId: string;
+    let tokenVersion: number | undefined;
     try {
-      const decoded = fastify.jwt.verify<{ id: string }>(token);
+      const decoded = fastify.jwt.verify<{ id: string; v?: number }>(token);
       userId = decoded.id;
+      tokenVersion = decoded.v;
     } catch (err) {
       fastify.log.warn({ err }, "WS connection rejected: invalid token");
       socket.close(1008, "Invalid token");
       return;
     }
+
+    // Messages arriving during the session check are kept, then replayed
+    const early: Buffer[] = [];
+    const keep = (message: Buffer) => early.push(message);
+    socket.on("message", keep);
+
+    // Revoked session (logout, password or 2FA change): refused like an
+    // invalid token (security audit F-07)
+    let current = false;
+    try {
+      current = await isSessionCurrent(fastify.prisma, {
+        id: userId,
+        v: tokenVersion,
+      });
+    } catch (err) {
+      fastify.log.error({ err, userId }, "Session check failed");
+    }
+    if (!current) {
+      socket.close(1008, "Invalid token");
+      return;
+    }
+
+    // The client may have left during the check: its close is already past
+    if (socket.readyState !== 1) return;
 
     // Prevent unhandled 'error' events on abrupt client disconnects from crashing Node
     socket.on("error", (err) => {
@@ -148,7 +210,8 @@ fastify.register(async function (fastify) {
     });
 
     fastify.log.info(`User authenticated on WS: ${userId}`);
-    connectedClients.set(userId, socket);
+    if (!connectedClients.has(userId)) connectedClients.set(userId, new Set());
+    connectedClients.get(userId)!.add(socket);
 
     // Deliver offline queued messages upon connection
     (async () => {
@@ -207,8 +270,16 @@ fastify.register(async function (fastify) {
           );
       });
     });
+    socket.off("message", keep);
+    for (const message of early) socket.emit("message", message);
 
     async function handleMessage(rawMessage: Buffer): Promise<void> {
+      if (!allowMessage()) {
+        socket.send(
+          JSON.stringify({ type: "error", message: "Too many messages" }),
+        );
+        return;
+      }
       let parsed: unknown;
       try {
         parsed = JSON.parse(rawMessage.toString());
@@ -328,9 +399,9 @@ fastify.register(async function (fastify) {
           return;
         }
 
-        const recipientSocket = connectedClients.get(payload.receiverId);
-        const isRecipientOnline =
-          recipientSocket !== undefined && recipientSocket.readyState === 1;
+        const isRecipientOnline = [
+          ...(connectedClients.get(payload.receiverId) ?? []),
+        ].some((ws) => ws.readyState === 1);
 
         const savedMessage = await fastify.prisma.directMessage.create({
           data: {
@@ -363,13 +434,9 @@ fastify.register(async function (fastify) {
           createdAt: savedMessage.createdAt.toISOString(),
         });
 
-        if (isRecipientOnline && recipientSocket) {
-          recipientSocket.send(outboundString);
-        }
-
-        if (socket.readyState === 1) {
-          socket.send(outboundString);
-        }
+        sendToUser(payload.receiverId, outboundString);
+        // Every tab of the sender shows the message too
+        sendToUser(userId, outboundString);
       } catch (err: unknown) {
         const prismaError = err as { code?: string };
         // Handle foreign key violation when sender or recipient no longer exists
@@ -387,9 +454,9 @@ fastify.register(async function (fastify) {
     }
 
     socket.on("close", () => {
-      if (connectedClients.get(userId) === socket) {
-        connectedClients.delete(userId);
-      }
+      const sockets = connectedClients.get(userId);
+      sockets?.delete(socket);
+      if (sockets?.size === 0) connectedClients.delete(userId);
       fastify.log.info(`User disconnected: ${userId}`);
     });
   });
